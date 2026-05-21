@@ -1,0 +1,337 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* === Card (design_02 gradient + heavy shadow) ===================== */
+  .panel-card {
+    background: linear-gradient(180deg, var(--color-surface-card-top), var(--color-surface-card));
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-card--accent {
+    border-color: rgba(168, 85, 247, 0.55);
+    box-shadow: var(--shadow-lg), 0 0 24px rgba(168, 85, 247, 0.15);
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px var(--space-card-padding);
+    border-bottom: 1px solid var(--color-border-default);
+  }
+  .panel-title {
+    font-size: var(--font-card-title-size);
+    line-height: var(--font-card-title-lh);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    letter-spacing: -0.01em;
+  }
+  .panel-body {
+    padding: var(--space-card-padding);
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .panel-meta {
+    font-size: var(--font-meta-size);
+    line-height: var(--font-meta-lh);
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* === Sidebar (style_guide §4.2) =================================== */
+  .app-sidebar {
+    width: var(--space-sidebar-width);
+    background: var(--color-surface-sidebar);
+    border-right: 1px solid var(--color-border-default);
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 6px 16px;
+    border-bottom: 1px solid var(--color-border-default);
+  }
+  .sidebar-brand__logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--color-brand-gradient);
+    color: white;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.02em;
+    box-shadow: 0 0 22px rgba(168, 85, 247, 0.35);
+  }
+  .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar-section__label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding: 4px 10px 8px;
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-size: var(--font-body-size);
+    line-height: var(--font-body-lh);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--motion-fast) var(--easing-standard),
+                color var(--motion-fast) var(--easing-standard);
+    border: 1px solid transparent;
+  }
+  .sidebar-item:hover {
+    background: rgba(168, 85, 247, 0.07);
+    color: var(--color-text-primary);
+  }
+  .sidebar-item--active {
+    background: rgba(168, 85, 247, 0.16);
+    color: #DDB6FF;
+    border-color: rgba(168, 85, 247, 0.35);
+    box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.18), 0 0 18px rgba(168, 85, 247, 0.18);
+  }
+  .sidebar-item--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .sidebar-item__icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+  }
+  .sidebar-item__count {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--color-text-muted);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* === Chip / tag =================================================== */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-default);
+    background: var(--color-surface-overlay);
+    color: var(--color-text-secondary);
+    font-size: var(--font-meta-size);
+    line-height: var(--font-meta-lh);
+    transition: background var(--motion-fast) var(--easing-standard),
+                border-color var(--motion-fast) var(--easing-standard);
+    white-space: nowrap;
+  }
+  .chip:hover {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.5);
+    color: var(--color-text-primary);
+  }
+  .chip--active {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: var(--color-brand-primary);
+    color: #DDB6FF;
+  }
+  .chip--info {
+    background: rgba(74, 168, 255, 0.12);
+    border-color: rgba(74, 168, 255, 0.45);
+    color: #BCDEFF;
+  }
+  .chip--success {
+    background: rgba(74, 222, 128, 0.14);
+    border-color: rgba(74, 222, 128, 0.45);
+    color: #BBF7D0;
+  }
+
+  /* === Badge ======================================================== */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: var(--font-meta-size);
+    font-weight: 600;
+    line-height: var(--font-meta-lh);
+  }
+  .badge--success    { background: var(--color-status-success); color: var(--color-status-success-fg); }
+  .badge--warning    { background: var(--color-status-warning); color: var(--color-status-warning-fg); }
+  .badge--error      { background: var(--color-status-error);   color: var(--color-status-error-fg); }
+  .badge--info       { background: var(--color-status-info);    color: var(--color-status-info-fg); }
+  .badge--neutral    { background: var(--color-surface-overlay);color: var(--color-text-secondary); }
+  .badge--cytotoxic-strong   { background: var(--color-cytotoxic-strong);   color: var(--color-text-inverse); }
+  .badge--cytotoxic-moderate { background: var(--color-cytotoxic-moderate); color: var(--color-text-inverse); }
+
+  /* === Buttons ====================================================== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-default);
+    background: var(--color-surface-overlay);
+    color: var(--color-text-primary);
+    font-size: var(--font-body-size);
+    font-weight: 500;
+    line-height: 1.4;
+    transition: background var(--motion-fast) var(--easing-standard),
+                border-color var(--motion-fast) var(--easing-standard);
+  }
+  .btn:hover {
+    background: rgba(168, 85, 247, 0.14);
+    border-color: rgba(168, 85, 247, 0.45);
+  }
+  .btn--primary {
+    background: var(--color-brand-primary);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 0 18px rgba(168, 85, 247, 0.25);
+  }
+  .btn--primary:hover {
+    background: var(--color-brand-primary-hover);
+  }
+  .btn--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-text-secondary);
+  }
+  .btn--ghost:hover {
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* === Link =========================================================== */
+  .a-link {
+    color: #C084FC;
+    text-decoration: underline;
+    text-decoration-color: rgba(192, 132, 252, 0.45);
+    text-underline-offset: 2px;
+    transition: text-decoration-color var(--motion-fast);
+  }
+  .a-link:hover {
+    text-decoration-color: var(--color-brand-primary);
+  }
+
+  /* === KPI tile (design_02 large purple numeric) ==================== */
+  .kpi-tile {
+    background: linear-gradient(180deg, var(--color-surface-card-top), var(--color-surface-card));
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    transition: border-color var(--motion-fast) var(--easing-standard);
+  }
+  .kpi-tile:hover {
+    border-color: rgba(168, 85, 247, 0.4);
+  }
+  .kpi-tile__label {
+    font-size: var(--font-meta-size);
+    line-height: var(--font-meta-lh);
+    color: var(--color-text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .kpi-tile__value {
+    font-size: 32px;
+    line-height: 38px;
+    font-weight: 700;
+    color: var(--color-brand-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
+  }
+  .kpi-tile__hint {
+    font-size: var(--font-meta-size);
+    color: var(--color-text-muted);
+  }
+
+  /* === Scientific table (Bloomberg terminal feel) =================== */
+  .sci-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .sci-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--color-surface-card-top);
+    color: var(--color-text-muted);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border-default);
+    text-align: left;
+    user-select: none;
+  }
+  .sci-table tbody tr {
+    border-bottom: 1px solid rgba(36, 50, 70, 0.5);
+    transition: background var(--motion-fast) var(--easing-standard);
+  }
+  .sci-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.012);
+  }
+  .sci-table tbody tr:hover {
+    background: rgba(168, 85, 247, 0.08);
+  }
+  .sci-table td {
+    padding: 9px 14px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-body-size);
+  }
+
+  /* === Section header divider ======================================= */
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 6px;
+    margin: var(--space-section-gap) 0 var(--space-3);
+    border-bottom: 1px solid var(--color-border-default);
+  }
+}
+
+/* Plotly modebar transparency on dark */
+.js-plotly-plot .modebar {
+  background: transparent !important;
+}

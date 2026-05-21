@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dbET6 Dashboard — Design 02</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">dB</div>
+    <nav>
+      <a class="active">Overview</a>
+      <a>Phenotype</a>
+      <a>Network</a>
+      <a>Mechanism</a>
+      <a>Raw Data</a>
+    </nav>
+  </aside>
+
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <p class="breadcrumb">Projects › PROTAC Degraders › dbET6</p>
+        <h1>dbET6 <span>PROTAC Degrader</span></h1>
+        <p>Epigenetic Modulator · Targets: BRD2 / BRD3 / BRD4</p>
+      </div>
+      <div class="actions">
+        <button>Share</button>
+        <button>Export</button>
+      </div>
+    </header>
+
+    <section class="kpis">
+      <article><p>Phenotype Shift</p><h2>+72%</h2><small>vs. vehicle control</small></article>
+      <article><p>Cell Viability</p><h2 class="green">84%</h2><small>at 10 μM / 48 h</small></article>
+      <article><p>BRD2 Affinity</p><h2>High</h2><small>IC50: 0.23 μM</small></article>
+      <article><p>Confidence Score</p><h2 class="blue">0.91</h2><small>Overall prediction</small></article>
+    </section>
+
+    <section class="tabs">
+      <button class="active">Overview</button>
+      <button>Phenotype</button>
+      <button>Network</button>
+      <button>Mechanism</button>
+      <button>Transcriptomics</button>
+      <button>Experimental Details</button>
+    </section>
+
+    <section class="grid">
+      <article class="card graph">
+        <div class="card-head">
+          <h3>Protein–Protein Interaction Network</h3>
+          <input placeholder="Search protein..." />
+        </div>
+        <div class="network">
+          <div class="node big">BRD2</div>
+          <div class="node n1">BRD4</div>
+          <div class="node n2">HDAC1</div>
+          <div class="node n3">HDAC2</div>
+          <div class="node n4">SMARCA2</div>
+          <div class="node n5">ADACA</div>
+          <svg>
+            <line x1="50%" y1="50%" x2="70%" y2="35%" />
+            <line x1="50%" y1="50%" x2="28%" y2="43%" />
+            <line x1="50%" y1="50%" x2="64%" y2="66%" />
+            <line x1="50%" y1="50%" x2="19%" y2="28%" />
+          </svg>
+        </div>
+        <div class="legend">
+          <span><i class="purple"></i>Primary Target</span>
+          <span><i class="blue-dot"></i>Epigenetic Regulator</span>
+          <span><i class="green-dot"></i>Chromatin Remodeler</span>
+        </div>
+      </article>
+
+      <article class="card video">
+        <div class="card-head"><h3>Time-lapse Imaging</h3><strong>48 h</strong></div>
+        <div class="image"></div>
+        <div class="timeline"><span></span></div>
+        <div class="events">
+          <span>Nuclear deformation</span>
+          <span>Membrane blebbing</span>
+          <span>Cell fragmentation</span>
+        </div>
+      </article>
+
+      <aside class="panel">
+        <article class="card"><h3>Compound Details</h3><dl><dt>Dose</dt><dd>10 μM / 48 h</dd><dt>HY Code</dt><dd>HY-11985</dd><dt>SMILES</dt><dd>O=C(NCCT2...)</dd></dl></article>
+        <article class="card"><h3>Target Profile</h3><p>BRD2, BRD3, BRD4</p><p>Epigenetic / Chromatin regulators</p></article>
+        <article class="card"><h3>Localization Annotations</h3><div class="bars"></div></article>
+      </aside>
+
+      <article class="card landscape"><h3>3D Phenotypic Landscape</h3><div class="scatter"></div></article>
+      <article class="card enrichment"><h3>Pathway Enrichment</h3><div class="bar w90"></div><div class="bar w80"></div><div class="bar w70"></div><div class="bar w55"></div></article>
+    </section>
+  </main>
+</body>
+</html>

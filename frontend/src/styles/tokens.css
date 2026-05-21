@@ -1,0 +1,149 @@
+/*
+ * Design tokens — Scientific Intelligence UI (design_02 + style_guide.md, 2026-05-21).
+ *
+ * Naming: `category.role.variant` → CSS var `--<category>-<role>-<variant>`.
+ * Component code must reference these via Tailwind (e.g. bg-surface-base) or
+ * var() — never inline hex/px (PRD §0 design-volatility containment).
+ */
+
+:root {
+  /* === Surfaces (deep navy, design_02) ============================== */
+  --color-surface-base:      #070B14;     /* page background */
+  --color-surface-elevated:  #0D1320;     /* sticky header / footer */
+  --color-surface-card:      #101826;     /* card primary */
+  --color-surface-card-top:  #131D2C;     /* card gradient top */
+  --color-surface-overlay:   #1A2438;     /* hover / pressed */
+  --color-surface-sidebar:   #080D18;     /* sidebar bg (darker than base) */
+  --color-surface-soft:      #0B121F;     /* subtle alt */
+
+  /* Borders */
+  --color-border-default:    #243246;
+  --color-border-strong:     #324663;
+  --color-border-active:     #7C3AED;
+  --color-border-accent:     var(--color-brand-primary);
+
+  /* === Text ========================================================== */
+  --color-text-primary:      #EDF3FF;
+  --color-text-secondary:    #B6C0D6;
+  --color-text-muted:        #8F9BB3;
+  --color-text-disabled:     #5C677B;
+  --color-text-inverse:      #070B14;
+  --color-text-on-brand:     #F3E8FF;    /* high-contrast text on purple bg */
+
+  /* === Brand (purple primary) ======================================= */
+  --color-brand-primary:        #A855F7;
+  --color-brand-primary-hover:  #B975FF;
+  --color-brand-primary-pressed:#8E33EA;
+  --color-brand-secondary:      #4AA8FF;
+  --color-brand-glow:           rgba(168, 85, 247, 0.55);
+  --color-brand-gradient: linear-gradient(135deg, #4AA8FF 0%, #A855F7 60%, #F472B6 100%);
+
+  /* === Semantic status (PRD + style_guide) ========================== */
+  --color-status-success:   #4ADE80;   /* activated / pass */
+  --color-status-warning:   #FB923C;   /* warning */
+  --color-status-error:     #F87171;   /* suppressed / fail */
+  --color-status-info:      #4AA8FF;   /* informational */
+  --color-status-neutral:   #8F9BB3;
+
+  --color-status-success-fg: #052E16;
+  --color-status-warning-fg: #2A1604;
+  --color-status-error-fg:   #2A0808;
+  --color-status-info-fg:    #061B2E;
+  --color-status-neutral-fg: #0B121F;
+
+  /* PPI semantic node roles */
+  --color-role-target:      var(--color-brand-primary);   /* purple */
+  --color-role-activated:   var(--color-status-success);  /* green */
+  --color-role-suppressed:  var(--color-status-error);    /* red */
+  --color-role-info:        var(--color-status-info);     /* blue */
+  --color-role-unknown:     var(--color-status-neutral);  /* gray */
+
+  /* Cytotoxic (Plate summary) */
+  --color-cytotoxic-strong:   #F472B6;
+  --color-cytotoxic-moderate: #C084FC;
+  --color-cytotoxic-none:     var(--color-text-muted);
+
+  /* === Typography (PRD §13 + style_guide §6) ======================== */
+  --font-family-sans: "Inter", "IBM Plex Sans", "Geist", "Pretendard", system-ui, sans-serif;
+  --font-family-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* style_guide scale: Hero 32 · Section 24 · Card 18 · Body 14 · Meta 12 */
+  --font-heading-hero-size: 32px;
+  --font-heading-hero-lh:   42px;
+  --font-heading-section-size: 24px;
+  --font-heading-section-lh:   34px;
+  --font-card-title-size:   18px;
+  --font-card-title-lh:     26px;
+  --font-body-size:         14px;
+  --font-body-lh:           22px;
+  --font-meta-size:         12px;
+  --font-meta-lh:           18px;
+
+  /* === Spacing (4/8/16/24/32/48) ==================================== */
+  --space-1:  4px;     /* xs */
+  --space-2:  8px;     /* sm */
+  --space-3:  12px;
+  --space-4:  16px;    /* md */
+  --space-5:  24px;    /* lg — card padding default */
+  --space-6:  32px;    /* xl — section gap */
+  --space-7:  48px;    /* xxl */
+  --space-8:  64px;
+
+  --space-card-padding: 24px;
+  --space-section-gap:  32px;
+  --space-component-gap: 16px;
+  --space-sidebar-width: 240px;
+
+  /* === Radius ======================================================== */
+  --radius-sm:    6px;
+  --radius-md:    10px;
+  --radius-lg:    14px;       /* default card */
+  --radius-xl:    18px;
+  --radius-pill:  9999px;
+
+  /* === Elevation (heavier on dark) ================================== */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md:  0 6px 18px rgba(0, 0, 0, 0.4);
+  --shadow-lg:  0 10px 30px rgba(0, 0, 0, 0.5);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow-brand: 0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 24px rgba(168, 85, 247, 0.18);
+
+  /* === Motion ======================================================== */
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 250ms;
+  --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body {
+  background: var(--color-surface-base);
+  background-image: radial-gradient(circle at 20% -10%, #101A2B 0%, #060914 55%);
+  background-attachment: fixed;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-body-size);
+  line-height: var(--font-body-lh);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar — very subtle on dark navy */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1A2438; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #243246; }
+
+::selection {
+  background: rgba(168, 85, 247, 0.32);
+  color: var(--color-text-primary);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow-brand);
+  border-radius: var(--radius-sm);
+}

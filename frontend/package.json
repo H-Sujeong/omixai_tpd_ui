@@ -1,0 +1,36 @@
+{
+  "name": "omixai-tpd-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.59.20",
+    "cytoscape": "^3.30.4",
+    "cytoscape-cose-bilkent": "^4.1.0",
+    "plotly.js-dist-min": "^2.35.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-plotly.js": "^2.6.0",
+    "react-router-dom": "^6.27.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.21.5",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/react-plotly.js": "^2.6.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
