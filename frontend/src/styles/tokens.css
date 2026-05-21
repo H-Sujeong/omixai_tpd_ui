@@ -67,6 +67,14 @@
   --color-status-info-fg:    #061B2E;
   --color-status-neutral-fg: #0B121F;
 
+  /* === Localization colormap (Teal→Cyan) ============================
+   * Used by LocalizationCard heatmap; distinct from brand purple so the
+   * dual-channel readout (brand on PPI vs teal on Localization) is
+   * legible. Step 13 (2026-05-21).
+   */
+  --color-loc-low-rgb:  15 110  86;     /* #0F6E56 — teal 600 */
+  --color-loc-high-rgb: 34 211 238;     /* #22D3EE — cyan 400 */
+
   /* PPI semantic node roles */
   --color-role-target:      var(--color-brand-primary);   /* purple */
   --color-role-activated:   var(--color-status-success);  /* green */

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Plot from "react-plotly.js";
 import type { LandscapePanel } from "@/types/api";
 
@@ -9,118 +10,292 @@ interface Props {
 }
 
 /**
- * 3D Target Landscape. Surface from `grid` (RBF interpolated) + community scatter.
- * Selected community is highlighted with a magenta marker; community switches
- * animate via highlightCommunity prop.
+ * Target Landscape — 2D contour by default, 3D surface on toggle.
+ *
+ * Step 13 (2026-05-21) — rewritten to match test_viz pattern:
+ *   - 2D contour is the default mode (easier to read, points more visible)
+ *   - 3D surface available via toggle button
+ *   - Target community marked with amber cross ✚ (#F59E0B / #92400E)
+ *   - Other communities = grey dots
+ *   - Highlighted community = orange diamond
+ *
+ * The plot panel uses a LIGHT background (#FAFAF7) inside the dark card
+ * — improves scientific data legibility (per user request 2026-05-21).
  */
+
+const COLOR = {
+  // 2D
+  surfaceLow:  "#185FA5",   // blue (negative PCC)
+  surfaceMid:  "#FFFFFF",   // white (zero)
+  surfaceHigh: "#A32D2D",   // red (positive PCC)
+  // points
+  otherDot:    "rgba(60,60,60,0.7)",
+  otherEdge:   "#FFFFFF",
+  targetFill:  "#F59E0B",
+  targetEdge:  "#92400E",
+  // highlight
+  hlFill:      "#F97316",
+  hlEdge:      "#7C2D12",
+} as const;
+
 export function Landscape({ landscape, highlightCommunity, onCommunityClick, height = 380 }: Props) {
-  const traces: any[] = [];
+  const [mode, setMode] = useState<"2d" | "3d">("2d");
 
-  if (landscape.grid) {
-    traces.push({
-      type: "surface",
-      x: landscape.grid.xi,
-      y: landscape.grid.yi,
-      z: landscape.grid.z,
-      colorscale: [
-        [0, "#1E3A8A"],
-        [0.5, "#1F2937"],
-        [1, "#A855F7"],
-      ],
-      opacity: 0.85,
-      showscale: true,
-      contours: {
-        z: { show: true, usecolormap: true, project: { z: true } },
-      },
-      colorbar: { title: { text: "avg(PCC)" }, len: 0.6 },
-    });
-  }
+  const scatter = landscape.scatter;
+  const scTarget = scatter.filter((p) => p.is_target);
+  const scOther = scatter.filter((p) => !p.is_target);
 
-  // All community dots (smaller)
-  traces.push({
-    type: "scatter3d",
-    mode: "markers",
-    x: landscape.scatter.map((s) => s.x),
-    y: landscape.scatter.map((s) => s.y),
-    z: landscape.scatter.map((s) => s.z),
-    text: landscape.scatter.map((s) => `community ${s.community_id} · n=${s.size}`),
-    hovertemplate: "%{text}<br>x=%{x:.2f} y=%{y:.2f} z=%{z:.3f}<extra></extra>",
-    marker: {
-      size: landscape.scatter.map((s) => Math.max(4, Math.min(14, Math.sqrt(s.size) * 1.5))),
-      color: landscape.scatter.map((s) => (s.is_target ? "#A855F7" : "#E6EDF3")),
-      opacity: landscape.scatter.map((s) => (s.is_target ? 1 : 0.65)),
-      line: { width: 0 },
-    },
-    customdata: landscape.scatter.map((s) => s.community_id),
-    name: "communities",
-  });
+  const traces: any[] = mode === "2d" ? build2D() : build3D();
 
-  // Highlight ring
-  if (highlightCommunity !== null) {
-    const hl = landscape.scatter.find((s) => s.community_id === highlightCommunity);
-    if (hl) {
-      traces.push({
-        type: "scatter3d",
-        mode: "markers+text",
-        x: [hl.x],
-        y: [hl.y],
-        z: [hl.z],
-        text: [`▾ #${hl.community_id}`],
-        textposition: "top center",
+  function build2D(): any[] {
+    const t: any[] = [];
+
+    // Filled contour
+    if (landscape.grid) {
+      t.push({
+        type: "contour",
+        x: landscape.grid.xi,
+        y: landscape.grid.yi,
+        z: landscape.grid.z,
+        colorscale: [
+          [0, COLOR.surfaceLow],
+          [0.5, COLOR.surfaceMid],
+          [1, COLOR.surfaceHigh],
+        ],
+        zmin: -0.5,
+        zmax: 0.5,
+        contours: { coloring: "fill", showlines: false },
+        colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 12 },
+        hoverinfo: "none",
+      });
+    }
+
+    // Other communities
+    if (scOther.length > 0) {
+      t.push({
+        type: "scatter",
+        mode: "markers",
+        x: scOther.map((p) => p.x),
+        y: scOther.map((p) => p.y),
+        customdata: scOther.map((p) => p.community_id),
+        text: scOther.map((p) => `community ${p.community_id} · n=${p.size}`),
         marker: {
-          size: 18,
-          color: "#F472B6",
-          symbol: "diamond",
-          line: { color: "#FFFFFF", width: 2 },
+          size: scOther.map((p) => Math.max(7, Math.min(14, Math.sqrt(p.size) * 1.5))),
+          symbol: "circle",
+          color: COLOR.otherDot,
+          line: { width: 1.5, color: COLOR.otherEdge },
         },
-        hoverinfo: "skip",
-        name: "current community",
+        hovertemplate: "<b>%{text}</b><br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
         showlegend: false,
       });
     }
+
+    // Target community: amber cross
+    if (scTarget.length > 0) {
+      t.push({
+        type: "scatter",
+        mode: "markers+text",
+        x: scTarget.map((p) => p.x),
+        y: scTarget.map((p) => p.y),
+        customdata: scTarget.map((p) => p.community_id),
+        text: scTarget.map(() => "✚"),
+        textposition: "top center",
+        textfont: { size: 16, color: COLOR.targetFill },
+        marker: {
+          size: 16,
+          symbol: "cross",
+          color: COLOR.targetFill,
+          line: { width: 2.5, color: COLOR.targetEdge },
+        },
+        hovertemplate: "<b>★ target community %{customdata}</b><br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
+        showlegend: false,
+      });
+    }
+
+    // Highlight ring (current selection)
+    if (highlightCommunity !== null) {
+      const hl = scatter.find((p) => p.community_id === highlightCommunity);
+      if (hl) {
+        t.push({
+          type: "scatter",
+          mode: "markers",
+          x: [hl.x],
+          y: [hl.y],
+          marker: {
+            size: 22,
+            symbol: "circle-open",
+            color: COLOR.hlFill,
+            line: { width: 3, color: COLOR.hlEdge },
+          },
+          hoverinfo: "skip",
+          showlegend: false,
+        });
+      }
+    }
+
+    return t;
   }
 
-  // Target reference point (PRD landscape always shows the target_point as +)
-  if (landscape.target_point) {
-    traces.push({
-      type: "scatter3d",
-      mode: "markers",
-      x: [landscape.target_point.x],
-      y: [landscape.target_point.y],
-      z: [landscape.target_point.z],
-      marker: { size: 9, color: "#FCD34D", symbol: "cross" },
-      hovertemplate: "target<br>x=%{x:.2f} y=%{y:.2f} z=%{z:.3f}<extra></extra>",
-      name: "target",
-      showlegend: false,
-    });
+  function build3D(): any[] {
+    const t: any[] = [];
+    if (landscape.grid) {
+      t.push({
+        type: "surface",
+        x: landscape.grid.xi,
+        y: landscape.grid.yi,
+        z: landscape.grid.z,
+        colorscale: [
+          [0, COLOR.surfaceLow],
+          [0.5, COLOR.surfaceMid],
+          [1, COLOR.surfaceHigh],
+        ],
+        cmin: -0.5,
+        cmax: 0.5,
+        opacity: 0.88,
+        contours: { x: { show: false }, y: { show: false }, z: { show: false } },
+        colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 12 },
+        hoverinfo: "none",
+      });
+    }
+    if (scOther.length > 0) {
+      t.push({
+        type: "scatter3d",
+        mode: "markers",
+        x: scOther.map((p) => p.x),
+        y: scOther.map((p) => p.y),
+        z: scOther.map((p) => p.z),
+        customdata: scOther.map((p) => p.community_id),
+        text: scOther.map((p) => `community ${p.community_id} · n=${p.size}`),
+        marker: {
+          size: 5,
+          color: COLOR.otherDot,
+          line: { width: 1.5, color: COLOR.otherEdge },
+        },
+        hovertemplate: "<b>%{text}</b><br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
+        showlegend: false,
+      });
+    }
+    if (scTarget.length > 0) {
+      t.push({
+        type: "scatter3d",
+        mode: "markers+text",
+        x: scTarget.map((p) => p.x),
+        y: scTarget.map((p) => p.y),
+        z: scTarget.map((p) => p.z),
+        customdata: scTarget.map((p) => p.community_id),
+        text: scTarget.map(() => "+"),
+        textfont: { color: COLOR.targetFill, size: 20, family: "Arial Black" },
+        marker: {
+          size: 10,
+          color: COLOR.targetFill,
+          symbol: "cross",
+          line: { width: 2, color: COLOR.targetEdge },
+        },
+        hovertemplate: "<b>★ target community %{customdata}</b><br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
+        showlegend: false,
+      });
+    }
+    return t;
   }
+
+  const layout: any =
+    mode === "2d"
+      ? {
+          margin: { l: 50, r: 80, t: 16, b: 50 },
+          paper_bgcolor: "#FAFAF7",
+          plot_bgcolor: "#FAFAF7",
+          height,
+          font: { family: "Inter, system-ui, sans-serif", size: 11, color: "#2C2C2A" },
+          xaxis: {
+            title: { text: landscape.axes.x ?? "Distance from anchor", font: { size: 11 } },
+            gridcolor: "rgba(0,0,0,0.06)",
+            zeroline: false,
+            autorange: "reversed" as const,
+          },
+          yaxis: {
+            title: { text: landscape.axes.y ?? "−log10(p)", font: { size: 11 } },
+            gridcolor: "rgba(0,0,0,0.06)",
+            zeroline: false,
+          },
+        }
+      : {
+          margin: { l: 0, r: 0, b: 0, t: 16 },
+          paper_bgcolor: "#FAFAF7",
+          height,
+          font: { family: "Inter, system-ui, sans-serif", size: 11, color: "#2C2C2A" },
+          scene: {
+            xaxis: {
+              title: { text: landscape.axes.x ?? "x", font: { size: 10 } },
+              autorange: "reversed" as const,
+              gridcolor: "#D3D1C7",
+              backgroundcolor: "rgba(240,240,240,0.25)",
+              showbackground: true,
+            },
+            yaxis: {
+              title: { text: landscape.axes.y ?? "y", font: { size: 10 } },
+              gridcolor: "#D3D1C7",
+              backgroundcolor: "rgba(240,240,240,0.25)",
+              showbackground: true,
+            },
+            zaxis: {
+              title: { text: landscape.axes.z ?? "z", font: { size: 10 } },
+              range: [-0.5, 0.5],
+              gridcolor: "#D3D1C7",
+              backgroundcolor: "rgba(240,240,240,0.25)",
+              showbackground: true,
+            },
+            camera: { eye: { x: 1.5, y: -1.5, z: 0.9 } },
+            aspectmode: "manual" as const,
+            aspectratio: { x: 1.2, y: 1, z: 0.8 },
+          },
+        };
 
   return (
-    <Plot
-      data={traces}
-      layout={{
-        margin: { l: 0, r: 0, b: 0, t: 10 },
-        paper_bgcolor: "transparent",
-        plot_bgcolor: "transparent",
-        height,
-        font: { family: "Inter, IBM Plex Sans, Pretendard, sans-serif", size: 11, color: "#B1BAC4" },
-        scene: {
-          xaxis: { title: { text: landscape.axes.x ?? "x" }, gridcolor: "rgba(255,255,255,0.08)", backgroundcolor: "rgba(0,0,0,0)", zerolinecolor: "rgba(255,255,255,0.18)" },
-          yaxis: { title: { text: landscape.axes.y ?? "y" }, gridcolor: "rgba(255,255,255,0.08)", backgroundcolor: "rgba(0,0,0,0)", zerolinecolor: "rgba(255,255,255,0.18)" },
-          zaxis: { title: { text: landscape.axes.z ?? "z" }, gridcolor: "rgba(255,255,255,0.08)", backgroundcolor: "rgba(0,0,0,0)", zerolinecolor: "rgba(255,255,255,0.18)" },
-        },
-      }}
-      config={{
-        displaylogo: false,
-        responsive: true,
-      }}
-      style={{ width: "100%" }}
-      onClick={(evt) => {
-        if (!onCommunityClick) return;
-        const p = evt.points?.[0] as any;
-        const cid = p?.customdata;
-        if (typeof cid === "number") onCommunityClick(cid);
-      }}
-    />
+    <div className="relative w-full">
+      {/* Toggle button — sits at top-right of plot, above any controls */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 rounded-md overflow-hidden border border-line bg-surface-elevated">
+        <button
+          type="button"
+          onClick={() => setMode("2d")}
+          className={`px-2.5 py-1 text-meta transition-colors duration-fast ${
+            mode === "2d"
+              ? "bg-brand-primary text-white"
+              : "text-ink-secondary hover:text-ink-primary"
+          }`}
+          aria-pressed={mode === "2d"}
+        >
+          2D
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("3d")}
+          className={`px-2.5 py-1 text-meta transition-colors duration-fast ${
+            mode === "3d"
+              ? "bg-brand-primary text-white"
+              : "text-ink-secondary hover:text-ink-primary"
+          }`}
+          aria-pressed={mode === "3d"}
+        >
+          3D
+        </button>
+      </div>
+
+      <Plot
+        data={traces}
+        layout={layout}
+        config={{
+          displaylogo: false,
+          responsive: true,
+          modeBarButtonsToRemove: ["toImage", "sendDataToCloud", "lasso2d", "select2d"],
+        }}
+        style={{ width: "100%", borderRadius: 6, overflow: "hidden" }}
+        onClick={(evt) => {
+          if (!onCommunityClick) return;
+          const p = evt.points?.[0] as any;
+          const cid = p?.customdata;
+          if (typeof cid === "number") onCommunityClick(cid);
+        }}
+      />
+    </div>
   );
 }

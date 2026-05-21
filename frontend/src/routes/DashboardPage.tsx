@@ -6,15 +6,12 @@ import { PanelCard } from "@/components/PanelCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TopbarMetaRow } from "@/components/TopbarMetaRow";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
-import { PpiLegend } from "@/features/ppi-graph/PpiLegend";
 import { findRelatedCommunityFromEdge } from "@/features/ppi-graph/relatedCommunity";
 import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
 import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel";
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
-import { InteractomeSlide } from "@/features/interactome-slide/InteractomeSlide";
 import { KpiStrip } from "@/features/kpi/KpiStrip";
-import { InsightSidebar } from "@/features/insight-sidebar/InsightSidebar";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
 /**
@@ -45,7 +42,8 @@ export function DashboardPage() {
     text: string;
     direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump";
   } | null>(null);
-  const [slideNodeId, setSlideNodeId] = useState<string | null>(null);
+  // Step 13 (2026-05-21): InteractomeSlide removed; node clicks now jump
+  // the user in-place to the relevant community on the current PPI panel.
 
   const dash = useDashboard(plateId, drugId, target);
 
@@ -110,7 +108,6 @@ export function DashboardPage() {
   const handleNodeClick = (nodeId: string) => {
     setSelectedNode(nodeId);
     setSelectedEdgeId(null);
-    setSlideNodeId(nodeId);
     if (!activePpi) return;
     const home = activePpi.current_community_id;
     const candidates = (activePpi.node_community_index[nodeId] ?? []).filter((c) => c !== home);
@@ -258,8 +255,10 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1600px] flex-1">
+      <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1">
         <KpiStrip kpis={d.kpis} />
+
+        <KeyFindingsStrip data={d.insight} />
 
         {bridgeNotice && (
           <BridgeNotice
@@ -269,19 +268,25 @@ export function DashboardPage() {
           />
         )}
 
-        {/* Single-page 3-column grid (design_02 mirror).
-         * Step 12 (2026-05-21).
-         *   Left  (col-span-4):  PPI Network + 3D Landscape, 50/50 vertical split
-         *   Center (col-span-5): Time-lapse, Phenotypic Profiling, Pathway Enrichment
-         *   Right (col-span-3):  Compound, Target, CellLine, References,
-         *                        Localization, About — sticky
+        {/* Single-page 3-column grid (Step 13, 2026-05-21, design_02-aligned).
+         * Left  (col-span-4): PPI Network + Landscape (2D/3D toggle)
+         * Center (col-span-5): Time-lapse (with cell-line popover) + Phenotypic
+         *                      Profiling + Pathway Enrichment
+         * Right (col-span-3): Compound, Target, Reference DBs (with external
+         *                      links), Localization (Teal→Cyan colormap)
+         *
+         * Removed (per user feedback):
+         *   - InteractomeSlide (node click now switches community in-place)
+         *   - Cell Line card (now an inline pill + hover popover above time-lapse)
+         *   - Mechanism of Action / Mechanism Summary panels (consolidated)
+         *   - Biomarkers / Experimental Notes panels
          */}
         <div className="mt-5 grid grid-cols-12 gap-5">
-          {/* === LEFT — Network + Landscape, equal heights =================== */}
+          {/* === LEFT — Network + Landscape =================================== */}
           <div className="col-span-12 xl:col-span-4 flex flex-col gap-5 min-w-0">
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
-              tooltip="노드 클릭 = E12 슬라이드 + community 점프. 엣지 클릭 = 관련된 community를 landscape에서 자동 선택."
+              tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = landscape에서 관련 community 자동 선택."
               accent
               status={d.status_flags.ppi}
               meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
@@ -290,28 +295,26 @@ export function DashboardPage() {
               actions={<span className="chip">{activePpi?.target}</span>}
             >
               {!activePpi ? (
-                <div className="h-[360px] flex items-center justify-center">
+                <div className="h-[440px] flex items-center justify-center">
                   <EmptyBlock label="PPI 데이터 없음" />
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
-                  <PpiGraph
-                    nodes={activePpi.nodes}
-                    edges={activePpi.edges}
-                    selectedNode={selectedNode}
-                    selectedEdgeId={selectedEdgeId}
-                    onNodeClick={handleNodeClick}
-                    onEdgeClick={handleEdgeClick}
-                    height={420}
-                  />
-                  <PpiLegend />
-                </div>
+                <PpiGraph
+                  nodes={activePpi.nodes}
+                  edges={activePpi.edges}
+                  targetName={activePpi.target}
+                  selectedNode={selectedNode}
+                  selectedEdgeId={selectedEdgeId}
+                  onNodeClick={handleNodeClick}
+                  onEdgeClick={handleEdgeClick}
+                  height={440}
+                />
               )}
             </PanelCard>
 
             <PanelCard
-              title="3D Phenotypic Landscape"
-              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 점 클릭 → PPI 재구성."
+              title="Target Landscape"
+              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community."
               status={d.status_flags.landscape}
             >
               {d.landscape ? (
@@ -329,13 +332,14 @@ export function DashboardPage() {
             </PanelCard>
           </div>
 
-          {/* === CENTER — Time-lapse + Profiling + Enrichment ================ */}
+          {/* === CENTER — Time-lapse + Profiling + Enrichment ================= */}
           <div className="col-span-12 xl:col-span-5 flex flex-col gap-5 min-w-0">
             <PanelCard
               title="Time-lapse Imaging"
               tooltip="0–48 h timelapse (4 h cadence)"
               status={d.status_flags.time_lapse}
               meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
+              actions={<CellLineInline cell={d.cell_line} />}
             >
               <TimeLapseViewerPanel data={d.time_lapse} />
             </PanelCard>
@@ -361,32 +365,17 @@ export function DashboardPage() {
             </PanelCard>
           </div>
 
-          {/* === RIGHT — sticky info column (mirrors design_02 panel) ======== */}
+          {/* === RIGHT — sticky info column ================================== */}
           <div className="col-span-12 xl:col-span-3 min-w-0">
             <div className="flex flex-col gap-4 xl:sticky xl:top-[200px]">
               <CompoundDetailsCard d={d} />
               <TargetProfileCard d={d} />
-              <CellLineCard d={d} />
               <ReferenceDatabasesCard d={d} target={target ?? d.target_id} />
               <LocalizationCard d={d} />
-              <MechanismOfActionCard d={d} />
-              <InsightSidebar
-                data={d.insight}
-                target={target ?? d.target_id}
-                communityId={activePpi?.current_community_id ?? null}
-              />
             </div>
           </div>
         </div>
       </div>
-
-      <InteractomeSlide
-        plateId={plateId!}
-        drugId={drugId!}
-        target={target ?? d.target_id}
-        nodeId={slideNodeId}
-        onClose={() => setSlideNodeId(null)}
-      />
     </div>
   );
 }
@@ -437,10 +426,12 @@ function BridgeNotice({
 
 /**
  * Localization Annotations card — heatmap-style row grid.
- * Each row = annotation; `level` (0–5) drives how many cells light up at
- * brand primary; remaining cells use a muted brand-tint. Inspired by
- * design_02's `repeating-linear-gradient` band but driven by data.
- * Step 10 (2026-05-21).
+ * Step 13 (2026-05-21): colormap switched from brand-primary to
+ * Teal→Cyan (--color-loc-low-rgb → --color-loc-high-rgb) so the
+ * localization channel is visually distinct from the PPI brand channel.
+ * Each row's 5 cells light up cumulatively by `level` (0-5); within the
+ * lit range the colors interpolate from teal (low cells) to cyan
+ * (high cells), then the cumulative max controls overall brightness.
  */
 function LocalizationCard({ d }: { d: DashboardResponse }) {
   return (
@@ -455,18 +446,32 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
                 aria-label={`${l.label} level ${l.level} of 5`}
                 className="flex gap-1 shrink-0"
               >
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <span
-                    key={i}
-                    className="block w-4 h-3.5 rounded-sm"
-                    style={{
-                      background:
-                        i < clamped
-                          ? `rgb(var(--color-brand-primary-rgb) / ${0.4 + (i / 5) * 0.55})`
-                          : "rgb(var(--color-brand-primary-rgb) / 0.08)",
-                    }}
-                  />
-                ))}
+                {Array.from({ length: 5 }).map((_, i) => {
+                  // Interpolate the lit cells from teal (low) → cyan (high)
+                  // across the bar; unlit cells use a muted teal at 8%.
+                  if (i >= clamped) {
+                    return (
+                      <span
+                        key={i}
+                        className="block w-4 h-3.5 rounded-sm"
+                        style={{ background: "rgb(var(--color-loc-low-rgb) / 0.08)" }}
+                      />
+                    );
+                  }
+                  const ratio = i / 4; // 0…1 across the 5 cells
+                  return (
+                    <span
+                      key={i}
+                      className="block w-4 h-3.5 rounded-sm"
+                      style={{
+                        background:
+                          ratio < 0.5
+                            ? `rgb(var(--color-loc-low-rgb) / ${0.55 + ratio * 0.6})`
+                            : `rgb(var(--color-loc-high-rgb) / ${0.55 + (ratio - 0.5) * 0.9})`,
+                      }}
+                    />
+                  );
+                })}
               </div>
               <span className="text-body text-ink-secondary">{l.label}</span>
             </li>
@@ -479,7 +484,7 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
           className="flex-1 h-1.5 rounded-full"
           style={{
             background:
-              "linear-gradient(90deg, rgb(var(--color-brand-primary-rgb) / 0.15), rgb(var(--color-brand-primary-rgb) / 0.95))",
+              "linear-gradient(90deg, rgb(var(--color-loc-low-rgb) / 0.85), rgb(var(--color-loc-high-rgb) / 0.95))",
           }}
         />
         <span>High</span>
@@ -489,16 +494,134 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
 }
 
 /**
- * "About this protein — Mechanism of Action" card.
- * Mirrors the design_02 paragraph block under the right column.
+ * "About this protein — Mechanism of Action" card — REMOVED in Step 13.
+ *
+ * Per user feedback (2026-05-21): Mechanism of Action and Mechanism Summary
+ * panels removed. External references (UniProt / Ensembl / HPA) plus
+ * additional MoA-source links now live inside ReferenceDatabasesCard.
  */
-function MechanismOfActionCard({ d }: { d: DashboardResponse }) {
+
+// ---------------------------------------------------------------------------
+// Step 13 (2026-05-21) — new helpers below
+// ---------------------------------------------------------------------------
+
+/**
+ * KeyFindingsStrip — 2×2 grid of "Key findings" pulled from InsightSummary.
+ * Placed directly under the KPI strip so the four most-important
+ * conclusions live at the top of the page in the same horizontal band as
+ * the four KPIs (matching the user's requested visual rhythm).
+ * Renders nothing if there are no findings.
+ */
+function KeyFindingsStrip({ data }: { data: DashboardResponse["insight"] }) {
+  if (!data || data.key_findings.length === 0) return null;
+  const findings = data.key_findings.slice(0, 4);
+
+  const ICON: Record<string, string> = {
+    pulse: "◉",
+    warning: "⚠",
+    info: "ⓘ",
+    target: "◎",
+    "trend-up": "↗",
+    "trend-down": "↘",
+  };
+
+  const SENT_TEXT: Record<string, string> = {
+    positive: "text-status-success",
+    warning: "text-status-warning",
+    negative: "text-status-error",
+    neutral: "text-ink-secondary",
+  };
+
+  const SENT_RING: Record<string, string> = {
+    positive: "ring-status-success/30",
+    warning: "ring-status-warning/30",
+    negative: "ring-status-error/30",
+    neutral: "ring-line",
+  };
+
   return (
-    <PanelCard title="Mechanism of Action">
-      <p className="text-body text-ink-secondary leading-relaxed whitespace-pre-line">
-        {d.moa_summary}
-      </p>
-    </PanelCard>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+      {findings.map((f, i) => (
+        <div
+          key={i}
+          className={`kpi-tile ring-1 ring-inset ${SENT_RING[f.sentiment] ?? SENT_RING.neutral}`}
+        >
+          <div className="flex items-baseline gap-1.5">
+            <span
+              className={`text-card ${SENT_TEXT[f.sentiment] ?? SENT_TEXT.neutral}`}
+              aria-hidden
+            >
+              {ICON[f.icon] ?? "•"}
+            </span>
+            <h4
+              className={`text-body font-semibold ${
+                SENT_TEXT[f.sentiment] ?? SENT_TEXT.neutral
+              }`}
+            >
+              {f.title}
+            </h4>
+          </div>
+          {f.detail && (
+            <p className="text-meta text-ink-secondary leading-relaxed mt-1 line-clamp-3">
+              {f.detail}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * CellLineInline — replaces the old CellLineCard.
+ * Renders a compact pill "U2OS [?]" inside the Time-lapse panel header.
+ * Hovering the [?] reveals a small dark-themed popover with Species /
+ * Tissue / Morphology / Note (CSS-only via group-hover; no JS).
+ */
+function CellLineInline({ cell }: { cell: DashboardResponse["cell_line"] }) {
+  return (
+    <div className="relative group inline-flex items-center gap-1.5">
+      <span className="chip">{cell.name}</span>
+      <button
+        type="button"
+        className="w-5 h-5 rounded-full border border-line text-meta text-ink-muted hover:text-ink-primary hover:border-brand-primary/45 transition-colors duration-fast"
+        aria-label="Cell line details"
+      >
+        ?
+      </button>
+      {/* Popover — appears below the [?] button on hover/focus */}
+      <div
+        role="tooltip"
+        className="
+          absolute top-full right-0 mt-2 z-50 w-64
+          opacity-0 invisible
+          group-hover:opacity-100 group-hover:visible
+          group-focus-within:opacity-100 group-focus-within:visible
+          transition-opacity duration-fast
+          rounded-lg border border-line bg-surface-panel shadow-lg
+          p-3
+        "
+      >
+        <dl className="grid grid-cols-[80px_1fr] gap-y-1.5 text-meta">
+          <dt className="text-ink-muted">Name</dt>
+          <dd className="font-medium text-ink-primary">{cell.name}</dd>
+          <dt className="text-ink-muted">Species</dt>
+          <dd className="text-ink-secondary">{cell.species ?? "—"}</dd>
+          <dt className="text-ink-muted">Tissue</dt>
+          <dd className="text-ink-secondary">{cell.tissue ?? "—"}</dd>
+          <dt className="text-ink-muted">Morphology</dt>
+          <dd className="text-ink-secondary">{cell.morphology ?? "—"}</dd>
+          {cell.description && (
+            <>
+              <dt className="text-ink-muted">Note</dt>
+              <dd className="text-ink-secondary leading-relaxed">
+                {cell.description}
+              </dd>
+            </>
+          )}
+        </dl>
+      </div>
+    </div>
   );
 }
 
@@ -549,40 +672,79 @@ function TargetProfileCard({ d }: { d: DashboardResponse }) {
   );
 }
 
-function CellLineCard({ d }: { d: DashboardResponse }) {
-  const c = d.cell_line;
-  return (
-    <PanelCard title="Cell line">
-      <dl className="grid grid-cols-3 gap-y-2 text-body">
-        <dt className="text-ink-muted">Name</dt>
-        <dd className="col-span-2 font-medium">{c.name}</dd>
-        <dt className="text-ink-muted">Species</dt>
-        <dd className="col-span-2">{c.species ?? "—"}</dd>
-        <dt className="text-ink-muted">Tissue</dt>
-        <dd className="col-span-2">{c.tissue ?? "—"}</dd>
-        <dt className="text-ink-muted">Morphology</dt>
-        <dd className="col-span-2">{c.morphology ?? "—"}</dd>
-        <dt className="text-ink-muted">Note</dt>
-        <dd className="col-span-2 text-ink-secondary">{c.description ?? "—"}</dd>
-      </dl>
-    </PanelCard>
-  );
-}
-
 function ReferenceDatabasesCard({ d, target }: { d: DashboardResponse; target: string }) {
   const refs = d.references.by_target[target] ?? d.references.by_target[d.target_id] ?? {};
-  const order = ["Ensembl", "Entrez", "UniProt", "HPA", "MedChemExpress"];
+  const dataOrder = ["Ensembl", "Entrez", "UniProt", "HPA"] as const;
+  const chemOrder = ["MedChemExpress"] as const;
+
+  // External MoA / mechanism sources — built from compound metadata.
+  // Step 13 (2026-05-21): consolidates the deleted MoA card's content.
+  const moaLinks: { label: string; href: string }[] = [];
+  const drugName = encodeURIComponent(d.drug_name);
+  moaLinks.push({
+    label: "PubChem",
+    href: `https://pubchem.ncbi.nlm.nih.gov/#query=${drugName}`,
+  });
+  moaLinks.push({
+    label: "ChEMBL",
+    href: `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${drugName}`,
+  });
+  moaLinks.push({
+    label: "DrugBank",
+    href: `https://go.drugbank.com/unearth/q?query=${drugName}&searcher=drugs`,
+  });
+  if (d.compound.hy_code) {
+    moaLinks.push({
+      label: "HY-code (MedChem)",
+      href: `https://www.medchemexpress.com/search.html?q=${encodeURIComponent(
+        d.compound.hy_code,
+      )}`,
+    });
+  }
+
+  const Section = ({
+    title,
+    items,
+  }: {
+    title: string;
+    items: { label: string; href: string }[];
+  }) =>
+    items.length === 0 ? null : (
+      <div>
+        <div className="text-meta text-ink-muted uppercase tracking-wider mb-1.5">
+          {title}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-body">
+          {items.map((it) => (
+            <a
+              key={it.label}
+              href={it.href}
+              target="_blank"
+              rel="noreferrer"
+              className="a-link"
+            >
+              {it.label}
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+
   return (
     <PanelCard title="Reference databases">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-body">
-        {order.map((k) =>
-          refs[k] ? (
-            <a key={k} href={refs[k]} target="_blank" rel="noreferrer" className="a-link">
-              {k}
-            </a>
-          ) : null,
+      <div className="flex flex-col gap-3">
+        <Section
+          title="Target gene"
+          items={dataOrder.filter((k) => refs[k]).map((k) => ({ label: k, href: refs[k] }))}
+        />
+        <Section
+          title="Compound"
+          items={chemOrder.filter((k) => refs[k]).map((k) => ({ label: k, href: refs[k] }))}
+        />
+        <Section title="Mechanism & literature" items={moaLinks} />
+        {Object.keys(refs).length === 0 && moaLinks.length === 0 && (
+          <span className="text-ink-muted">없음</span>
         )}
-        {Object.keys(refs).length === 0 && <span className="text-ink-muted">없음</span>}
       </div>
     </PanelCard>
   );

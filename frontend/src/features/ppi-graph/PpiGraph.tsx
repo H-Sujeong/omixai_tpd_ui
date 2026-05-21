@@ -1,7 +1,7 @@
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import coseBilkent from "cytoscape-cose-bilkent";
-import { useEffect, useRef } from "react";
-import type { PpiEdge, PpiNode, PpiRole } from "@/types/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { PpiEdge, PpiNode } from "@/types/api";
 
 let registered = false;
 function ensureRegistered() {
@@ -11,55 +11,63 @@ function ensureRegistered() {
   }
 }
 
+type FilterMode = "all" | "target" | "pos" | "neg" | "neutral";
+
 interface Props {
   nodes: PpiNode[];
   edges: PpiEdge[];
+  /** Primary target name (e.g. "BRD2") — gets a special amber cross style */
+  targetName?: string | null;
   selectedNode?: string | null;
   selectedEdgeId?: string | null;
   onNodeClick?: (nodeId: string) => void;
-  /**
-   * Bi-directional landscape ↔ PPI: clicking an edge tells the parent to
-   * pick the most-related community for that edge's endpoints.
-   */
   onEdgeClick?: (edge: { id: string; source: string; target: string; corr: number }) => void;
-  /**
-   * Fixed pixel height. If omitted, the container uses a responsive height
-   * (360 / 440 / 520 by viewport, Step 7) so the graph fits within laptop
-   * and tablet viewports without overflowing the fold.
-   */
   height?: number;
 }
 
 /**
- * Semantic palette (PRD §9). Resolves from CSS vars at render so designer swaps
- * in `tokens.css` propagate without touching this file.
+ * On-Target PPI network — test_viz visual ruleset.
+ * Step 13 (2026-05-21).
+ *
+ * Node colors (corr-based, not role-based):
+ *   - Primary target (n.id === targetName)  → amber #F59E0B + thick border, ✚ prefix
+ *   - is_target = true                       → red #EF4444
+ *   - corr >  0.2                            → blue #185FA5  (positively correlated)
+ *   - corr < -0.2                            → purple #7C3AED (negatively correlated)
+ *   - else                                   → grey #9CA3AF  (neutral)
+ *
+ * Node size scales with degree (test_viz: 18-60px).
+ * Plot panel uses a LIGHT background (#FAFAF7) for legibility against the
+ * dark dashboard cards — same treatment as Landscape.
+ *
+ * Filter chips above the graph let the user isolate {target / pos / neg / neutral}.
  */
-function readVar(name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
+
+function nodeColor(n: PpiNode, isMain: boolean): string {
+  if (isMain) return "#F59E0B";
+  if (n.is_target) return "#EF4444";
+  if (n.corr > 0.2) return "#185FA5";
+  if (n.corr < -0.2) return "#7C3AED";
+  return "#9CA3AF";
+}
+function nodeBorder(n: PpiNode, isMain: boolean): string {
+  if (isMain) return "#92400E";
+  if (n.is_target) return "#DC2626";
+  return "#D3D1C7";
+}
+function nodeBorderW(n: PpiNode, isMain: boolean): number {
+  if (isMain) return 4;
+  if (n.is_target) return 2.5;
+  return 1;
+}
+function nodeSize(n: PpiNode): number {
+  return Math.max(18, Math.min(60, 18 + n.degree * 1.5));
 }
 
-const ROLE_FALLBACK: Record<PpiRole, string> = {
-  target: "#A855F7",
-  activated: "#4ADE80",
-  suppressed: "#F87171",
-  info: "#60A5FA",
-  unknown: "#94A3B8",
-};
-
-function roleColor(role: PpiRole | undefined | null): string {
-  const key: PpiRole = role ?? "unknown";
-  return readVar(`--color-role-${key}`, ROLE_FALLBACK[key]);
-}
-
-/**
- * Cytoscape.js wrapper. PPI nodes are colored by community_id, target node gets
- * a brand-primary halo, edges are weighted by string_score.
- */
 export function PpiGraph({
   nodes,
   edges,
+  targetName,
   selectedNode,
   selectedEdgeId,
   onNodeClick,
@@ -68,7 +76,42 @@ export function PpiGraph({
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
+  const [filter, setFilter] = useState<FilterMode>("all");
 
+  const elements = useMemo<ElementDefinition[]>(() => {
+    const els: ElementDefinition[] = [];
+    nodes.forEach((n) => {
+      const isMain = !!targetName && n.id === targetName;
+      els.push({
+        data: {
+          id: n.id,
+          label: isMain ? "✚ " + n.id : n.id,
+          degree: n.degree,
+          corr: n.corr,
+          is_target: n.is_target ? "yes" : "no",
+          is_main: isMain ? "yes" : "no",
+          size: nodeSize(n),
+          color: nodeColor(n, isMain),
+          borderColor: nodeBorder(n, isMain),
+          borderWidth: nodeBorderW(n, isMain),
+        },
+      });
+    });
+    edges.forEach((e) => {
+      els.push({
+        data: {
+          id: `${e.source}__${e.target}`,
+          source: e.source,
+          target: e.target,
+          weight: Math.max(0.4, Math.abs(e.corr)),
+          corr: e.corr,
+        },
+      });
+    });
+    return els;
+  }, [nodes, edges, targetName]);
+
+  // Initial build
   useEffect(() => {
     ensureRegistered();
     if (!ref.current) return;
@@ -76,36 +119,6 @@ export function PpiGraph({
       cyRef.current.destroy();
       cyRef.current = null;
     }
-    const elements: ElementDefinition[] = [
-      ...nodes.map<ElementDefinition>((n) => ({
-        data: {
-          id: n.id,
-          label: n.id,
-          is_target: n.is_target ? "yes" : "no",
-          role: n.role ?? "unknown",
-          degree: n.degree,
-          corr: n.corr,
-          confidence: n.confidence ?? Math.abs(n.corr),
-          color: roleColor(n.role),
-        },
-      })),
-      ...edges.map<ElementDefinition>((e) => ({
-        data: {
-          id: `${e.source}__${e.target}`,
-          source: e.source,
-          target: e.target,
-          weight: Math.max(0.4, Math.abs(e.corr)),
-          score: e.string_score,
-          corr: e.corr,
-          edgeColor:
-            e.corr >= 0.3
-              ? "rgba(74, 222, 128, 0.45)"
-              : e.corr <= -0.2
-              ? "rgba(248, 113, 113, 0.45)"
-              : "rgba(143, 155, 179, 0.30)",
-        },
-      })),
-    ];
     const cy = cytoscape({
       container: ref.current,
       elements,
@@ -114,77 +127,74 @@ export function PpiGraph({
           selector: "node",
           style: {
             "background-color": "data(color)",
+            "width": "data(size)",
+            "height": "data(size)",
             "label": "data(label)",
-            "color": "#E6EDF3",
             "font-size": 10,
-            "font-weight": 500,
-            "text-valign": "center",
+            "text-valign": "bottom",
             "text-halign": "center",
-            "text-outline-color": "#0F1115",
-            "text-outline-width": 2,
-            "width": "mapData(degree, 0, 200, 20, 64)",
-            "height": "mapData(degree, 0, 200, 20, 64)",
-            "border-width": 1,
-            "border-color": "rgba(255,255,255,0.18)",
+            "text-margin-y": 4,
+            "color": "#2C2C2A",
+            "border-width": "data(borderWidth)",
+            "border-color": "data(borderColor)",
             "overlay-opacity": 0,
           },
         },
         {
-          selector: 'node[is_target = "yes"]',
+          selector: 'node[is_main = "yes"]',
           style: {
-            "border-color": "#A855F7",
-            "border-width": 4,
-            "border-opacity": 0.9,
+            "font-size": 11,
+            "font-weight": "bold",
+            "color": "#451A03",
           } as any,
         },
         {
           selector: "node:selected",
           style: {
-            "border-color": "#FFFFFF",
-            "border-width": 3.5,
+            "border-width": 4,
+            "border-color": "#F97316",
           } as any,
         },
         {
           selector: "edge",
           style: {
-            "width": "mapData(weight, 0, 1, 0.6, 4)",
-            "line-color": "data(edgeColor)",
+            "width": "mapData(weight, 0, 1, 0.8, 3)",
+            "line-color": "#B4B2A9",
+            "opacity": 0.5,
             "curve-style": "bezier",
-            "opacity": 0.9,
           },
         },
         {
-          selector: "edge:selected",
+          selector: "edge.hl",
           style: {
-            "line-color": "#A855F7",
-            "opacity": 1.0,
-            "width": 4,
-          },
+            "line-color": "#F97316",
+            "opacity": 1,
+            "width": 2.5,
+          } as any,
         },
         {
           selector: "edge.bridge-active",
           style: {
-            "line-color": "#A855F7",
-            "opacity": 1.0,
-            "width": 4,
-            "line-style": "solid",
+            "line-color": "#F97316",
+            "opacity": 1,
+            "width": 3.5,
           } as any,
         },
       ],
       layout: {
-        name: "cose-bilkent",
-        idealEdgeLength: 80,
-        nodeOverlap: 12,
-        nodeRepulsion: 5000,
-        randomize: true,
+        name: nodes.length > 50 ? "concentric" : "cose-bilkent",
         animate: false,
+        idealEdgeLength: 80,
+        nodeRepulsion: 9000,
       } as any,
       wheelSensitivity: 0.25,
     });
     cyRef.current = cy;
+
     cy.on("tap", "node", (evt) => {
-      const id = evt.target.id() as string;
-      onNodeClick?.(id);
+      cy.edges().removeClass("hl");
+      evt.target.connectedEdges().addClass("hl");
+      onNodeClick?.(evt.target.id() as string);
     });
     cy.on("tap", "edge", (evt) => {
       const e = evt.target;
@@ -196,14 +206,25 @@ export function PpiGraph({
       e.addClass("bridge-active");
       onEdgeClick?.({ id, source: src, target: tgt, corr });
     });
+    cy.on("tap", (evt) => {
+      if (evt.target === cy) cy.edges().removeClass("hl");
+    });
+
+    // Focus on main target if present
+    const mainNode = cy.nodes().filter((n) => n.data("is_main") === "yes");
+    if (mainNode.length > 0) {
+      cy.fit(mainNode.union(mainNode.neighborhood()), 60);
+      setTimeout(() => cy.fit(undefined, 20), 600);
+    }
+
     return () => {
       cy.destroy();
       cyRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges]);
+  }, [elements]);
 
-  // Re-apply selection highlight without rebuilding the graph
+  // External selectedNode highlight
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -214,7 +235,7 @@ export function PpiGraph({
     }
   }, [selectedNode]);
 
-  // External edge highlight (e.g. from landscape→ppi sync)
+  // External edge highlight (landscape→ppi)
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -225,13 +246,108 @@ export function PpiGraph({
     }
   }, [selectedEdgeId]);
 
+  // Filter: hide/show nodes by category
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.nodes().forEach((n) => {
+      const isMain = n.data("is_main") === "yes";
+      const isTarget = n.data("is_target") === "yes";
+      const corr = (n.data("corr") as number) ?? 0;
+      let show = true;
+      switch (filter) {
+        case "target":
+          show = isMain || isTarget;
+          break;
+        case "pos":
+          show = isMain || corr > 0.2;
+          break;
+        case "neg":
+          show = isMain || corr < -0.2;
+          break;
+        case "neutral":
+          show = isMain || (corr >= -0.2 && corr <= 0.2 && !isTarget);
+          break;
+        default:
+          show = true;
+      }
+      n.style("display", show ? "element" : "none");
+    });
+    // Hide edges connecting hidden nodes
+    cy.edges().forEach((e) => {
+      const src = e.source().style("display");
+      const tgt = e.target().style("display");
+      e.style("display", src === "none" || tgt === "none" ? "none" : "element");
+    });
+  }, [filter]);
+
+  const FilterChip = ({ mode, label, accent }: { mode: FilterMode; label: string; accent?: string }) => {
+    const active = filter === mode;
+    return (
+      <button
+        type="button"
+        onClick={() => setFilter(mode)}
+        className={`px-2 py-0.5 text-meta border rounded transition-colors duration-fast ${
+          active
+            ? "bg-brand-primary text-white border-brand-primary"
+            : "text-ink-secondary border-line hover:text-ink-primary"
+        }`}
+        style={accent && !active ? { color: accent, borderColor: accent } : undefined}
+        aria-pressed={active}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
-    <div
-      ref={ref}
-      className={`w-full rounded-md border border-line bg-surface-soft${
-        height === undefined ? " h-[360px] md:h-[440px] xl:h-[520px]" : ""
-      }`}
-      style={height !== undefined ? { height } : undefined}
-    />
+    <div className="flex flex-col gap-2 w-full">
+      {/* Filter chips */}
+      <div className="flex flex-wrap items-center gap-1.5 text-meta text-ink-muted">
+        <span className="mr-1">필터:</span>
+        <FilterChip mode="all" label="전체" />
+        <FilterChip mode="target" label="타깃" accent="#F59E0B" />
+        <FilterChip mode="pos" label="양성" accent="#185FA5" />
+        <FilterChip mode="neg" label="음성" accent="#7C3AED" />
+        <FilterChip mode="neutral" label="중립" />
+      </div>
+
+      {/* Plot panel (light bg, light borders) */}
+      <div
+        ref={ref}
+        className={`w-full rounded-md border border-line${
+          height === undefined ? " h-[360px] md:h-[440px] xl:h-[520px]" : ""
+        }`}
+        style={{
+          ...(height !== undefined ? { height } : undefined),
+          background: "#FAFAF7",
+        }}
+      />
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-ink-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full" style={{ background: "#F59E0B", border: "2px solid #92400E" }} />
+          주 타깃 (✚)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#EF4444", border: "1.5px solid #DC2626" }} />
+          is_target
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#185FA5" }} />
+          양성 corr &gt; 0.2
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#7C3AED" }} />
+          음성 corr &lt; −0.2
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#9CA3AF" }} />
+          중립
+        </span>
+        <span className="ml-auto opacity-70">노드 크기 = degree</span>
+      </div>
+    </div>
   );
 }
