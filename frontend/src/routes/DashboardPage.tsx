@@ -5,13 +5,11 @@ import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock"
 import { PanelCard } from "@/components/PanelCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TopbarMetaRow } from "@/components/TopbarMetaRow";
-import { TabBar, type TabDef } from "@/features/tabs/TabBar";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
 import { PpiLegend } from "@/features/ppi-graph/PpiLegend";
 import { findRelatedCommunityFromEdge } from "@/features/ppi-graph/relatedCommunity";
 import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
-import { PhenotypicMiniCard } from "@/features/phenotypic/PhenotypicMiniCard";
 import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel";
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
 import { InteractomeSlide } from "@/features/interactome-slide/InteractomeSlide";
@@ -20,37 +18,23 @@ import { InsightSidebar } from "@/features/insight-sidebar/InsightSidebar";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
 /**
- * Dashboard tab identifiers. Persisted in URL search params (?tab=...).
- * Step 5 (2026-05-21): narrowed from {overview, phenotype, network,
- * mechanism, raw} to {phenotype, network, mechanism}. The Overview tab's
- * content has moved into the topbar meta row + Mechanism tab; Raw Data
- * was always v2-disabled and is now removed entirely.
+ * Single-page dashboard layout (Step 12, 2026-05-21).
  *
- * Legacy ?tab=overview / ?tab=raw URLs are auto-redirected to
- * ?tab=phenotype (see effect inside DashboardPage).
+ * The previous 3-tab structure (Phenotype/Network/Mechanism) has been
+ * collapsed into one continuous page that mirrors design_02 — everything
+ * the user needs is visible at once, organized in three columns:
+ *
+ *   - Left (col-span-4): PPI Network + 3D Landscape, evenly split 50/50
+ *   - Center (col-span-5): Time-lapse, Phenotypic Profiling, Pathway Enrichment
+ *   - Right (col-span-3): Compound, Target, Cell Line, References,
+ *                          Localization, Mechanism of Action (sticky)
+ *
+ * Legacy ?tab=... URLs are stripped on entry (replace) so bookmarks survive.
  */
-export type DashboardTab = "phenotype" | "network" | "mechanism";
-
-const VALID_TABS: ReadonlySet<DashboardTab> = new Set([
-  "phenotype",
-  "network",
-  "mechanism",
-]);
-
 export function DashboardPage() {
   const { plateId, drugId } = useParams<{ plateId: string; drugId: string }>();
   const [search, setSearch] = useSearchParams();
 
-  // Step 1 (2026-05-21): activeTab is derived directly from URL — single
-  // source of truth. Sidebar writes the tab param on click; DashboardPage
-  // reads it here. No more URL↔context↔URL bidirectional sync.
-  // Step 5 (2026-05-21): default is now phenotype; unknown values
-  // (including legacy overview/raw) fall back to phenotype and the URL
-  // is rewritten by the redirect effect below.
-  const rawTab = search.get("tab");
-  const activeTab: DashboardTab = VALID_TABS.has(rawTab as DashboardTab)
-    ? (rawTab as DashboardTab)
-    : "phenotype";
   const initialTarget = search.get("target") ?? undefined;
 
   const [target, setTarget] = useState<string | undefined>(initialTarget);
@@ -65,15 +49,11 @@ export function DashboardPage() {
 
   const dash = useDashboard(plateId, drugId, target);
 
-  // Step 3 (2026-05-21): drugContext effect removed — sidebar no longer
-  // renders a per-drug section. Drug name appears in the topbar h1, plate
-  // id appears in the breadcrumb.
-
   useEffect(() => {
     if (dash.data && !target) setTarget(dash.data.target_id);
   }, [dash.data, target]);
 
-  // One-way: target state → URL. Tab writes are owned by handleTabChange.
+  // One-way: target state → URL.
   useEffect(() => {
     if (!target) return;
     setSearch(
@@ -87,39 +67,22 @@ export function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
-  // Step 5 (2026-05-21): rewrite legacy ?tab=overview / ?tab=raw or any
-  // invalid value to ?tab=phenotype so bookmarks survive and the URL
-  // always reflects the rendered tab.
+  // Step 12 (2026-05-21): if a legacy ?tab=... param is still in the URL
+  // from a bookmark, strip it silently — the dashboard is now single-page
+  // and the tab param has no effect. Done once on mount.
   useEffect(() => {
-    if (rawTab !== null && !VALID_TABS.has(rawTab as DashboardTab)) {
+    if (search.get("tab")) {
       setSearch(
         (prev) => {
           const next = new URLSearchParams(prev);
-          next.set("tab", "phenotype");
+          next.delete("tab");
           return next;
         },
         { replace: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawTab]);
-
-  const handleTabChange = (tab: string) => {
-    setSearch(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", tab);
-        return next;
-      },
-      { replace: true },
-    );
-  };
-
-  const tabs: TabDef[] = [
-    { id: "phenotype", label: "Phenotype" },
-    { id: "network", label: "Network" },
-    { id: "mechanism", label: "Mechanism" },
-  ];
+  }, []);
 
   useEffect(() => {
     if (dash.data?.ppi && selectedCommunity === null) {
@@ -293,7 +256,6 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
-        <TabBar tabs={tabs} active={activeTab} onChange={handleTabChange} />
       </div>
 
       <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1600px] flex-1">
@@ -307,37 +269,113 @@ export function DashboardPage() {
           />
         )}
 
-        {/* Two-column body — main analysis + insight sidebar */}
+        {/* Single-page 3-column grid (design_02 mirror).
+         * Step 12 (2026-05-21).
+         *   Left  (col-span-4):  PPI Network + 3D Landscape, 50/50 vertical split
+         *   Center (col-span-5): Time-lapse, Phenotypic Profiling, Pathway Enrichment
+         *   Right (col-span-3):  Compound, Target, CellLine, References,
+         *                        Localization, About — sticky
+         */}
         <div className="mt-5 grid grid-cols-12 gap-5">
-          <div
-            className="col-span-12 xl:col-span-9 min-w-0"
-            role="tabpanel"
-            id={`tabpanel-${activeTab}`}
-          >
-            {activeTab === "phenotype" && <PhenotypeTab d={d} />}
-            {activeTab === "network" && (
-              <NetworkTab
-                d={d}
-                activePpi={activePpi}
-                selectedNode={selectedNode}
-                selectedEdgeId={selectedEdgeId}
-                handleNodeClick={handleNodeClick}
-                handleEdgeClick={handleEdgeClick}
-                handleLandscapeClick={handleLandscapeClick}
-                selectedCommunity={selectedCommunity}
-                onShowPhenotype={() => handleTabChange("phenotype")}
-              />
-            )}
-            {activeTab === "mechanism" && (
-              <MechanismTab d={d} target={target ?? d.target_id} />
-            )}
+          {/* === LEFT — Network + Landscape, equal heights =================== */}
+          <div className="col-span-12 xl:col-span-4 flex flex-col gap-5 min-w-0">
+            <PanelCard
+              title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
+              tooltip="노드 클릭 = E12 슬라이드 + community 점프. 엣지 클릭 = 관련된 community를 landscape에서 자동 선택."
+              accent
+              status={d.status_flags.ppi}
+              meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
+                activePpi?.nodes.length ?? 0
+              } · edges=${activePpi?.edges.length ?? 0}`}
+              actions={<span className="chip">{activePpi?.target}</span>}
+            >
+              {!activePpi ? (
+                <div className="h-[360px] flex items-center justify-center">
+                  <EmptyBlock label="PPI 데이터 없음" />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <PpiGraph
+                    nodes={activePpi.nodes}
+                    edges={activePpi.edges}
+                    selectedNode={selectedNode}
+                    selectedEdgeId={selectedEdgeId}
+                    onNodeClick={handleNodeClick}
+                    onEdgeClick={handleEdgeClick}
+                    height={420}
+                  />
+                  <PpiLegend />
+                </div>
+              )}
+            </PanelCard>
+
+            <PanelCard
+              title="3D Phenotypic Landscape"
+              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 점 클릭 → PPI 재구성."
+              status={d.status_flags.landscape}
+            >
+              {d.landscape ? (
+                <Landscape
+                  landscape={d.landscape}
+                  highlightCommunity={selectedCommunity}
+                  onCommunityClick={handleLandscapeClick}
+                  height={420}
+                />
+              ) : (
+                <div className="h-[420px] flex items-center justify-center">
+                  <EmptyBlock />
+                </div>
+              )}
+            </PanelCard>
           </div>
+
+          {/* === CENTER — Time-lapse + Profiling + Enrichment ================ */}
+          <div className="col-span-12 xl:col-span-5 flex flex-col gap-5 min-w-0">
+            <PanelCard
+              title="Time-lapse Imaging"
+              tooltip="0–48 h timelapse (4 h cadence)"
+              status={d.status_flags.time_lapse}
+              meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
+            >
+              <TimeLapseViewerPanel data={d.time_lapse} />
+            </PanelCard>
+
+            <PanelCard
+              title="Phenotypic Profiling"
+              tooltip="Growth Rate + Phenome Tracking"
+              status={d.status_flags.phenotypic}
+              meta={
+                d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
+                  ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
+                  : undefined
+              }
+            >
+              <PhenotypicProfilingPanel data={d.phenotypic} />
+            </PanelCard>
+
+            <PanelCard
+              title="Pathway Enrichment"
+              tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
+            >
+              <EnrichmentBar terms={d.enrichment} />
+            </PanelCard>
+          </div>
+
+          {/* === RIGHT — sticky info column (mirrors design_02 panel) ======== */}
           <div className="col-span-12 xl:col-span-3 min-w-0">
-            <InsightSidebar
-              data={d.insight}
-              target={target ?? d.target_id}
-              communityId={activePpi?.current_community_id ?? null}
-            />
+            <div className="flex flex-col gap-4 xl:sticky xl:top-[200px]">
+              <CompoundDetailsCard d={d} />
+              <TargetProfileCard d={d} />
+              <CellLineCard d={d} />
+              <ReferenceDatabasesCard d={d} target={target ?? d.target_id} />
+              <LocalizationCard d={d} />
+              <MechanismOfActionCard d={d} />
+              <InsightSidebar
+                data={d.insight}
+                target={target ?? d.target_id}
+                communityId={activePpi?.current_community_id ?? null}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -394,177 +432,73 @@ function BridgeNotice({
 }
 
 // ---------------------------------------------------------------------------
-// Tab panels
+// Right-column info cards specific to the single-page dashboard
 // ---------------------------------------------------------------------------
 
-function PhenotypeTab({ d }: { d: DashboardResponse }) {
+/**
+ * Localization Annotations card — heatmap-style row grid.
+ * Each row = annotation; `level` (0–5) drives how many cells light up at
+ * brand primary; remaining cells use a muted brand-tint. Inspired by
+ * design_02's `repeating-linear-gradient` band but driven by data.
+ * Step 10 (2026-05-21).
+ */
+function LocalizationCard({ d }: { d: DashboardResponse }) {
   return (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12 xl:col-span-7">
-        <PanelCard
-          title="Time-lapse Video"
-          tooltip="0–48 h timelapse (4 h cadence)"
-          status={d.status_flags.time_lapse}
-          meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
-        >
-          <TimeLapseViewerPanel data={d.time_lapse} />
-        </PanelCard>
-      </div>
-      <div className="col-span-12 xl:col-span-5">
-        <PanelCard
-          title="Phenotypic Profiling"
-          tooltip="Growth Rate + Phenome Tracking"
-          status={d.status_flags.phenotypic}
-          meta={
-            d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
-              ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
-              : undefined
-          }
-        >
-          <PhenotypicProfilingPanel data={d.phenotypic} />
-        </PanelCard>
-      </div>
-    </div>
-  );
-}
-
-function NetworkTab({
-  d,
-  activePpi,
-  selectedNode,
-  selectedEdgeId,
-  handleNodeClick,
-  handleEdgeClick,
-  handleLandscapeClick,
-  selectedCommunity,
-  onShowPhenotype,
-}: {
-  d: DashboardResponse;
-  activePpi: PpiPanel | null;
-  selectedNode: string | null;
-  selectedEdgeId: string | null;
-  handleNodeClick: (id: string) => void;
-  handleEdgeClick: (e: { id: string; source: string; target: string; corr: number }) => void;
-  handleLandscapeClick: (cid: number) => void;
-  selectedCommunity: number | null;
-  onShowPhenotype: () => void;
-}) {
-  return (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12">
-        <PhenotypicMiniCard
-          phenotypic={d.phenotypic}
-          firstFrame={d.time_lapse?.frames[0] ?? null}
-          onJump={onShowPhenotype}
+    <PanelCard title="Localization Annotations">
+      <ul className="space-y-2.5">
+        {d.localization_annotations.map((l: { label: string; level: number }) => {
+          const clamped = Math.max(0, Math.min(5, l.level));
+          return (
+            <li key={l.label} className="flex items-center gap-3">
+              <div
+                role="img"
+                aria-label={`${l.label} level ${l.level} of 5`}
+                className="flex gap-1 shrink-0"
+              >
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="block w-4 h-3.5 rounded-sm"
+                    style={{
+                      background:
+                        i < clamped
+                          ? `rgb(var(--color-brand-primary-rgb) / ${0.4 + (i / 5) * 0.55})`
+                          : "rgb(var(--color-brand-primary-rgb) / 0.08)",
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="text-body text-ink-secondary">{l.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-3 pt-2.5 border-t border-line flex items-center gap-2 text-meta text-ink-muted">
+        <span>Low</span>
+        <div
+          className="flex-1 h-1.5 rounded-full"
+          style={{
+            background:
+              "linear-gradient(90deg, rgb(var(--color-brand-primary-rgb) / 0.15), rgb(var(--color-brand-primary-rgb) / 0.95))",
+          }}
         />
+        <span>High</span>
       </div>
-      <div className="col-span-12 xl:col-span-7">
-        <PanelCard
-          title={`PPI Graph · community ${activePpi?.current_community_id ?? "—"}`}
-          tooltip="노드 클릭 = E12 슬라이드 + community 점프. 엣지 클릭 = 관련된 community를 landscape에서 자동 선택 (양방향 인터랙션)."
-          accent
-          status={d.status_flags.ppi}
-          meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
-            activePpi?.nodes.length ?? 0
-          } · edges=${activePpi?.edges.length ?? 0}`}
-          actions={<span className="chip">{activePpi?.target}</span>}
-        >
-          {!activePpi ? (
-            <EmptyBlock label="PPI 데이터 없음" />
-          ) : (
-            <div className="flex flex-col gap-3">
-              <PpiGraph
-                nodes={activePpi.nodes}
-                edges={activePpi.edges}
-                selectedNode={selectedNode}
-                selectedEdgeId={selectedEdgeId}
-                onNodeClick={handleNodeClick}
-                onEdgeClick={handleEdgeClick}
-              />
-              <PpiLegend />
-            </div>
-          )}
-        </PanelCard>
-      </div>
-      <div className="col-span-12 xl:col-span-5">
-        <PanelCard
-          title="Target Landscape (3D)"
-          tooltip="x=Distance, y=−log10(p), z=avg(PCC). 점 클릭 → PPI 재구성. PPI 엣지 클릭이 들어오면 자동으로 해당 community 피크가 강조됩니다."
-          status={d.status_flags.landscape}
-        >
-          {d.landscape ? (
-            <Landscape
-              landscape={d.landscape}
-              highlightCommunity={selectedCommunity}
-              onCommunityClick={handleLandscapeClick}
-              height={520}
-            />
-          ) : (
-            <EmptyBlock />
-          )}
-        </PanelCard>
-      </div>
-      <div className="col-span-12">
-        <PanelCard
-          title="On-Target Module Enrichment"
-          tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
-        >
-          <EnrichmentBar terms={d.enrichment} height={300} />
-        </PanelCard>
-      </div>
-    </div>
+    </PanelCard>
   );
 }
 
-function MechanismTab({ d, target }: { d: DashboardResponse; target: string }) {
-  // Step 5 (2026-05-21): Mechanism tab now consolidates all static drug /
-  // protein context that previously lived in Overview. Top row keeps MoA
-  // narrative + localization prominent; bottom row is structured detail.
+/**
+ * "About this protein — Mechanism of Action" card.
+ * Mirrors the design_02 paragraph block under the right column.
+ */
+function MechanismOfActionCard({ d }: { d: DashboardResponse }) {
   return (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12 lg:col-span-8">
-        <PanelCard title="Mechanism of Action">
-          <p className="text-body text-ink-primary leading-relaxed whitespace-pre-line">
-            {d.moa_summary}
-          </p>
-        </PanelCard>
-      </div>
-      <div className="col-span-12 lg:col-span-4">
-        <PanelCard title="Localization Annotations">
-          <ul className="space-y-2">
-            {d.localization_annotations.map((l: { label: string; level: number }) => (
-              <li key={l.label} className="flex items-center gap-3">
-                <div className="flex gap-1">
-                  {[1, 2, 3].map((i) => (
-                    <span
-                      key={i}
-                      className="w-3 h-3 rounded-sm border border-line"
-                      style={{
-                        background:
-                          i <= l.level ? "var(--color-brand-primary)" : "transparent",
-                      }}
-                    />
-                  ))}
-                </div>
-                <span className="text-body">{l.label}</span>
-              </li>
-            ))}
-          </ul>
-        </PanelCard>
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <CompoundDetailsCard d={d} />
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <TargetProfileCard d={d} />
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <CellLineCard d={d} />
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <ReferenceDatabasesCard d={d} target={target} />
-      </div>
-    </div>
+    <PanelCard title="Mechanism of Action">
+      <p className="text-body text-ink-secondary leading-relaxed whitespace-pre-line">
+        {d.moa_summary}
+      </p>
+    </PanelCard>
   );
 }
 

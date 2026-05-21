@@ -309,15 +309,23 @@ function Th({
   active: boolean;
   dir: "asc" | "desc";
 }) {
+  // Always show a sort indicator so users discover the affordance.
+  // Inactive = muted both-arrows · active = single arrow in brand color.
+  // Step 9 (2026-05-21).
   return (
     <th
       className={`cursor-pointer select-none hover:text-ink-primary transition-colors duration-fast ${
-        active ? "text-ink-primary" : ""
+        active ? "text-brand-primary" : "text-ink-secondary"
       }`}
       onClick={onClick}
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
     >
-      {children}
-      {active && <span className="ml-1">{dir === "asc" ? "▲" : "▼"}</span>}
+      <span className="inline-flex items-center gap-1">
+        {children}
+        <span className="text-meta opacity-90" aria-hidden>
+          {active ? (dir === "asc" ? "▲" : "▼") : "↕"}
+        </span>
+      </span>
     </th>
   );
 }
