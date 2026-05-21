@@ -25,7 +25,7 @@ export function Landscape({ landscape, highlightCommunity, onCommunityClick, hei
       colorscale: [
         [0, "#1E3A8A"],
         [0.5, "#1F2937"],
-        [1, "#A871FF"],
+        [1, "#A855F7"],
       ],
       opacity: 0.85,
       showscale: true,
@@ -47,7 +47,7 @@ export function Landscape({ landscape, highlightCommunity, onCommunityClick, hei
     hovertemplate: "%{text}<br>x=%{x:.2f} y=%{y:.2f} z=%{z:.3f}<extra></extra>",
     marker: {
       size: landscape.scatter.map((s) => Math.max(4, Math.min(14, Math.sqrt(s.size) * 1.5))),
-      color: landscape.scatter.map((s) => (s.is_target ? "#A871FF" : "#E6EDF3")),
+      color: landscape.scatter.map((s) => (s.is_target ? "#A855F7" : "#E6EDF3")),
       opacity: landscape.scatter.map((s) => (s.is_target ? 1 : 0.65)),
       line: { width: 0 },
     },

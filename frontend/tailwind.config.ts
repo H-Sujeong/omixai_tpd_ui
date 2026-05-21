@@ -34,19 +34,22 @@ const config: Config = {
           inverse: "var(--color-text-inverse)",
         },
         // category: brand
+        // Format uses `rgb(var(--token-rgb) / <alpha-value>)` so Tailwind
+        // opacity modifiers like `bg-brand-primary/45` compile correctly.
+        // The matching RGB-triplet vars live in tokens.css. Step 8 (2026-05-21).
         brand: {
-          primary: "var(--color-brand-primary)",
-          "primary-hover": "var(--color-brand-primary-hover)",
-          "primary-pressed": "var(--color-brand-primary-pressed)",
-          secondary: "var(--color-brand-secondary)",
+          primary: "rgb(var(--color-brand-primary-rgb) / <alpha-value>)",
+          "primary-hover": "rgb(var(--color-brand-primary-hover-rgb) / <alpha-value>)",
+          "primary-pressed": "rgb(var(--color-brand-primary-pressed-rgb) / <alpha-value>)",
+          secondary: "rgb(var(--color-brand-secondary-rgb) / <alpha-value>)",
         },
-        // category: status
+        // category: status (same alpha-supporting pattern)
         status: {
-          success: "var(--color-status-success)",
-          warning: "var(--color-status-warning)",
-          error: "var(--color-status-error)",
-          info: "var(--color-status-info)",
-          neutral: "var(--color-status-neutral)",
+          success: "rgb(var(--color-status-success-rgb) / <alpha-value>)",
+          warning: "rgb(var(--color-status-warning-rgb) / <alpha-value>)",
+          error: "rgb(var(--color-status-error-rgb) / <alpha-value>)",
+          info: "rgb(var(--color-status-info-rgb) / <alpha-value>)",
+          neutral: "rgb(var(--color-status-neutral-rgb) / <alpha-value>)",
         },
         // category: role (PPI node semantics)
         role: {

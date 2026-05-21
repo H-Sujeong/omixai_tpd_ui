@@ -50,10 +50,10 @@ export function InteractomeSlide({ plateId, drugId, target, nodeId, onClose }: P
 
   return (
     <aside
-      className={`fixed top-14 right-0 bottom-0 bg-surface-panel border-l border-line shadow-lg transition-transform duration-200 ${
+      className={`fixed right-0 bottom-0 bg-surface-panel border-l border-line shadow-lg transition-transform duration-200 ${
         open ? "translate-x-0" : "translate-x-full"
       }`}
-      style={{ width: 520, zIndex: 60 }}
+      style={{ top: "var(--height-topbar)", width: 520, maxWidth: "100vw", zIndex: 60 }}
       aria-hidden={!open}
     >
       <header className="flex items-center justify-between px-4 py-3 border-b border-line">
@@ -82,7 +82,10 @@ export function InteractomeSlide({ plateId, drugId, target, nodeId, onClose }: P
         </div>
       </header>
 
-      <div className="h-[calc(100vh-3.5rem-3.5rem)] overflow-y-auto p-3">
+      <div
+        className="overflow-y-auto p-3"
+        style={{ height: "calc(100vh - var(--height-topbar) - 3.5rem)" }}
+      >
         {!open && <EmptyBlock label="PPI 노드를 클릭하면 ego network가 열립니다." />}
         {open && isLoading && <LoadingBlock />}
         {open && error && <ErrorBlock error={error} />}

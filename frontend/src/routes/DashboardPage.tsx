@@ -4,13 +4,14 @@ import { useCommunityPanel, useDashboard, useSwitchCommunity } from "@/api/queri
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { PanelCard } from "@/components/PanelCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { useSidebar } from "@/components/AppShell";
-import type { SidebarTab } from "@/components/Sidebar";
+import { TopbarMetaRow } from "@/components/TopbarMetaRow";
+import { TabBar, type TabDef } from "@/features/tabs/TabBar";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
 import { PpiLegend } from "@/features/ppi-graph/PpiLegend";
 import { findRelatedCommunityFromEdge } from "@/features/ppi-graph/relatedCommunity";
 import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
+import { PhenotypicMiniCard } from "@/features/phenotypic/PhenotypicMiniCard";
 import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel";
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
 import { InteractomeSlide } from "@/features/interactome-slide/InteractomeSlide";
@@ -18,13 +19,39 @@ import { KpiStrip } from "@/features/kpi/KpiStrip";
 import { InsightSidebar } from "@/features/insight-sidebar/InsightSidebar";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
+/**
+ * Dashboard tab identifiers. Persisted in URL search params (?tab=...).
+ * Step 5 (2026-05-21): narrowed from {overview, phenotype, network,
+ * mechanism, raw} to {phenotype, network, mechanism}. The Overview tab's
+ * content has moved into the topbar meta row + Mechanism tab; Raw Data
+ * was always v2-disabled and is now removed entirely.
+ *
+ * Legacy ?tab=overview / ?tab=raw URLs are auto-redirected to
+ * ?tab=phenotype (see effect inside DashboardPage).
+ */
+export type DashboardTab = "phenotype" | "network" | "mechanism";
+
+const VALID_TABS: ReadonlySet<DashboardTab> = new Set([
+  "phenotype",
+  "network",
+  "mechanism",
+]);
+
 export function DashboardPage() {
   const { plateId, drugId } = useParams<{ plateId: string; drugId: string }>();
   const [search, setSearch] = useSearchParams();
-  const sidebar = useSidebar();
 
+  // Step 1 (2026-05-21): activeTab is derived directly from URL — single
+  // source of truth. Sidebar writes the tab param on click; DashboardPage
+  // reads it here. No more URL↔context↔URL bidirectional sync.
+  // Step 5 (2026-05-21): default is now phenotype; unknown values
+  // (including legacy overview/raw) fall back to phenotype and the URL
+  // is rewritten by the redirect effect below.
+  const rawTab = search.get("tab");
+  const activeTab: DashboardTab = VALID_TABS.has(rawTab as DashboardTab)
+    ? (rawTab as DashboardTab)
+    : "phenotype";
   const initialTarget = search.get("target") ?? undefined;
-  const initialTab = (search.get("tab") as SidebarTab | null) ?? "overview";
 
   const [target, setTarget] = useState<string | undefined>(initialTarget);
   const [selectedCommunity, setSelectedCommunity] = useState<number | null>(null);
@@ -38,29 +65,61 @@ export function DashboardPage() {
 
   const dash = useDashboard(plateId, drugId, target);
 
-  // Sidebar context: register drug + drive tabs via shared state
-  useEffect(() => {
-    if (dash.data) {
-      sidebar.setDrugContext({ drugName: dash.data.drug_name, plateId: dash.data.plate_id });
-      if (sidebar.activeTab !== initialTab) sidebar.setActiveTab(initialTab);
-    }
-    return () => sidebar.setDrugContext(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dash.data?.plate_id, dash.data?.drug_name]);
-
-  const activeTab = sidebar.activeTab;
+  // Step 3 (2026-05-21): drugContext effect removed — sidebar no longer
+  // renders a per-drug section. Drug name appears in the topbar h1, plate
+  // id appears in the breadcrumb.
 
   useEffect(() => {
     if (dash.data && !target) setTarget(dash.data.target_id);
   }, [dash.data, target]);
 
+  // One-way: target state → URL. Tab writes are owned by handleTabChange.
   useEffect(() => {
-    const next = new URLSearchParams(search);
-    if (target) next.set("target", target);
-    next.set("tab", activeTab);
-    setSearch(next, { replace: true });
+    if (!target) return;
+    setSearch(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("target", target);
+        return next;
+      },
+      { replace: true },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, activeTab]);
+  }, [target]);
+
+  // Step 5 (2026-05-21): rewrite legacy ?tab=overview / ?tab=raw or any
+  // invalid value to ?tab=phenotype so bookmarks survive and the URL
+  // always reflects the rendered tab.
+  useEffect(() => {
+    if (rawTab !== null && !VALID_TABS.has(rawTab as DashboardTab)) {
+      setSearch(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", "phenotype");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawTab]);
+
+  const handleTabChange = (tab: string) => {
+    setSearch(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  const tabs: TabDef[] = [
+    { id: "phenotype", label: "Phenotype" },
+    { id: "network", label: "Network" },
+    { id: "mechanism", label: "Mechanism" },
+  ];
 
   useEffect(() => {
     if (dash.data?.ppi && selectedCommunity === null) {
@@ -185,8 +244,8 @@ export function DashboardPage() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Topbar — design_02 breadcrumb + hero + actions */}
-      <div className="sticky top-0 z-20 bg-surface-elevated border-b border-line">
-        <div className="px-8 py-4 flex items-start justify-between gap-4">
+      <div className="sticky top-0 z-20 bg-surface-elevated">
+        <div className="pl-16 pr-4 lg:px-8 py-4 flex flex-col lg:flex-row items-start lg:justify-between gap-3 lg:gap-4">
           <div className="min-w-0">
             <div className="text-meta uppercase tracking-[0.16em] text-ink-muted">
               <Link to="/plates" className="hover:text-ink-primary">Workspace</Link>
@@ -207,9 +266,10 @@ export function DashboardPage() {
               {d.target_profile.target_class ?? "Targeted protein degradation"} · Targets:{" "}
               {d.target_profile.targets.join(" / ")}
             </p>
+            <TopbarMetaRow d={d} target={target ?? d.target_id} />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1 mr-2">
+          <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+            <div className="flex flex-wrap items-center gap-1 mr-2">
               <span className="text-meta text-ink-muted mr-2">Target</span>
               {d.available_targets.map((t) => (
                 <button
@@ -227,15 +287,16 @@ export function DashboardPage() {
                 </button>
               ))}
             </div>
-            <div className="text-meta text-ink-muted tabular text-right">
+            <div className="text-meta text-ink-muted tabular text-left lg:text-right">
               <div>batch · {d.provenance.plate_id}</div>
               <div>v{d.provenance.pipeline_version}</div>
             </div>
           </div>
         </div>
+        <TabBar tabs={tabs} active={activeTab} onChange={handleTabChange} />
       </div>
 
-      <div className="px-8 py-6 mx-auto w-full max-w-[1600px] flex-1">
+      <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1600px] flex-1">
         <KpiStrip kpis={d.kpis} />
 
         {bridgeNotice && (
@@ -253,7 +314,6 @@ export function DashboardPage() {
             role="tabpanel"
             id={`tabpanel-${activeTab}`}
           >
-            {activeTab === "overview" && <OverviewTab d={d} />}
             {activeTab === "phenotype" && <PhenotypeTab d={d} />}
             {activeTab === "network" && (
               <NetworkTab
@@ -265,15 +325,11 @@ export function DashboardPage() {
                 handleEdgeClick={handleEdgeClick}
                 handleLandscapeClick={handleLandscapeClick}
                 selectedCommunity={selectedCommunity}
+                onShowPhenotype={() => handleTabChange("phenotype")}
               />
             )}
             {activeTab === "mechanism" && (
               <MechanismTab d={d} target={target ?? d.target_id} />
-            )}
-            {activeTab === "raw" && (
-              <PanelCard title="Raw Data">
-                <EmptyBlock label="Raw data export는 v2에서 제공됩니다. /api/v1/.../dashboard 응답을 직접 사용할 수 있습니다." />
-              </PanelCard>
             )}
           </div>
           <div className="col-span-12 xl:col-span-3 min-w-0">
@@ -341,58 +397,6 @@ function BridgeNotice({
 // Tab panels
 // ---------------------------------------------------------------------------
 
-function OverviewTab({ d }: { d: DashboardResponse }) {
-  return (
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <CompoundDetailsCard d={d} />
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <TargetProfileCard d={d} />
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <CellLineCard d={d} />
-      </div>
-      <div className="col-span-12 md:col-span-6 xl:col-span-3">
-        <ReferenceDatabasesCard d={d} target={d.target_id} />
-      </div>
-      <div className="col-span-12 lg:col-span-8">
-        <PanelCard
-          title="About this protein — Mechanism of Action"
-          tooltip="Insight 사이드바와 동기화됩니다."
-        >
-          <p className="text-body text-ink-primary leading-relaxed whitespace-pre-line">
-            {d.moa_summary}
-          </p>
-        </PanelCard>
-      </div>
-      <div className="col-span-12 lg:col-span-4">
-        <PanelCard title="Localization Annotations">
-          <ul className="space-y-2">
-            {d.localization_annotations.map((l: any) => (
-              <li key={l.label} className="flex items-center gap-3">
-                <div className="flex gap-1">
-                  {[1, 2, 3].map((i) => (
-                    <span
-                      key={i}
-                      className="w-3 h-3 rounded-sm border border-line"
-                      style={{
-                        background:
-                          i <= l.level ? "var(--color-brand-primary)" : "transparent",
-                      }}
-                    />
-                  ))}
-                </div>
-                <span className="text-body">{l.label}</span>
-              </li>
-            ))}
-          </ul>
-        </PanelCard>
-      </div>
-    </div>
-  );
-}
-
 function PhenotypeTab({ d }: { d: DashboardResponse }) {
   return (
     <div className="grid grid-cols-12 gap-4">
@@ -433,6 +437,7 @@ function NetworkTab({
   handleEdgeClick,
   handleLandscapeClick,
   selectedCommunity,
+  onShowPhenotype,
 }: {
   d: DashboardResponse;
   activePpi: PpiPanel | null;
@@ -442,9 +447,17 @@ function NetworkTab({
   handleEdgeClick: (e: { id: string; source: string; target: string; corr: number }) => void;
   handleLandscapeClick: (cid: number) => void;
   selectedCommunity: number | null;
+  onShowPhenotype: () => void;
 }) {
   return (
     <div className="grid grid-cols-12 gap-4">
+      <div className="col-span-12">
+        <PhenotypicMiniCard
+          phenotypic={d.phenotypic}
+          firstFrame={d.time_lapse?.frames[0] ?? null}
+          onJump={onShowPhenotype}
+        />
+      </div>
       <div className="col-span-12 xl:col-span-7">
         <PanelCard
           title={`PPI Graph · community ${activePpi?.current_community_id ?? "—"}`}
@@ -467,7 +480,6 @@ function NetworkTab({
                 selectedEdgeId={selectedEdgeId}
                 onNodeClick={handleNodeClick}
                 onEdgeClick={handleEdgeClick}
-                height={520}
               />
               <PpiLegend />
             </div>
@@ -505,6 +517,9 @@ function NetworkTab({
 }
 
 function MechanismTab({ d, target }: { d: DashboardResponse; target: string }) {
+  // Step 5 (2026-05-21): Mechanism tab now consolidates all static drug /
+  // protein context that previously lived in Overview. Top row keeps MoA
+  // narrative + localization prominent; bottom row is structured detail.
   return (
     <div className="grid grid-cols-12 gap-4">
       <div className="col-span-12 lg:col-span-8">
@@ -517,7 +532,7 @@ function MechanismTab({ d, target }: { d: DashboardResponse; target: string }) {
       <div className="col-span-12 lg:col-span-4">
         <PanelCard title="Localization Annotations">
           <ul className="space-y-2">
-            {d.localization_annotations.map((l: any) => (
+            {d.localization_annotations.map((l: { label: string; level: number }) => (
               <li key={l.label} className="flex items-center gap-3">
                 <div className="flex gap-1">
                   {[1, 2, 3].map((i) => (
@@ -525,7 +540,8 @@ function MechanismTab({ d, target }: { d: DashboardResponse; target: string }) {
                       key={i}
                       className="w-3 h-3 rounded-sm border border-line"
                       style={{
-                        background: i <= l.level ? "var(--color-brand-primary)" : "transparent",
+                        background:
+                          i <= l.level ? "var(--color-brand-primary)" : "transparent",
                       }}
                     />
                   ))}
@@ -536,26 +552,16 @@ function MechanismTab({ d, target }: { d: DashboardResponse; target: string }) {
           </ul>
         </PanelCard>
       </div>
-      <div className="col-span-12 lg:col-span-7">
-        <PanelCard title="Compound Details">
-          <dl className="grid grid-cols-3 gap-y-2 text-body">
-            <dt className="text-ink-muted">Dose</dt>
-            <dd className="col-span-2 tabular">
-              {d.compound.dose_um ? `${d.compound.dose_um} µM` : "—"}
-              {d.compound.treatment_hours && (
-                <span className="ml-3 text-ink-muted">~ {d.compound.treatment_hours} h</span>
-              )}
-            </dd>
-            <dt className="text-ink-muted">HY-code</dt>
-            <dd className="col-span-2 font-mono text-meta">{d.compound.hy_code ?? "—"}</dd>
-            <dt className="text-ink-muted">SMILES</dt>
-            <dd className="col-span-2 font-mono text-meta break-all text-ink-secondary">
-              {d.compound.smiles ?? "—"}
-            </dd>
-          </dl>
-        </PanelCard>
+      <div className="col-span-12 md:col-span-6 xl:col-span-3">
+        <CompoundDetailsCard d={d} />
       </div>
-      <div className="col-span-12 lg:col-span-5">
+      <div className="col-span-12 md:col-span-6 xl:col-span-3">
+        <TargetProfileCard d={d} />
+      </div>
+      <div className="col-span-12 md:col-span-6 xl:col-span-3">
+        <CellLineCard d={d} />
+      </div>
+      <div className="col-span-12 md:col-span-6 xl:col-span-3">
         <ReferenceDatabasesCard d={d} target={target} />
       </div>
     </div>

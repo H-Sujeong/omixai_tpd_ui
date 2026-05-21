@@ -38,12 +38,28 @@
   --color-brand-glow:           rgba(168, 85, 247, 0.55);
   --color-brand-gradient: linear-gradient(135deg, #4AA8FF 0%, #A855F7 60%, #F472B6 100%);
 
+  /* RGB triplets for the same brand colors. Required so Tailwind's
+   * alpha modifier (`bg-brand-primary/45` etc.) can compile against
+   * a `rgb(var(--…) / <alpha-value>)` color in tailwind.config.ts.
+   * Step 8 (2026-05-21). */
+  --color-brand-primary-rgb:         168  85 247;
+  --color-brand-primary-hover-rgb:   185 117 255;
+  --color-brand-primary-pressed-rgb: 142  51 234;
+  --color-brand-secondary-rgb:        74 168 255;
+
   /* === Semantic status (PRD + style_guide) ========================== */
   --color-status-success:   #4ADE80;   /* activated / pass */
   --color-status-warning:   #FB923C;   /* warning */
   --color-status-error:     #F87171;   /* suppressed / fail */
   --color-status-info:      #4AA8FF;   /* informational */
   --color-status-neutral:   #8F9BB3;
+
+  /* RGB triplets — same purpose as brand-*-rgb above. */
+  --color-status-success-rgb: 74 222 128;
+  --color-status-warning-rgb: 251 146 60;
+  --color-status-error-rgb:   248 113 113;
+  --color-status-info-rgb:    74 168 255;
+  --color-status-neutral-rgb: 143 155 179;
 
   --color-status-success-fg: #052E16;
   --color-status-warning-fg: #2A1604;
@@ -93,6 +109,12 @@
   --space-section-gap:  32px;
   --space-component-gap: 16px;
   --space-sidebar-width: 240px;
+
+  /* Topbar = breadcrumb + h1 + chips + paragraph + TopbarMetaRow + TabBar.
+   * Static value; conservative against single-line content. InteractomeSlide
+   * uses this so its fixed `top:` lines up with the topbar bottom edge
+   * regardless of viewport. Step 8 (2026-05-21). */
+  --height-topbar: 180px;
 
   /* === Radius ======================================================== */
   --radius-sm:    6px;

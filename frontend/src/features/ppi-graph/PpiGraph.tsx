@@ -22,6 +22,11 @@ interface Props {
    * pick the most-related community for that edge's endpoints.
    */
   onEdgeClick?: (edge: { id: string; source: string; target: string; corr: number }) => void;
+  /**
+   * Fixed pixel height. If omitted, the container uses a responsive height
+   * (360 / 440 / 520 by viewport, Step 7) so the graph fits within laptop
+   * and tablet viewports without overflowing the fold.
+   */
   height?: number;
 }
 
@@ -36,7 +41,7 @@ function readVar(name: string, fallback: string): string {
 }
 
 const ROLE_FALLBACK: Record<PpiRole, string> = {
-  target: "#A871FF",
+  target: "#A855F7",
   activated: "#4ADE80",
   suppressed: "#F87171",
   info: "#60A5FA",
@@ -59,7 +64,7 @@ export function PpiGraph({
   selectedEdgeId,
   onNodeClick,
   onEdgeClick,
-  height = 540,
+  height,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
@@ -127,7 +132,7 @@ export function PpiGraph({
         {
           selector: 'node[is_target = "yes"]',
           style: {
-            "border-color": "#A871FF",
+            "border-color": "#A855F7",
             "border-width": 4,
             "border-opacity": 0.9,
           } as any,
@@ -223,8 +228,10 @@ export function PpiGraph({
   return (
     <div
       ref={ref}
-      className="w-full rounded-md border border-line"
-      style={{ height, background: "#0B121F" }}
+      className={`w-full rounded-md border border-line bg-surface-soft${
+        height === undefined ? " h-[360px] md:h-[440px] xl:h-[520px]" : ""
+      }`}
+      style={height !== undefined ? { height } : undefined}
     />
   );
 }

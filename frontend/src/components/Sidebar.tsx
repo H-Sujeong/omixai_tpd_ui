@@ -1,14 +1,25 @@
 import { Link, useLocation, useParams } from "react-router-dom";
-import type { ReactNode } from "react";
 
 /**
  * Left sidebar nav (design_02 + style_guide §4.2).
  *
- * Two sections:
- *  - App nav: Plates / Help / Settings (always visible)
- *  - Workspace nav: Dashboard sub-tabs (Overview/Phenotype/Network/Mechanism/Raw)
- *    — only when on a drug dashboard route.
+ * App-level navigation only:
+ *   - Workspace: Plates (active when on /plates index)
+ *   - System (placeholder): Help / Settings
+ *
+ * Step 3 (2026-05-21): drug-context section removed (now in TabBar).
+ * Step 7 (2026-05-21): on <lg the sidebar becomes an off-canvas drawer
+ * controlled by AppShell's mobileOpen state. On lg+ it falls back to
+ * the original sticky-left position with no transform.
  */
+
+interface Props {
+  /** Off-canvas drawer open state on <lg. Ignored on lg+. */
+  isMobileOpen?: boolean;
+  /** Called when a Link inside the drawer is clicked, so the drawer
+   *  closes after navigation. */
+  onCloseMobile?: () => void;
+}
 
 const ICON = {
   plates: (
@@ -17,35 +28,6 @@ const ICON = {
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  ),
-  overview: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 12h7m0 0V5m0 7v7m0-7h11" />
-    </svg>
-  ),
-  phenotype: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 17c2-1 3-5 5-5s3 3 5 3 4-6 6-6 2 2 2 2" />
-    </svg>
-  ),
-  network: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="6" cy="6" r="2.5" />
-      <circle cx="18" cy="6" r="2.5" />
-      <circle cx="12" cy="18" r="2.5" />
-      <path d="M8 7l8 0M7 8l4 8M17 8l-4 8" />
-    </svg>
-  ),
-  mechanism: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2.1 2.1M16.9 16.9L19 19M5 19l2.1-2.1M16.9 7.1L19 5" />
-    </svg>
-  ),
-  raw: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 4h16v16H4z M4 9h16 M9 4v16" />
     </svg>
   ),
   help: (
@@ -62,26 +44,21 @@ const ICON = {
   ),
 } as const;
 
-export type SidebarTab =
-  | "overview"
-  | "phenotype"
-  | "network"
-  | "mechanism"
-  | "raw";
-
-interface Props {
-  activeTab?: SidebarTab;
-  onTabChange?: (tab: SidebarTab) => void;
-  drugContext?: { drugName: string; plateId: string };
-}
-
-export function Sidebar({ activeTab, onTabChange, drugContext }: Props) {
+export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
   const location = useLocation();
   const onPlatesIndex = location.pathname === "/plates";
 
   return (
-    <aside className="app-sidebar">
-      <Link to="/plates" className="sidebar-brand">
+    <aside
+      className={`
+        app-sidebar
+        max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50
+        max-lg:transition-transform max-lg:duration-base
+        ${isMobileOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"}
+      `}
+      aria-hidden={!isMobileOpen && typeof window !== "undefined" && window.innerWidth < 1024 ? true : undefined}
+    >
+      <Link to="/plates" className="sidebar-brand" onClick={onCloseMobile}>
         <div className="sidebar-brand__logo">TPD</div>
         <div className="leading-tight">
           <div className="font-semibold text-ink-primary text-sm">OmixAI-TPD</div>
@@ -94,57 +71,12 @@ export function Sidebar({ activeTab, onTabChange, drugContext }: Props) {
         <Link
           to="/plates"
           className={`sidebar-item ${onPlatesIndex ? "sidebar-item--active" : ""}`}
+          onClick={onCloseMobile}
         >
           <span className="sidebar-item__icon">{ICON.plates}</span>
           <span>Plates</span>
         </Link>
       </div>
-
-      {drugContext && (
-        <div className="sidebar-section">
-          <div className="sidebar-section__label">
-            {drugContext.drugName}
-            <span className="ml-2 text-ink-muted">· {drugContext.plateId}</span>
-          </div>
-          <SidebarTabItem
-            id="overview"
-            label="Overview"
-            icon={ICON.overview}
-            active={activeTab === "overview"}
-            onClick={onTabChange}
-          />
-          <SidebarTabItem
-            id="phenotype"
-            label="Phenotype"
-            icon={ICON.phenotype}
-            active={activeTab === "phenotype"}
-            onClick={onTabChange}
-          />
-          <SidebarTabItem
-            id="network"
-            label="Network"
-            icon={ICON.network}
-            active={activeTab === "network"}
-            onClick={onTabChange}
-          />
-          <SidebarTabItem
-            id="mechanism"
-            label="Mechanism"
-            icon={ICON.mechanism}
-            active={activeTab === "mechanism"}
-            onClick={onTabChange}
-          />
-          <SidebarTabItem
-            id="raw"
-            label="Raw Data"
-            icon={ICON.raw}
-            active={activeTab === "raw"}
-            onClick={onTabChange}
-            badge="v2"
-            disabled
-          />
-        </div>
-      )}
 
       <div className="sidebar-section mt-auto">
         <div className="sidebar-section__label">System</div>
@@ -161,39 +93,7 @@ export function Sidebar({ activeTab, onTabChange, drugContext }: Props) {
   );
 }
 
-function SidebarTabItem({
-  id,
-  label,
-  icon,
-  active,
-  badge,
-  disabled,
-  onClick,
-}: {
-  id: SidebarTab;
-  label: string;
-  icon: ReactNode;
-  active?: boolean;
-  badge?: string;
-  disabled?: boolean;
-  onClick?: (tab: SidebarTab) => void;
-}) {
-  return (
-    <button
-      className={`sidebar-item w-full text-left ${active ? "sidebar-item--active" : ""} ${
-        disabled ? "sidebar-item--disabled" : ""
-      }`}
-      onClick={() => !disabled && onClick?.(id)}
-      disabled={disabled}
-    >
-      <span className="sidebar-item__icon">{icon}</span>
-      <span>{label}</span>
-      {badge && <span className="sidebar-item__count">{badge}</span>}
-    </button>
-  );
-}
-
-// Helper for routes outside Dashboard to use the params hook safely
+// Helper for routes outside Dashboard to use the params hook safely.
 export function usePlateContext() {
   const params = useParams<{ plateId?: string; drugId?: string }>();
   return params;
