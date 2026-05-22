@@ -4,94 +4,108 @@
  * Naming: `category.role.variant` → CSS var `--<category>-<role>-<variant>`.
  * Component code must reference these via Tailwind (e.g. bg-surface-base) or
  * var() — never inline hex/px (PRD §0 design-volatility containment).
+ *
+ * Light mode is the default (:root). Dark mode overrides via .dark on <html>.
+ * Toggle is managed by useTheme hook (localStorage key: "omixai-theme").
  */
 
+/* ─── LIGHT MODE (default) ─────────────────────────────────────────────── */
 :root {
-  /* === Surfaces (deep navy, design_02) ============================== */
-  --color-surface-base:      #070B14;     /* page background */
-  --color-surface-elevated:  #0D1320;     /* sticky header / footer */
-  --color-surface-card:      #101826;     /* card primary */
-  --color-surface-card-top:  #131D2C;     /* card gradient top */
-  --color-surface-overlay:   #1A2438;     /* hover / pressed */
-  --color-surface-sidebar:   #080D18;     /* sidebar bg (darker than base) */
-  --color-surface-soft:      #0B121F;     /* subtle alt */
+  /* === Surfaces (cool blue-white, mirrors dark navy at the other end) == */
+  --color-surface-base:      #F4F7FF;     /* page background */
+  --color-surface-elevated:  #EEF1FC;     /* sticky header / footer */
+  --color-surface-card:      #FFFFFF;     /* card primary */
+  --color-surface-card-top:  #F8FAFF;     /* card gradient top */
+  --color-surface-overlay:   #E5EAF8;     /* hover / pressed */
+  --color-surface-sidebar:   #EDF0FB;     /* sidebar bg */
+  --color-surface-soft:      #F0F4FE;     /* subtle alt */
+
+  /* Background gradient */
+  --body-bg-gradient: radial-gradient(circle at 20% -10%, #E8EEFF 0%, #F4F7FF 55%);
 
   /* Borders */
-  --color-border-default:    #243246;
-  --color-border-strong:     #324663;
+  --color-border-default:    #C8D3EC;
+  --color-border-strong:     #A8B8D8;
   --color-border-active:     #7C3AED;
   --color-border-accent:     var(--color-brand-primary);
 
   /* === Text ========================================================== */
-  --color-text-primary:      #EDF3FF;
-  --color-text-secondary:    #B6C0D6;
-  --color-text-muted:        #8F9BB3;
-  --color-text-disabled:     #5C677B;
-  --color-text-inverse:      #070B14;
-  --color-text-on-brand:     #F3E8FF;    /* high-contrast text on purple bg */
+  --color-text-primary:      #0D1224;
+  --color-text-secondary:    #344066;
+  --color-text-muted:        #5E6E9A;
+  --color-text-disabled:     #9AA5C7;
+  --color-text-inverse:      #EDF3FF;
+  --color-text-on-brand:     #F3E8FF;
 
-  /* === Brand (purple primary) ======================================= */
-  --color-brand-primary:        #A855F7;
-  --color-brand-primary-hover:  #B975FF;
-  --color-brand-primary-pressed:#8E33EA;
-  --color-brand-secondary:      #4AA8FF;
-  --color-brand-glow:           rgba(168, 85, 247, 0.55);
-  --color-brand-gradient: linear-gradient(135deg, #4AA8FF 0%, #A855F7 60%, #F472B6 100%);
+  /* === Brand (purple — slightly deeper for WCAG contrast on white) ==== */
+  --color-brand-primary:        #7C3AED;
+  --color-brand-primary-hover:  #9333EA;
+  --color-brand-primary-pressed:#6D28D9;
+  --color-brand-secondary:      #2563EB;
+  --color-brand-glow:           rgba(124, 58, 237, 0.35);
+  --color-brand-gradient: linear-gradient(135deg, #2563EB 0%, #7C3AED 60%, #EC4899 100%);
 
-  /* RGB triplets for the same brand colors. Required so Tailwind's
-   * alpha modifier (`bg-brand-primary/45` etc.) can compile against
-   * a `rgb(var(--…) / <alpha-value>)` color in tailwind.config.ts.
-   * Step 8 (2026-05-21). */
-  --color-brand-primary-rgb:         168  85 247;
-  --color-brand-primary-hover-rgb:   185 117 255;
-  --color-brand-primary-pressed-rgb: 142  51 234;
-  --color-brand-secondary-rgb:        74 168 255;
+  --color-brand-primary-rgb:         124  58 237;
+  --color-brand-primary-hover-rgb:   147  51 234;
+  --color-brand-primary-pressed-rgb: 109  40 217;
+  --color-brand-secondary-rgb:        37  99 235;
 
-  /* === Semantic status (PRD + style_guide) ========================== */
-  --color-status-success:   #4ADE80;   /* activated / pass */
-  --color-status-warning:   #FB923C;   /* warning */
-  --color-status-error:     #F87171;   /* suppressed / fail */
-  --color-status-info:      #4AA8FF;   /* informational */
-  --color-status-neutral:   #8F9BB3;
+  /* === Semantic status (deeper tones for legibility on light) ======== */
+  --color-status-success:   #16A34A;
+  --color-status-warning:   #D97706;
+  --color-status-error:     #DC2626;
+  --color-status-info:      #2563EB;
+  --color-status-neutral:   #64748B;
 
-  /* RGB triplets — same purpose as brand-*-rgb above. */
-  --color-status-success-rgb: 74 222 128;
-  --color-status-warning-rgb: 251 146 60;
-  --color-status-error-rgb:   248 113 113;
-  --color-status-info-rgb:    74 168 255;
-  --color-status-neutral-rgb: 143 155 179;
+  --color-status-success-rgb:  22 163  74;
+  --color-status-warning-rgb: 217 119   6;
+  --color-status-error-rgb:   220  38  38;
+  --color-status-info-rgb:     37  99 235;
+  --color-status-neutral-rgb: 100 116 139;
 
-  --color-status-success-fg: #052E16;
-  --color-status-warning-fg: #2A1604;
-  --color-status-error-fg:   #2A0808;
-  --color-status-info-fg:    #061B2E;
-  --color-status-neutral-fg: #0B121F;
+  --color-status-success-fg: #F0FDF4;
+  --color-status-warning-fg: #FFFBEB;
+  --color-status-error-fg:   #FEF2F2;
+  --color-status-info-fg:    #EFF6FF;
+  --color-status-neutral-fg: #F8FAFC;
 
-  /* === Localization colormap (Teal→Cyan) ============================
-   * Used by LocalizationCard heatmap; distinct from brand purple so the
-   * dual-channel readout (brand on PPI vs teal on Localization) is
-   * legible. Step 13 (2026-05-21).
-   */
-  --color-loc-low-rgb:  15 110  86;     /* #0F6E56 — teal 600 */
-  --color-loc-high-rgb: 34 211 238;     /* #22D3EE — cyan 400 */
+  /* === Localization colormap (Teal→Cyan) — same as dark for science == */
+  --color-loc-low-rgb:  15 110  86;
+  --color-loc-high-rgb: 34 211 238;
 
   /* PPI semantic node roles */
-  --color-role-target:      var(--color-brand-primary);   /* purple */
-  --color-role-activated:   var(--color-status-success);  /* green */
-  --color-role-suppressed:  var(--color-status-error);    /* red */
-  --color-role-info:        var(--color-status-info);     /* blue */
-  --color-role-unknown:     var(--color-status-neutral);  /* gray */
+  --color-role-target:      var(--color-brand-primary);
+  --color-role-activated:   var(--color-status-success);
+  --color-role-suppressed:  var(--color-status-error);
+  --color-role-info:        var(--color-status-info);
+  --color-role-unknown:     var(--color-status-neutral);
 
-  /* Cytotoxic (Plate summary) */
-  --color-cytotoxic-strong:   #F472B6;
-  --color-cytotoxic-moderate: #C084FC;
+  /* Cytotoxic */
+  --color-cytotoxic-strong:   #DB2777;
+  --color-cytotoxic-moderate: #9333EA;
   --color-cytotoxic-none:     var(--color-text-muted);
 
-  /* === Typography (PRD §13 + style_guide §6) ======================== */
+  /* === Component-level color aliases (replaces raw rgba in main.css) = */
+  --color-sidebar-active-text:  #6D28D9;
+  --color-chip-active-text:     #5B21B6;
+  --color-chip-info-text:       #1E40AF;
+  --color-chip-info-bg:         rgba(37, 99, 235, 0.10);
+  --color-chip-info-border:     rgba(37, 99, 235, 0.40);
+  --color-chip-success-text:    #14532D;
+  --color-chip-success-bg:      rgba(22, 163, 74, 0.12);
+  --color-chip-success-border:  rgba(22, 163, 74, 0.40);
+  --color-table-row-border:     rgba(200, 211, 236, 0.7);
+  --color-ghost-hover-bg:       rgba(0, 0, 0, 0.04);
+  --color-item-count-bg:        rgba(0, 0, 0, 0.05);
+  --color-link:                 #7C3AED;
+  --color-link-underline:       rgba(124, 58, 237, 0.40);
+  --color-scrollbar-thumb:      #C8D3EC;
+  --color-scrollbar-hover:      #A8B8D8;
+
+  /* === Typography ===================================================== */
   --font-family-sans: "Inter", "IBM Plex Sans", "Geist", "Pretendard", system-ui, sans-serif;
   --font-family-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 
-  /* style_guide scale: Hero 32 · Section 24 · Card 18 · Body 14 · Meta 12 */
   --font-heading-hero-size: 32px;
   --font-heading-hero-lh:   42px;
   --font-heading-section-size: 24px;
@@ -103,14 +117,14 @@
   --font-meta-size:         12px;
   --font-meta-lh:           18px;
 
-  /* === Spacing (4/8/16/24/32/48) ==================================== */
-  --space-1:  4px;     /* xs */
-  --space-2:  8px;     /* sm */
+  /* === Spacing ======================================================== */
+  --space-1:  4px;
+  --space-2:  8px;
   --space-3:  12px;
-  --space-4:  16px;    /* md */
-  --space-5:  24px;    /* lg — card padding default */
-  --space-6:  32px;    /* xl — section gap */
-  --space-7:  48px;    /* xxl */
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-7:  48px;
   --space-8:  64px;
 
   --space-card-padding: 24px;
@@ -118,36 +132,120 @@
   --space-component-gap: 16px;
   --space-sidebar-width: 240px;
 
-  /* Topbar = breadcrumb + h1 + chips + paragraph + TopbarMetaRow + TabBar.
-   * Static value; conservative against single-line content. InteractomeSlide
-   * uses this so its fixed `top:` lines up with the topbar bottom edge
-   * regardless of viewport. Step 8 (2026-05-21). */
   --height-topbar: 180px;
 
-  /* === Radius ======================================================== */
+  /* === Radius ========================================================= */
   --radius-sm:    6px;
   --radius-md:    10px;
-  --radius-lg:    14px;       /* default card */
+  --radius-lg:    14px;
   --radius-xl:    18px;
   --radius-pill:  9999px;
 
-  /* === Elevation (heavier on dark) ================================== */
-  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md:  0 6px 18px rgba(0, 0, 0, 0.4);
-  --shadow-lg:  0 10px 30px rgba(0, 0, 0, 0.5);
-  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.6);
-  --shadow-glow-brand: 0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 24px rgba(168, 85, 247, 0.18);
+  /* === Elevation (softer on light) =================================== */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md:  0 6px 18px rgba(0, 0, 0, 0.09);
+  --shadow-lg:  0 10px 30px rgba(0, 0, 0, 0.11);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.14);
+  --shadow-glow-brand: 0 0 0 1px rgba(124, 58, 237, 0.3), 0 0 24px rgba(124, 58, 237, 0.12);
 
-  /* === Motion ======================================================== */
+  /* === Motion ========================================================= */
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --motion-slow: 250ms;
   --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ─── DARK MODE (.dark on <html>) ─────────────────────────────────────── */
+.dark {
+  /* === Surfaces ======================================================= */
+  --color-surface-base:      #070B14;
+  --color-surface-elevated:  #0D1320;
+  --color-surface-card:      #101826;
+  --color-surface-card-top:  #131D2C;
+  --color-surface-overlay:   #1A2438;
+  --color-surface-sidebar:   #080D18;
+  --color-surface-soft:      #0B121F;
+
+  --body-bg-gradient: radial-gradient(circle at 20% -10%, #101A2B 0%, #060914 55%);
+
+  /* Borders */
+  --color-border-default:    #243246;
+  --color-border-strong:     #324663;
+  --color-border-active:     #7C3AED;
+
+  /* === Text =========================================================== */
+  --color-text-primary:      #EDF3FF;
+  --color-text-secondary:    #B6C0D6;
+  --color-text-muted:        #8F9BB3;
+  --color-text-disabled:     #5C677B;
+  --color-text-inverse:      #070B14;
+  --color-text-on-brand:     #F3E8FF;
+
+  /* === Brand ========================================================== */
+  --color-brand-primary:        #A855F7;
+  --color-brand-primary-hover:  #B975FF;
+  --color-brand-primary-pressed:#8E33EA;
+  --color-brand-secondary:      #4AA8FF;
+  --color-brand-glow:           rgba(168, 85, 247, 0.55);
+  --color-brand-gradient: linear-gradient(135deg, #4AA8FF 0%, #A855F7 60%, #F472B6 100%);
+
+  --color-brand-primary-rgb:         168  85 247;
+  --color-brand-primary-hover-rgb:   185 117 255;
+  --color-brand-primary-pressed-rgb: 142  51 234;
+  --color-brand-secondary-rgb:        74 168 255;
+
+  /* === Semantic status ================================================ */
+  --color-status-success:   #4ADE80;
+  --color-status-warning:   #FB923C;
+  --color-status-error:     #F87171;
+  --color-status-info:      #4AA8FF;
+  --color-status-neutral:   #8F9BB3;
+
+  --color-status-success-rgb:  74 222 128;
+  --color-status-warning-rgb: 251 146  60;
+  --color-status-error-rgb:   248 113 113;
+  --color-status-info-rgb:     74 168 255;
+  --color-status-neutral-rgb: 143 155 179;
+
+  --color-status-success-fg: #052E16;
+  --color-status-warning-fg: #2A1604;
+  --color-status-error-fg:   #2A0808;
+  --color-status-info-fg:    #061B2E;
+  --color-status-neutral-fg: #0B121F;
+
+  /* Cytotoxic */
+  --color-cytotoxic-strong:   #F472B6;
+  --color-cytotoxic-moderate: #C084FC;
+  --color-cytotoxic-none:     var(--color-text-muted);
+
+  /* === Component-level color aliases ================================= */
+  --color-sidebar-active-text:  #DDB6FF;
+  --color-chip-active-text:     #DDB6FF;
+  --color-chip-info-text:       #BCDEFF;
+  --color-chip-info-bg:         rgba(74, 168, 255, 0.12);
+  --color-chip-info-border:     rgba(74, 168, 255, 0.45);
+  --color-chip-success-text:    #BBF7D0;
+  --color-chip-success-bg:      rgba(74, 222, 128, 0.14);
+  --color-chip-success-border:  rgba(74, 222, 128, 0.45);
+  --color-table-row-border:     rgba(36, 50, 70, 0.5);
+  --color-ghost-hover-bg:       rgba(255, 255, 255, 0.04);
+  --color-item-count-bg:        rgba(255, 255, 255, 0.04);
+  --color-link:                 #C084FC;
+  --color-link-underline:       rgba(192, 132, 252, 0.45);
+  --color-scrollbar-thumb:      #1A2438;
+  --color-scrollbar-hover:      #243246;
+
+  /* === Elevation ====================================================== */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md:  0 6px 18px rgba(0, 0, 0, 0.4);
+  --shadow-lg:  0 10px 30px rgba(0, 0, 0, 0.5);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow-brand: 0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 24px rgba(168, 85, 247, 0.18);
+}
+
 html, body {
   background: var(--color-surface-base);
-  background-image: radial-gradient(circle at 20% -10%, #101A2B 0%, #060914 55%);
+  background-image: var(--body-bg-gradient);
   background-attachment: fixed;
   color: var(--color-text-primary);
   font-family: var(--font-family-sans);
@@ -155,20 +253,21 @@ html, body {
   line-height: var(--font-body-lh);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color var(--motion-base) var(--easing-standard),
+              color var(--motion-base) var(--easing-standard);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom scrollbar — very subtle on dark navy */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1A2438; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: #243246; }
+::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-hover); }
 
 ::selection {
-  background: rgba(168, 85, 247, 0.32);
+  background: rgba(var(--color-brand-primary-rgb) / 0.28);
   color: var(--color-text-primary);
 }
 

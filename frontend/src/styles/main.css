@@ -114,10 +114,10 @@
     color: var(--color-text-primary);
   }
   .sidebar-item--active {
-    background: rgba(168, 85, 247, 0.16);
-    color: #DDB6FF;
-    border-color: rgba(168, 85, 247, 0.35);
-    box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.18), 0 0 18px rgba(168, 85, 247, 0.18);
+    background: rgb(var(--color-brand-primary-rgb) / 0.14);
+    color: var(--color-sidebar-active-text);
+    border-color: rgb(var(--color-brand-primary-rgb) / 0.35);
+    box-shadow: 0 0 0 1px rgb(var(--color-brand-primary-rgb) / 0.18), 0 0 18px rgb(var(--color-brand-primary-rgb) / 0.14);
   }
   .sidebar-item--disabled {
     opacity: 0.4;
@@ -135,7 +135,7 @@
     margin-left: auto;
     font-size: 10px;
     color: var(--color-text-muted);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--color-item-count-bg);
     padding: 1px 7px;
     border-radius: var(--radius-pill);
     font-variant-numeric: tabular-nums;
@@ -163,19 +163,19 @@
     color: var(--color-text-primary);
   }
   .chip--active {
-    background: rgba(168, 85, 247, 0.2);
+    background: rgb(var(--color-brand-primary-rgb) / 0.16);
     border-color: var(--color-brand-primary);
-    color: #DDB6FF;
+    color: var(--color-chip-active-text);
   }
   .chip--info {
-    background: rgba(74, 168, 255, 0.12);
-    border-color: rgba(74, 168, 255, 0.45);
-    color: #BCDEFF;
+    background: var(--color-chip-info-bg);
+    border-color: var(--color-chip-info-border);
+    color: var(--color-chip-info-text);
   }
   .chip--success {
-    background: rgba(74, 222, 128, 0.14);
-    border-color: rgba(74, 222, 128, 0.45);
-    color: #BBF7D0;
+    background: var(--color-chip-success-bg);
+    border-color: var(--color-chip-success-border);
+    color: var(--color-chip-success-text);
   }
 
   /* === Badge ======================================================== */
@@ -233,14 +233,14 @@
   }
   .btn--ghost:hover {
     color: var(--color-text-primary);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--color-ghost-hover-bg);
   }
 
   /* === Link =========================================================== */
   .a-link {
-    color: #C084FC;
+    color: var(--color-link);
     text-decoration: underline;
-    text-decoration-color: rgba(192, 132, 252, 0.45);
+    text-decoration-color: var(--color-link-underline);
     text-underline-offset: 2px;
     transition: text-decoration-color var(--motion-fast);
   }
@@ -305,14 +305,14 @@
     user-select: none;
   }
   .sci-table tbody tr {
-    border-bottom: 1px solid rgba(36, 50, 70, 0.5);
+    border-bottom: 1px solid var(--color-table-row-border);
     transition: background var(--motion-fast) var(--easing-standard);
   }
   .sci-table tbody tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.012);
+    background: rgb(var(--color-brand-primary-rgb) / 0.02);
   }
   .sci-table tbody tr:hover {
-    background: rgba(168, 85, 247, 0.08);
+    background: rgb(var(--color-brand-primary-rgb) / 0.06);
   }
   .sci-table td {
     padding: 9px 14px;
@@ -378,7 +378,13 @@
   }
 }
 
-/* Plotly modebar transparency on dark */
+/* Plotly modebar — transparent bg, adapt icon color per theme */
 .js-plotly-plot .modebar {
   background: transparent !important;
+}
+.js-plotly-plot .modebar-btn path {
+  fill: var(--color-text-muted) !important;
+}
+.js-plotly-plot .modebar-btn:hover path {
+  fill: var(--color-text-primary) !important;
 }

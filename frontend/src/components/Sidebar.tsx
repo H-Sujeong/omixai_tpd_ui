@@ -1,4 +1,5 @@
 import { Link, useLocation, useParams } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * Left sidebar nav (design_02 + style_guide §4.2).
@@ -80,6 +81,7 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
 
       <div className="sidebar-section mt-auto">
         <div className="sidebar-section__label">System</div>
+        <ThemeToggle />
         <a className="sidebar-item sidebar-item--disabled">
           <span className="sidebar-item__icon">{ICON.help}</span>
           <span>Help</span>
