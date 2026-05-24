@@ -4,11 +4,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 /**
  * Left sidebar nav (design_02 + style_guide §4.2).
  *
- * App-level navigation only:
+ * Structure:
+ *   - Brand (top)
  *   - Workspace: Plates (active when on /plates index)
- *   - System (placeholder): Help / Settings
+ *   - Footer (mt-auto): Theme slide toggle
  *
- * Step 3 (2026-05-21): drug-context section removed (now in TabBar).
  * Step 7 (2026-05-21): on <lg the sidebar becomes an off-canvas drawer
  * controlled by AppShell's mobileOpen state. On lg+ it falls back to
  * the original sticky-left position with no transform.
@@ -31,18 +31,6 @@ const ICON = {
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   ),
-  help: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4M12 17.2v0" />
-    </svg>
-  ),
-  settings: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09c0-.66-.4-1.25-1-1.51a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09c.66 0 1.25-.4 1.51-1z" />
-    </svg>
-  ),
 } as const;
 
 export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
@@ -59,12 +47,9 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
       `}
       aria-hidden={!isMobileOpen && typeof window !== "undefined" && window.innerWidth < 1024 ? true : undefined}
     >
-      <Link to="/plates" className="sidebar-brand" onClick={onCloseMobile}>
+      <Link to="/plates" className="sidebar-brand" onClick={onCloseMobile} title="OmixAI-TPD · Molecular intelligence">
         <div className="sidebar-brand__logo">TPD</div>
-        <div className="leading-tight">
-          <div className="font-semibold text-ink-primary text-sm">OmixAI-TPD</div>
-          <div className="text-meta text-ink-muted">Molecular intelligence</div>
-        </div>
+        <div className="sidebar-brand__name">OmixAI</div>
       </Link>
 
       <div className="sidebar-section">
@@ -79,17 +64,9 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         </Link>
       </div>
 
-      <div className="sidebar-section mt-auto">
-        <div className="sidebar-section__label">System</div>
+      <div className="sidebar-footer mt-auto">
+        <div className="sidebar-section__label">Theme</div>
         <ThemeToggle />
-        <a className="sidebar-item sidebar-item--disabled">
-          <span className="sidebar-item__icon">{ICON.help}</span>
-          <span>Help</span>
-        </a>
-        <a className="sidebar-item sidebar-item--disabled">
-          <span className="sidebar-item__icon">{ICON.settings}</span>
-          <span>Settings</span>
-        </a>
       </div>
     </aside>
   );
