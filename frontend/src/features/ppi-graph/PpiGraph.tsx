@@ -300,9 +300,16 @@ export function PpiGraph({
     );
   };
 
+  const handleFit = () => {
+    cyRef.current?.fit(undefined, 20);
+  };
+  const handleReset = () => {
+    cyRef.current?.reset();
+  };
+
   return (
     <div className="flex flex-col gap-2 w-full">
-      {/* Filter chips */}
+      {/* Filter chips + view controls */}
       <div className="flex flex-wrap items-center gap-1.5 text-meta text-ink-muted">
         <span className="mr-1">필터:</span>
         <FilterChip mode="all" label="전체" />
@@ -310,6 +317,23 @@ export function PpiGraph({
         <FilterChip mode="pos" label="양성" accent="#185FA5" />
         <FilterChip mode="neg" label="음성" accent="#7C3AED" />
         <FilterChip mode="neutral" label="중립" />
+        <span className="mx-1 text-line">|</span>
+        <button
+          type="button"
+          onClick={handleFit}
+          className="px-2 py-0.5 text-meta border border-line rounded text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
+          title="화면에 맞추기"
+        >
+          Fit
+        </button>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="px-2 py-0.5 text-meta border border-line rounded text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
+          title="줌/팬 초기화"
+        >
+          Reset
+        </button>
       </div>
 
       {/* Plot panel (light bg, light borders) */}
