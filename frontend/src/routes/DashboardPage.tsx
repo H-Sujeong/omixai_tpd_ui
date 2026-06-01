@@ -282,21 +282,21 @@ export function DashboardPage() {
           />
         )}
 
-        {/* Single-page 3-column grid (Step 13, 2026-05-21, design_02-aligned).
-         * Left  (col-span-4): PPI Network + Landscape (2D/3D toggle)
-         * Center (col-span-5): Time-lapse (with cell-line popover) + Phenotypic
-         *                      Profiling + Pathway Enrichment
-         * Right (col-span-3): Compound, Target, Reference DBs (with external
-         *                      links), Localization (Teal→Cyan colormap)
+        {/* Layout (2026-06-01, UI변환안layout.png).
          *
-         * Removed (per user feedback):
-         *   - InteractomeSlide (node click now switches community in-place)
-         *   - Cell Line card (now an inline pill + hover popover above time-lapse)
-         *   - Mechanism of Action / Mechanism Summary panels (consolidated)
-         *   - Biomarkers / Experimental Notes panels
+         *   Col 1 (col-span-4) | Col 2 (col-span-5) | Col 3 (col-span-3, sticky)
+         *   ─────────────────────────────────────────────────────────────────
+         *   PPI Network  (big) │ Target Landscape  │  Compound Details
+         *                       │  (+ PCC threshold)│  Target Profile
+         *   ───────────────────│───────────────────│  Reference databases
+         *   Time-lapse Imaging │ Pathway Enrichment│  Localization
+         *   Phenotypic Profile │ (GO, tall)        │
+         *
+         *   Landscape + PPI are pulled up into the top "row" to give them
+         *   space (test_viz parity). Col 3 remains the sticky info column.
          */}
         <div className="mt-5 grid grid-cols-12 gap-5">
-          {/* === LEFT — Network + Landscape =================================== */}
+          {/* === COL 1 (col-span-4): PPI (top) + TimeLapse + Phenotypic ====== */}
           <div className="col-span-12 xl:col-span-4 flex flex-col gap-5 min-w-0">
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
@@ -309,7 +309,7 @@ export function DashboardPage() {
               actions={<span className="chip">{activePpi?.target}</span>}
             >
               {!activePpi ? (
-                <div className="h-[440px] flex items-center justify-center">
+                <div className="h-[520px] flex items-center justify-center">
                   <EmptyBlock label="PPI 데이터 없음" />
                 </div>
               ) : (
@@ -321,33 +321,11 @@ export function DashboardPage() {
                   selectedEdgeId={selectedEdgeId}
                   onNodeClick={handleNodeClick}
                   onEdgeClick={handleEdgeClick}
-                  height={440}
+                  height={520}
                 />
               )}
             </PanelCard>
 
-            <PanelCard
-              title="Target Landscape"
-              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community."
-              status={d.status_flags.landscape}
-            >
-              {d.landscape ? (
-                <Landscape
-                  landscape={d.landscape}
-                  highlightCommunity={selectedCommunity}
-                  onCommunityClick={handleLandscapeClick}
-                  height={420}
-                />
-              ) : (
-                <div className="h-[420px] flex items-center justify-center">
-                  <EmptyBlock />
-                </div>
-              )}
-            </PanelCard>
-          </div>
-
-          {/* === CENTER — Time-lapse + Profiling + Enrichment ================= */}
-          <div className="col-span-12 xl:col-span-5 flex flex-col gap-5 min-w-0">
             <PanelCard
               title="Time-lapse Imaging"
               tooltip="0–48 h timelapse (4 h cadence)"
@@ -370,6 +348,28 @@ export function DashboardPage() {
             >
               <PhenotypicProfilingPanel data={d.phenotypic} />
             </PanelCard>
+          </div>
+
+          {/* === COL 2 (col-span-5): Landscape (top) + Pathway (GO) ========== */}
+          <div className="col-span-12 xl:col-span-5 flex flex-col gap-5 min-w-0">
+            <PanelCard
+              title="Target Landscape"
+              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
+              status={d.status_flags.landscape}
+            >
+              {d.landscape ? (
+                <Landscape
+                  landscape={d.landscape}
+                  highlightCommunity={selectedCommunity}
+                  onCommunityClick={handleLandscapeClick}
+                  height={520}
+                />
+              ) : (
+                <div className="h-[520px] flex items-center justify-center">
+                  <EmptyBlock />
+                </div>
+              )}
+            </PanelCard>
 
             <PanelCard
               title="Pathway Enrichment"
@@ -379,7 +379,7 @@ export function DashboardPage() {
             </PanelCard>
           </div>
 
-          {/* === RIGHT — sticky info column ================================== */}
+          {/* === COL 3 (col-span-3): sticky info column (unchanged) ========== */}
           <div className="col-span-12 xl:col-span-3 min-w-0">
             <div className="flex flex-col gap-4 xl:sticky xl:top-[200px]">
               <CompoundDetailsCard d={d} />
