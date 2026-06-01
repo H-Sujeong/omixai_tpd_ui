@@ -180,12 +180,26 @@ export function DashboardPage() {
 
   const handleLandscapeClick = (cid: number) => {
     if (!activePpi) return;
+    const here = activePpi.current_community_id;
     setSelectedEdgeId(null);
+    setSelectedNode(null);
     setBridgeNotice({
       text: `Landscape peak → community ${cid} 선택 → PPI 재구성`,
       direction: "landscape-to-ppi",
     });
     setSelectedCommunity(cid);
+    // Record the transition on the backend, mirroring the node/edge handlers.
+    // Skip when clicking the already-active community (no-op switch).
+    if (cid !== here && plateId && drugId && target) {
+      switchCommunity.mutate({
+        plateId,
+        drugId,
+        fromCommunityId: here,
+        toCommunityId: cid,
+        bridgingNode: `landscape:peak#${cid}`,
+        target,
+      });
+    }
   };
 
   const resetToTargetCommunity = () => {

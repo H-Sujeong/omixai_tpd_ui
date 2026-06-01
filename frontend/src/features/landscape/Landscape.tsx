@@ -121,6 +121,9 @@ export function Landscape({ landscape, highlightCommunity, onCommunityClick, hei
           mode: "markers",
           x: [hl.x],
           y: [hl.y],
+          // Tag the ring with its own community_id so clicks landing on the
+          // ring (not the underlying dot) still dispatch a sensible cid.
+          customdata: [hl.community_id],
           marker: {
             size: 22,
             symbol: "circle-open",
@@ -291,9 +294,15 @@ export function Landscape({ landscape, highlightCommunity, onCommunityClick, hei
         style={{ width: "100%", borderRadius: 6, overflow: "hidden" }}
         onClick={(evt) => {
           if (!onCommunityClick) return;
-          const p = evt.points?.[0] as any;
-          const cid = p?.customdata;
-          if (typeof cid === "number") onCommunityClick(cid);
+          // The highlight ring trace (drawn last, on top) has no customdata.
+          // After the first click it sits over the community dot, so naively
+          // taking points[0] would always pick the ring and drop the click.
+          // Scan all hit points for the first one carrying a numeric
+          // community_id so subsequent clicks keep re-targeting the PPI.
+          const hit = (evt.points ?? []).find(
+            (pp: any) => typeof pp?.customdata === "number",
+          ) as any;
+          if (hit) onCommunityClick(hit.customdata as number);
         }}
       />
     </div>
