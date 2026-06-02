@@ -48,7 +48,7 @@ export function PlateListPage() {
        *  distinct layer above the plate grid; the page now reads as
        *  Workspace → Selection rather than two adjacent same-weight blocks. */}
       <section
-        className="mb-12 rounded-xl border border-line bg-surface-soft px-8 py-7"
+        className="mb-12 rounded-xl border border-line bg-surface-soft px-8 py-5"
         aria-label="Workspace summary"
       >
         <h1
@@ -158,9 +158,8 @@ function bucketDrugs(drugs: DrugSummaryRow[]) {
   ).length;
   const assetOnly = withAssets.length - cytotoxic - cytostatic;
   const total = drugs.length;
-  const active = cytotoxic + cytostatic;
-  const activePct = total ? Math.round((active / total) * 100) : 0;
-  return { noAsset, assetOnly, cytotoxic, cytostatic, total, activePct };
+  const assetCovered = withAssets.length;
+  return { noAsset, assetOnly, cytotoxic, cytostatic, total, assetCovered };
 }
 
 function PlateCard({
@@ -311,13 +310,14 @@ function PlateCard({
        *  here from inside the card body. The legacy "✓ assets ready" line
        *  was redundant once the outcome bar started rendering composition. */}
       <div className="px-5 py-3 border-t border-line bg-surface-soft flex items-center justify-between text-caption">
-        <span className="text-ink-secondary">
+        <span className="text-ink-secondary inline-flex items-baseline gap-1.5">
           {buckets ? (
             <>
+              <span className="text-ink-muted">Asset Coverage</span>
               <span className="text-ink-primary tabular font-semibold">
-                {buckets.activePct}%
-              </span>{" "}
-              phenotype-active compounds
+                {buckets.assetCovered} / {buckets.total}
+              </span>
+              <span>compounds</span>
             </>
           ) : (
             <span className="text-ink-muted">composition pending</span>
