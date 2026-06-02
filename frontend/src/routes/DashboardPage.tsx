@@ -238,8 +238,35 @@ export function DashboardPage() {
           />
         )}
 
-        {/* === Row 1: PPI 50% + Landscape 50% ============================ */}
+        {/* === Row 1: Landscape 50% + PPI 50% ============================
+         *  (swapped 2026-06-02 — Landscape sits left as the primary
+         *  navigation surface; PPI panel updates on landscape clicks,
+         *  so left→right reading order = cause→effect.) */}
         <div className="grid grid-cols-12 gap-5">
+          <section
+            id="landscape"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
+          >
+            <PanelCard
+              title="Target Landscape"
+              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
+              status={d.status_flags.landscape}
+            >
+              {d.landscape ? (
+                <Landscape
+                  landscape={d.landscape}
+                  highlightCommunity={selectedCommunity}
+                  onCommunityClick={handleLandscapeClick}
+                  height={520}
+                />
+              ) : (
+                <div className="h-[520px] flex items-center justify-center">
+                  <EmptyBlock />
+                </div>
+              )}
+            </PanelCard>
+          </section>
+
           <section
             id="ppi"
             className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
@@ -269,30 +296,6 @@ export function DashboardPage() {
                   onEdgeClick={handleEdgeClick}
                   height={520}
                 />
-              )}
-            </PanelCard>
-          </section>
-
-          <section
-            id="landscape"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
-          >
-            <PanelCard
-              title="Target Landscape"
-              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
-              status={d.status_flags.landscape}
-            >
-              {d.landscape ? (
-                <Landscape
-                  landscape={d.landscape}
-                  highlightCommunity={selectedCommunity}
-                  onCommunityClick={handleLandscapeClick}
-                  height={520}
-                />
-              ) : (
-                <div className="h-[520px] flex items-center justify-center">
-                  <EmptyBlock />
-                </div>
               )}
             </PanelCard>
           </section>
