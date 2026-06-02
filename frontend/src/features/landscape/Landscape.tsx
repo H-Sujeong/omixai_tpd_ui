@@ -76,15 +76,29 @@ export function Landscape({
 
   const [mode, setMode] = useState<"2d" | "3d">("2d");
   // Signed PCC threshold: a community remains visible iff its z >= threshold.
-  // Range −0.5 … 0.5, default 0 — per user instruction the slider's base
-  // sits at zero (show only non-negative correlations). Users slide left
-  // to include negative tail or right to isolate strong positive.
+  // Slider bounds are derived from the actual data — min and max of
+  // landscape.scatter[].z — so users never see values that don't exist
+  // in the plot. Base value is 0 (user preference); if 0 lies outside
+  // the data range we clamp to the nearest bound via effectiveThreshold.
   const [pccThreshold, setPccThreshold] = useState<number>(0);
 
+  const [rangeMin, rangeMax] = useMemo(() => {
+    if (landscape.scatter.length === 0) return [0, 0];
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const p of landscape.scatter) {
+      if (p.z < lo) lo = p.z;
+      if (p.z > hi) hi = p.z;
+    }
+    return [lo, hi];
+  }, [landscape.scatter]);
+
+  const effectiveThreshold = Math.max(rangeMin, Math.min(rangeMax, pccThreshold));
+
   const visibleScatter = useMemo(() => {
-    if (pccThreshold <= -0.5) return landscape.scatter;
-    return landscape.scatter.filter((p) => p.z >= pccThreshold);
-  }, [landscape.scatter, pccThreshold]);
+    if (effectiveThreshold <= rangeMin) return landscape.scatter;
+    return landscape.scatter.filter((p) => p.z >= effectiveThreshold);
+  }, [landscape.scatter, effectiveThreshold, rangeMin]);
 
   const scTarget = visibleScatter.filter((p) => p.is_target);
   const scOther  = visibleScatter.filter((p) => !p.is_target);
@@ -340,8 +354,8 @@ export function Landscape({
   const visibleCount = visibleScatter.length;
 
   const clampThreshold = (v: number) => {
-    if (Number.isNaN(v)) return 0;
-    return Math.max(-0.5, Math.min(0.5, v));
+    if (Number.isNaN(v)) return effectiveThreshold;
+    return Math.max(rangeMin, Math.min(rangeMax, v));
   };
 
   return (
@@ -377,34 +391,35 @@ export function Landscape({
           </button>
         </div>
 
-        {/* PCC threshold — signed (−0.5 … 0.5), 0.001 step for fine tuning.
-         *  Input widened so a 6-char value like "-0.345" is not clipped. */}
+        {/* PCC threshold — signed, 0.001 step. Slider bounds derived from
+         *  actual data min/max so users never see values that don't exist
+         *  in the current landscape. */}
         <div
           className="flex items-center gap-2 rounded-md border border-line bg-surface-elevated px-2 py-1"
-          title="avg(PCC) ≥ threshold 인 community 만 표시 (부호 그대로, 0.001 단위)"
+          title={`avg(PCC) ≥ threshold 인 community 만 표시 (data range: ${rangeMin.toFixed(3)} … ${rangeMax.toFixed(3)})`}
         >
           <span className="whitespace-nowrap">PCC ≥</span>
           <input
             type="number"
-            min={-0.5}
-            max={0.5}
+            min={rangeMin}
+            max={rangeMax}
             step={0.001}
-            value={pccThreshold.toFixed(3)}
+            value={effectiveThreshold.toFixed(3)}
             onChange={(e) => setPccThreshold(clampThreshold(parseFloat(e.target.value)))}
             className="w-20 tabular rounded border border-line bg-transparent px-1.5 py-0.5 text-ink-primary text-right focus:outline-none focus:border-brand-primary"
             aria-label="PCC threshold value"
           />
           <input
             type="range"
-            min={-0.5}
-            max={0.5}
+            min={rangeMin}
+            max={rangeMax}
             step={0.001}
-            value={pccThreshold}
+            value={effectiveThreshold}
             onChange={(e) => setPccThreshold(parseFloat(e.target.value))}
             className="w-48 accent-brand-primary"
             aria-label="PCC threshold slider"
           />
-          {pccThreshold !== 0 && (
+          {effectiveThreshold > rangeMin && (
             <span className="text-ink-muted whitespace-nowrap">
               ({visibleCount}/{totalPoints})
             </span>
