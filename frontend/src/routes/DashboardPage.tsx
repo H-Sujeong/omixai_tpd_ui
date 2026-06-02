@@ -14,25 +14,17 @@ import { KpiStrip } from "@/features/kpi/KpiStrip";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
 /**
- * Compound Dashboard — 2026-06-02 IA refactor (proposal #2).
+ * Compound Dashboard — 2026-06-02 IA polish (P1+P2+P3 from feedback #3).
  *
- * The dashboard-specific left rail is gone. Compound identity now lives
- * in the sticky page header; a horizontal tab nav under the header
- * provides section jumps. The freed horizontal space is given to the
- * primary visualizations (PPI + Landscape) and a Pathway / Imaging row.
- *
- *   [Sticky Header]
- *     breadcrumb
- *     drug name + targets + chips + conditions ··· target switcher / refs
- *     [tab nav: Overview · PPI · Landscape · Pathway · Imaging]
- *
- *   #overview        KPI strip → Key Findings → Mechanistic Signatures
- *   #ppi / #landscape  PPI 50% │ Landscape 50%
- *   #pathway / #imaging Pathway 50% │ (Time-lapse on top, Phenotypic below)
- *
- * Optional References, Compound Details, Target Profile cards removed —
- * compound info is already in the header; reference links are absorbed
- * into the header's right cluster as chip-style external links.
+ *   P1.1 — KpiStrip value-first + KeyFindings 2x2 removed.
+ *   P1.2 — Mechanistic Signatures shrunk to ~140px (smaller cells, no
+ *          gradient legend).
+ *   P2.1 — External reference links moved from header right cluster into
+ *          the left identity column (under conditions).
+ *   P2.2 — Section nav gets IntersectionObserver scroll-spy with a
+ *          2px brand-primary border-bottom under the active tab.
+ *   P3   — New "Summary" section between header and KPI carrying
+ *          d.insight.mechanism + top key_findings titles as 2-3 lines.
  */
 export function DashboardPage() {
   const { plateId, drugId } = useParams<{ plateId: string; drugId: string }>();
@@ -228,13 +220,13 @@ export function DashboardPage() {
       />
 
       <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1 flex flex-col gap-6">
-        {/* === #overview — KPI · Key Findings · Mechanistic Signatures ==== */}
+        {/* === #overview — Summary · KPI · Mechanistic Signatures ========= */}
         <section
           id="overview"
-          className="scroll-mt-[180px] flex flex-col gap-4"
+          className="scroll-mt-[200px] flex flex-col gap-4"
         >
+          <ExecutiveSummary insight={d.insight} />
           <KpiStrip kpis={d.kpis} />
-          <KeyFindingsStrip data={d.insight} />
           <MechanisticSignatures d={d} />
         </section>
 
@@ -250,7 +242,7 @@ export function DashboardPage() {
         <div className="grid grid-cols-12 gap-5">
           <section
             id="ppi"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px]"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
           >
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
@@ -283,7 +275,7 @@ export function DashboardPage() {
 
           <section
             id="landscape"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px]"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
           >
             <PanelCard
               title="Target Landscape"
@@ -306,11 +298,11 @@ export function DashboardPage() {
           </section>
         </div>
 
-        {/* === Row 2: Pathway 50% + Imaging-column 50% (Time-lapse + Phenotypic stacked) === */}
+        {/* === Row 2: Pathway 50% + Imaging-column 50% =================== */}
         <div className="grid grid-cols-12 gap-5">
           <section
             id="pathway"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px]"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
           >
             <PanelCard
               title="Pathway Enrichment"
@@ -322,7 +314,7 @@ export function DashboardPage() {
 
           <section
             id="imaging"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px] flex flex-col gap-5"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px] flex flex-col gap-5"
           >
             <PanelCard
               title="Time-lapse Imaging"
@@ -354,7 +346,7 @@ export function DashboardPage() {
 }
 
 // ===========================================================================
-// Header (sticky) — identity + target switcher + external refs + section tabs
+// Header (sticky) — identity + target switcher + section tabs (scroll-spy)
 // ===========================================================================
 
 const SECTION_NAV: { id: string; label: string }[] = [
@@ -364,6 +356,40 @@ const SECTION_NAV: { id: string; label: string }[] = [
   { id: "pathway", label: "Pathway" },
   { id: "imaging", label: "Imaging" },
 ];
+
+/**
+ * Scroll-spy hook — observes the listed section elements and returns the
+ * id of the topmost visible one. Tuned via `rootMargin` so the active
+ * change fires once a section's heading crosses just below the sticky
+ * header (not when it merely peeks at the very bottom of the viewport).
+ */
+function useActiveSection(ids: string[]): string {
+  const [active, setActive] = useState<string>(ids[0] ?? "");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length === 0) return;
+        const top = visible.reduce((a, b) =>
+          a.boundingClientRect.top < b.boundingClientRect.top ? a : b,
+        );
+        setActive(top.target.id);
+      },
+      { rootMargin: "-200px 0px -55% 0px", threshold: 0 },
+    );
+    const els: Element[] = [];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) {
+        observer.observe(el);
+        els.push(el);
+      }
+    }
+    return () => observer.disconnect();
+  }, [ids.join("|")]);
+  return active;
+}
 
 function DashboardHeader({
   d,
@@ -377,6 +403,7 @@ function DashboardHeader({
   onTargetChange: (t: string) => void;
 }) {
   const c = d.compound;
+  const activeSection = useActiveSection(SECTION_NAV.map((s) => s.id));
 
   const conditions = [
     c.dose_um != null ? `${c.dose_um} µM` : null,
@@ -403,9 +430,8 @@ function DashboardHeader({
         </div>
       </div>
 
-      {/* Identity row — left: compound identity · right: switcher + refs */}
+      {/* Identity row — left: identity + refs · right: switcher + version */}
       <div className="pl-16 pr-4 lg:px-8 pt-2 pb-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        {/* LEFT: identity block */}
         <div className="min-w-0">
           <h1
             className="text-ink-primary tracking-tight"
@@ -437,9 +463,13 @@ function DashboardHeader({
               {conditions.join(" · ")}
             </p>
           )}
+
+          {/* External reference chips — moved here from the right cluster.
+           * Keeps the right side reserved for analysis controls (target
+           * switcher / version) and gives identity a single coherent block. */}
+          <ExternalRefChips d={d} target={target} />
         </div>
 
-        {/* RIGHT: target switcher + version + external links */}
         <div className="flex flex-col items-start lg:items-end gap-2 shrink-0">
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-meta text-ink-muted mr-2">Target</span>
@@ -456,32 +486,41 @@ function DashboardHeader({
               v{d.provenance.pipeline_version}
             </span>
           </div>
-          <ExternalRefChips d={d} target={target} />
         </div>
       </div>
 
-      {/* Sticky horizontal section tab nav */}
+      {/* Sticky horizontal section tab nav — with scroll-spy active state.
+       * Active tab gets a 2px brand border-bottom + primary text; the
+       * whole nav band itself sits between the identity row and the
+       * page body so it reads as a tab strip rather than free links. */}
       <nav
         className="pl-16 pr-4 lg:px-8 border-t border-line"
         aria-label="Dashboard sections"
       >
         <ul className="flex items-center gap-1 -mb-px overflow-x-auto">
-          {SECTION_NAV.map((it) => (
-            <li key={it.id}>
-              <a
-                href={`#${it.id}`}
-                className="
-                  inline-flex items-center px-3 py-2.5
-                  text-body font-medium text-ink-secondary
-                  border-b-2 border-transparent
-                  hover:text-ink-primary hover:border-brand-primary/40
-                  transition-colors duration-fast
-                "
-              >
-                {it.label}
-              </a>
-            </li>
-          ))}
+          {SECTION_NAV.map((it) => {
+            const isActive = activeSection === it.id;
+            return (
+              <li key={it.id}>
+                <a
+                  href={`#${it.id}`}
+                  aria-current={isActive ? "true" : undefined}
+                  className={`
+                    inline-flex items-center px-3 py-2.5
+                    text-body font-medium
+                    border-b-2 transition-colors duration-fast
+                    ${
+                      isActive
+                        ? "text-brand-primary border-brand-primary"
+                        : "text-ink-secondary border-transparent hover:text-ink-primary hover:border-brand-primary/40"
+                    }
+                  `}
+                >
+                  {it.label}
+                </a>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </header>
@@ -489,11 +528,11 @@ function DashboardHeader({
 }
 
 /**
- * ExternalRefChips — flattened reference list shown as chip-style links
- * in the header right cluster. Replaces the dedicated Reference Databases
- * card. Order: target-gene refs first (UniProt / Ensembl / Entrez / HPA),
- * then compound refs (MedChemExpress), then derived MoA / literature
- * search links (PubChem / ChEMBL / DrugBank).
+ * ExternalRefChips — flattened reference list rendered as chip-style
+ * links inside the header identity block. Replaces the dedicated
+ * Reference Databases card. Order: target-gene refs first (UniProt /
+ * Ensembl / Entrez / HPA), then compound refs (MedChemExpress), then
+ * derived MoA / literature search links (PubChem / ChEMBL / DrugBank).
  */
 function ExternalRefChips({
   d,
@@ -531,49 +570,91 @@ function ExternalRefChips({
   if (items.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta justify-start lg:justify-end max-w-[520px]">
-      <span className="text-ink-muted uppercase tracking-wider mr-1">
-        External
-      </span>
-      {items.map((it, i) => (
-        <span key={it.label} className="inline-flex items-baseline gap-2">
-          {i > 0 && (
-            <span className="text-ink-muted opacity-50 select-none" aria-hidden>
-              ·
-            </span>
-          )}
-          <a
-            href={it.href}
-            target="_blank"
-            rel="noreferrer"
-            className="a-link"
-          >
-            {it.label}
-          </a>
-        </span>
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      {items.map((it) => (
+        <a
+          key={it.label}
+          href={it.href}
+          target="_blank"
+          rel="noreferrer"
+          className="chip hover:chip--active"
+        >
+          {it.label}
+        </a>
       ))}
     </div>
   );
 }
 
 // ===========================================================================
-// Mechanistic Signatures (formerly Localization Annotations) — heatmap rows
+// Executive Summary — short narrative under the header
 // ===========================================================================
 
 /**
- * Renames the existing localization_annotations payload to "Mechanistic
- * Signatures" and lifts it from the bottom #references strip into the
- * Overview band, between KPI/Key Findings and the main analysis grid.
- *
- * Visual format unchanged — 5-cell teal→cyan heatmap per row — so this is
- * purely a placement + label change at the UI layer. Backend payload
- * (`d.localization_annotations`) is reused as-is.
+ * Summary panel at the very top of the analysis flow. Tries the explicit
+ * `mechanism` paragraph first; falls back to the top key_findings titles
+ * if mechanism is empty. The 2-3 line constraint is enforced visually
+ * (line-clamp on the bullet list) rather than by slicing — that way new
+ * findings remain reachable in source order without UI re-tuning.
+ */
+function ExecutiveSummary({
+  insight,
+}: {
+  insight: DashboardResponse["insight"];
+}) {
+  if (!insight) return null;
+  const lines = insight.key_findings.slice(0, 3).map((f) => f.title);
+  const hasMechanism = Boolean(insight.mechanism);
+  if (!hasMechanism && lines.length === 0) return null;
+
+  return (
+    <PanelCard title="Summary">
+      {hasMechanism && (
+        <p className="text-body-strong text-ink-primary leading-relaxed">
+          {insight.mechanism}
+        </p>
+      )}
+      {lines.length > 0 && (
+        <ul className={`${hasMechanism ? "mt-2.5" : ""} flex flex-col gap-1.5`}>
+          {lines.map((line, i) => (
+            <li
+              key={i}
+              className="flex gap-2 text-body text-ink-secondary leading-relaxed"
+            >
+              <span
+                className="text-brand-primary shrink-0 mt-0.5"
+                aria-hidden
+              >
+                ›
+              </span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PanelCard>
+  );
+}
+
+// ===========================================================================
+// Mechanistic Signatures (formerly Localization Annotations) — compact heatmap
+// ===========================================================================
+
+/**
+ * Compact 4-row heatmap. Earlier version was ~230px tall with a gradient
+ * legend below; user noted that read as more dominant than PPI/Landscape
+ * even though it's an "interpretation layer", not the primary evidence.
+ * Halved by:
+ *   - smaller cells (12×8 vs 16×14)
+ *   - tighter row gap
+ *   - dropping the bottom Low→High gradient legend (was redundant —
+ *     the per-cell intensity ramp already communicates the same scale)
  */
 function MechanisticSignatures({ d }: { d: DashboardResponse }) {
   if (d.localization_annotations.length === 0) return null;
   return (
     <PanelCard title="Mechanistic Signatures">
-      <ul className="space-y-2.5">
+      <ul className="flex flex-col gap-1.5">
         {d.localization_annotations.map((l: { label: string; level: number }) => {
           const clamped = Math.max(0, Math.min(5, l.level));
           return (
@@ -581,14 +662,14 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
               <div
                 role="img"
                 aria-label={`${l.label} level ${l.level} of 5`}
-                className="flex gap-1 shrink-0"
+                className="flex gap-0.5 shrink-0"
               >
                 {Array.from({ length: 5 }).map((_, i) => {
                   if (i >= clamped) {
                     return (
                       <span
                         key={i}
-                        className="block w-4 h-3.5 rounded-sm"
+                        className="block w-3 h-2 rounded-sm"
                         style={{ background: "rgb(var(--color-loc-low-rgb) / 0.08)" }}
                       />
                     );
@@ -597,7 +678,7 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
                   return (
                     <span
                       key={i}
-                      className="block w-4 h-3.5 rounded-sm"
+                      className="block w-3 h-2 rounded-sm"
                       style={{
                         background:
                           ratio < 0.5
@@ -613,23 +694,12 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
           );
         })}
       </ul>
-      <div className="mt-3 pt-2.5 border-t border-line flex items-center gap-2 text-meta text-ink-muted">
-        <span>Low</span>
-        <div
-          className="flex-1 h-1.5 rounded-full"
-          style={{
-            background:
-              "linear-gradient(90deg, rgb(var(--color-loc-low-rgb) / 0.85), rgb(var(--color-loc-high-rgb) / 0.95))",
-          }}
-        />
-        <span>High</span>
-      </div>
     </PanelCard>
   );
 }
 
 // ===========================================================================
-// Existing helpers (KeyFindings, Bridge notice, CellLineInline)
+// Bridge notice + cell-line popover
 // ===========================================================================
 
 function BridgeNotice({
@@ -664,66 +734,6 @@ function BridgeNotice({
       >
         ✕
       </button>
-    </div>
-  );
-}
-
-function KeyFindingsStrip({ data }: { data: DashboardResponse["insight"] }) {
-  if (!data || data.key_findings.length === 0) return null;
-  const findings = data.key_findings.slice(0, 4);
-
-  const ICON: Record<string, string> = {
-    pulse: "◉",
-    warning: "⚠",
-    info: "ⓘ",
-    target: "◎",
-    "trend-up": "↗",
-    "trend-down": "↘",
-  };
-
-  const SENT_TEXT: Record<string, string> = {
-    positive: "text-status-success",
-    warning: "text-status-warning",
-    negative: "text-status-error",
-    neutral: "text-ink-secondary",
-  };
-
-  const SENT_RING: Record<string, string> = {
-    positive: "ring-status-success/30",
-    warning: "ring-status-warning/30",
-    negative: "ring-status-error/30",
-    neutral: "ring-line",
-  };
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-      {findings.map((f, i) => (
-        <div
-          key={i}
-          className={`kpi-tile ring-1 ring-inset ${SENT_RING[f.sentiment] ?? SENT_RING.neutral}`}
-        >
-          <div className="flex items-baseline gap-1.5">
-            <span
-              className={`text-card ${SENT_TEXT[f.sentiment] ?? SENT_TEXT.neutral}`}
-              aria-hidden
-            >
-              {ICON[f.icon] ?? "•"}
-            </span>
-            <h4
-              className={`text-body font-semibold ${
-                SENT_TEXT[f.sentiment] ?? SENT_TEXT.neutral
-              }`}
-            >
-              {f.title}
-            </h4>
-          </div>
-          {f.detail && (
-            <p className="text-meta text-ink-secondary leading-relaxed mt-1 line-clamp-3">
-              {f.detail}
-            </p>
-          )}
-        </div>
-      ))}
     </div>
   );
 }

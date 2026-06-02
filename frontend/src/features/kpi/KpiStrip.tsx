@@ -36,6 +36,14 @@ export function KpiStrip({ kpis }: Props) {
             className={`kpi-tile ring-1 ring-inset ${SENTIMENT_RING[sent]}`}
             aria-label={`${k.label}: ${k.value}`}
           >
+            {/* Value first — the scan target. Was label-then-value; user
+             *  asked to flip so the page's headline numbers register
+             *  immediately and the supporting text drops below. */}
+            <div
+              className={`kpi-tile__value ${sent !== "neutral" ? SENTIMENT_TEXT[sent] : ""}`}
+            >
+              {k.value}
+            </div>
             <div className="flex items-center justify-between">
               <span className="kpi-tile__label">{k.label}</span>
               {k.direction && (
@@ -43,9 +51,6 @@ export function KpiStrip({ kpis }: Props) {
                   {ARROW[k.direction]}
                 </span>
               )}
-            </div>
-            <div className={`kpi-tile__value ${sent !== "neutral" ? SENTIMENT_TEXT[sent] : ""}`}>
-              {k.value}
             </div>
             {k.hint && <div className="kpi-tile__hint">{k.hint}</div>}
           </div>
