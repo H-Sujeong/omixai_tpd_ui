@@ -61,11 +61,10 @@ export function PlateListPage() {
           Target Protein Degradation Experiments
         </h1>
         <p
-          className="mt-3 max-w-2xl text-ink-secondary"
+          className="mt-3 max-w-4xl text-ink-secondary"
           style={{ fontSize: "15px", lineHeight: 1.6, fontWeight: 400 }}
         >
-          Explore phenotype-driven target degradation experiments and compound
-          outcomes.
+          Explore phenotype-driven target degradation experiments and compound outcomes.
         </p>
 
         {summary && (
