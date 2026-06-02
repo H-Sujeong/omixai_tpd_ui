@@ -352,6 +352,20 @@ export function DashboardPage() {
 // Header (sticky) — identity + target switcher + section tabs (scroll-spy)
 // ===========================================================================
 
+/**
+ * Backend drug_group values are internal slugs (e.g. "Epigenetic_chromatin",
+ * "CDK_cell_cycle"). For human-facing header rendering we replace underscores
+ * with " / " and capitalize each segment so the class line reads as natural
+ * text — no chip styling needed.
+ */
+function formatDrugGroup(raw: string): string {
+  return raw
+    .split("_")
+    .filter(Boolean)
+    .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
+    .join(" / ");
+}
+
 const SECTION_NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "ppi", label: "PPI" },
@@ -433,7 +447,14 @@ function DashboardHeader({
         </div>
       </div>
 
-      {/* Identity row — left: identity + refs · right: switcher + version */}
+      {/* Identity row — left: relationship-labeled identity · right:
+       *  switcher + version.  Earlier version was a vertical stack of
+       *  unlabeled rows (drug / targets / chips / conditions); users had
+       *  to infer which row was which role.  Now each role carries a tiny
+       *  muted label ("Target", class as plain class line, conditions as
+       *  plain conditions line) so the relationship reads at a glance
+       *  while StatusBadge stays as the only semantic chip — outcome is
+       *  the one field where color carries meaning. */}
       <div className="pl-16 pr-4 lg:px-8 pt-2 pb-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <h1
@@ -449,15 +470,21 @@ function DashboardHeader({
           </h1>
 
           {d.target_profile.targets.length > 0 && (
-            <p className="mt-1 text-body-strong text-ink-secondary">
-              {d.target_profile.targets.join(" / ")}
+            <p className="mt-1.5 text-body">
+              <span className="text-ink-muted mr-2">Target</span>
+              <span className="text-ink-primary font-semibold">
+                {d.target_profile.targets.join(", ")}
+              </span>
             </p>
           )}
 
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {d.target_profile.drug_group && (
-              <span className="chip">{d.target_profile.drug_group}</span>
-            )}
+          {d.target_profile.drug_group && (
+            <p className="mt-1 text-body text-ink-secondary">
+              {formatDrugGroup(d.target_profile.drug_group)}
+            </p>
+          )}
+
+          <div className="mt-2">
             <StatusBadge growth_class={d.phenotypic?.growth_class} />
           </div>
 
