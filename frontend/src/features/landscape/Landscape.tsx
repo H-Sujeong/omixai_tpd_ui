@@ -48,6 +48,16 @@ const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
 const COLOR_OTHER_EDGE  = "#FFFFFF";
 const REF_LINE_COLOR    = "#1F2937";
 
+/**
+ * Visual flag for the extra "target itself" glyph that sits on top of the
+ * target-community marker (a larger ✚ text overlay).  Per user request the
+ * landscape only highlights the target *community* by default — flip this
+ * to `true` to bring the per-target glyph back without resurfacing all the
+ * rendering branches.  Kept in code rather than wiring a UI toggle so the
+ * decision lives in one place.
+ */
+const SHOW_TARGET_GLYPH = false;
+
 export function Landscape({
   landscape,
   onCommunityClick,
@@ -146,21 +156,20 @@ export function Landscape({
       });
     }
 
-    // 4. Target community — amber cross marker only.
-    //    Earlier this stacked a `text: "✚"` overlay on top of the marker,
-    //    which read as two separate target indicators (the larger orange
-    //    glyph and the smaller marker just below it). Per user feedback
-    //    we only mark the target *community*; the target node itself
-    //    does not get an extra glyph.
+    // 4. Target community marker.  When SHOW_TARGET_GLYPH is on a larger
+    //    ✚ text overlay rides on top to also highlight the target node
+    //    itself; default is off, so by default only the community is
+    //    marked.  All overlay-related props are still passed when the
+    //    flag is on, just to keep the code path warm.
     if (scTarget.length > 0) {
-      t.push({
+      const trace: any = {
         type: "scatter",
-        mode: "markers",
+        mode: SHOW_TARGET_GLYPH ? "markers+text" : "markers",
         x: scTarget.map((p) => p.x),
         y: scTarget.map((p) => p.y),
         customdata: scTarget.map((p) => p.community_id),
         marker: {
-          size: 16,
+          size: SHOW_TARGET_GLYPH ? 14 : 16,
           symbol: "cross",
           color: COLOR_TARGET_FILL,
           line: { width: 2.5, color: COLOR_TARGET_EDGE },
@@ -168,7 +177,13 @@ export function Landscape({
         hovertemplate:
           "<b>★ target community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
         showlegend: false,
-      });
+      };
+      if (SHOW_TARGET_GLYPH) {
+        trace.text = scTarget.map(() => "✚");
+        trace.textposition = "top center";
+        trace.textfont = { size: 16, color: COLOR_TARGET_FILL };
+      }
+      t.push(trace);
     }
 
     return t;
@@ -231,17 +246,15 @@ export function Landscape({
       });
     }
     if (scTarget.length > 0) {
-      t.push({
+      const trace: any = {
         type: "scatter3d",
-        mode: "markers+text",
+        mode: SHOW_TARGET_GLYPH ? "markers+text" : "markers",
         x: scTarget.map((p) => p.x),
         y: scTarget.map((p) => p.y),
         z: scTarget.map((p) => p.z),
         customdata: scTarget.map((p) => p.community_id),
-        text: scTarget.map(() => "+"),
-        textfont: { color: COLOR_TARGET_FILL, size: 20, family: "Arial Black" },
         marker: {
-          size: 10,
+          size: SHOW_TARGET_GLYPH ? 10 : 11,
           color: COLOR_TARGET_FILL,
           symbol: "cross",
           line: { width: 2, color: COLOR_TARGET_EDGE },
@@ -249,7 +262,12 @@ export function Landscape({
         hovertemplate:
           "★ target community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
         showlegend: false,
-      });
+      };
+      if (SHOW_TARGET_GLYPH) {
+        trace.text = scTarget.map(() => "+");
+        trace.textfont = { color: COLOR_TARGET_FILL, size: 20, family: "Arial Black" };
+      }
+      t.push(trace);
     }
     return t;
   }
