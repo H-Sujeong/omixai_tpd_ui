@@ -187,7 +187,7 @@ export function PpiGraph({
         idealEdgeLength: 80,
         nodeRepulsion: 9000,
       } as any,
-      wheelSensitivity: 0.25,
+      wheelSensitivity: 1,
     });
     cyRef.current = cy;
 
