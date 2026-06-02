@@ -123,11 +123,14 @@
   --font-family-sans: "Geist", "Inter", "IBM Plex Sans", "Pretendard", system-ui, sans-serif;
   --font-family-mono: "Geist Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 
-  /* T1 display — page hero. 2026-06-02: bumped 36→60px and 700→800. */
-  --font-display-size:    60px;
-  --font-display-lh:      60px;     /* 1.0 — tight hero */
-  --font-display-weight:  800;
-  --font-display-tracking: -0.04em;
+  /* T1 display — page hero. 2026-06-02 (rev3): 60→48/700 after feedback
+   * that 60/800 was eating visual budget vs the Plate Summary number.
+   * 48/700 reads as the page identifier but no longer outweighs the
+   * actual scan target (compounds count). */
+  --font-display-size:    48px;
+  --font-display-lh:      48px;     /* 1.0 — tight hero */
+  --font-display-weight:  700;
+  --font-display-tracking: -0.03em;
 
   --font-kpi-size:        48px;
   --font-kpi-lh:          48px;     /* 1.0 */

@@ -1,5 +1,5 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Fragment, useMemo, useState } from "react";
 import { useDrugSummary, usePlates } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -24,6 +24,7 @@ export function DrugSummaryPage() {
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("");
   const [filterEffect, setFilterEffect] = useState<string>("");
+  const [assetsOnly, setAssetsOnly] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("drug_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -44,6 +45,7 @@ export function DrugSummaryPage() {
     let r = data.filter((d) => {
       if (filterGroup && d.drug_group !== filterGroup) return false;
       if (filterEffect && d.growth_class !== filterEffect) return false;
+      if (assetsOnly && !d.has_dashboard_assets) return false;
       if (search) {
         const q = search.toLowerCase();
         const txt = (
@@ -65,7 +67,7 @@ export function DrugSummaryPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return r;
-  }, [data, search, filterGroup, filterEffect, sortKey, sortDir]);
+  }, [data, search, filterGroup, filterEffect, assetsOnly, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -104,18 +106,12 @@ export function DrugSummaryPage() {
 
   return (
     <div className="flex-1 px-8 py-7 mx-auto w-full max-w-[1500px]">
-      {/* Breadcrumb (T7 label) + Page title (T1 display) */}
-      <div className="text-label uppercase text-ink-muted">
-        <Link to="/plates" className="hover:text-ink-primary">Workspace</Link>
-        <span className="mx-2">/</span>
-        <span>Plates</span>
-        <span className="mx-2">/</span>
-        <span className="text-ink-secondary">{plateId}</span>
-      </div>
-      <header className="flex flex-wrap items-baseline gap-3 mt-1 mb-5">
-        {/* Inline style binds all four T1 properties from CSS vars so this
-         * survives a Tailwind config that hasn't recompiled yet
-         * (theme.extend.fontSize changes often need a Vite restart). */}
+      {/* Page title (T1 display). 2026-06-02: breadcrumb removed — Sidebar
+       * already conveys current location, and the h1 below shows the plate
+       * id at 60px, so a small "Workspace / Plates / D3_10" line above was
+       * redundant noise. Inline style binds all four T1 properties from CSS
+       * vars so this survives a Tailwind config that hasn't recompiled yet. */}
+      <header className="mt-1 mb-5">
         <h1
           className="text-ink-primary"
           style={{
@@ -127,14 +123,7 @@ export function DrugSummaryPage() {
         >
           {plateId}
         </h1>
-        {plateMeta?.plate_code && <span className="chip">{plateMeta.plate_code}</span>}
-        {plateMeta?.dose_um && (
-          <span className="chip chip--info">{plateMeta.dose_um} µM</span>
-        )}
-        {plateMeta?.cell_line && <span className="chip">{plateMeta.cell_line}</span>}
-        {plateMeta?.treatment_hours && (
-          <span className="chip">{plateMeta.treatment_hours} h</span>
-        )}
+        <PlateMetaRow meta={plateMeta} />
       </header>
 
       {/* Plate Summary — stacked horizontal bar, replaces the prior 4-tile
@@ -175,13 +164,34 @@ export function DrugSummaryPage() {
             </option>
           ))}
         </select>
-        {(search || filterGroup || filterEffect) && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={assetsOnly}
+          onClick={() => setAssetsOnly((v) => !v)}
+          title="실측 PPI / landscape 자산이 있는 약물만 표시"
+          className={`border rounded-md px-3 py-2 text-body transition-colors duration-fast inline-flex items-center gap-1.5 ${
+            assetsOnly
+              ? "border-brand-primary text-brand-primary font-medium"
+              : "border-line bg-surface-card text-ink-secondary hover:text-ink-primary"
+          }`}
+          style={
+            assetsOnly
+              ? { background: "rgb(var(--color-brand-primary-rgb) / 0.10)" }
+              : undefined
+          }
+        >
+          <span aria-hidden>{assetsOnly ? "✓" : "○"}</span>
+          Assets only
+        </button>
+        {(search || filterGroup || filterEffect || assetsOnly) && (
           <button
             className="btn btn--ghost text-meta"
             onClick={() => {
               setSearch("");
               setFilterGroup("");
               setFilterEffect("");
+              setAssetsOnly(false);
             }}
           >
             Reset
@@ -388,6 +398,84 @@ function TargetsCell({
   );
 }
 
+/**
+ * Plate header meta row — labeled inline (2026-06-02 rev4, explicit form).
+ *
+ *   Set D3  ·  Cell U2OS  ·  Dose 10 µM  ·  Observation 48 h
+ *   muted  bold              muted   bold     …
+ *
+ * Rev3 collapsed conditions into a bare "U2OS · 10 µM · 48 h" line which
+ * read cleaner but lost role information — and crucially is ambiguous for
+ * multi-dose experiments (a "Dose series, 6 levels" entry would look like
+ * a single condition). The labeled form is verbose but unambiguous, which
+ * matters more for a research tool than visual minimalism.
+ *
+ * Dose extensibility: render via formatDose() so the same component handles
+ *   - single dose:        "10 µM"
+ *   - explicit range:     "0.1–10 µM, 6 levels"   (future)
+ *   - unknown series:     "series, 6 levels"      (future)
+ * Add the variant fields to the meta payload to opt into the richer forms.
+ */
+function formatDose(meta: {
+  dose_um?: number | null;
+  dose_range?: [number, number] | null;
+  dose_levels?: number | null;
+}): string | null {
+  if (meta.dose_range && meta.dose_range.length === 2) {
+    const [lo, hi] = meta.dose_range;
+    const levels = meta.dose_levels ? `, ${meta.dose_levels} levels` : "";
+    return `${lo}–${hi} µM${levels}`;
+  }
+  if (meta.dose_levels && meta.dose_levels > 1) {
+    return `series, ${meta.dose_levels} levels`;
+  }
+  if (meta.dose_um != null) return `${meta.dose_um} µM`;
+  return null;
+}
+
+function PlateMetaRow({
+  meta,
+}: {
+  meta:
+    | {
+        plate_code?: string | null;
+        cell_line?: string | null;
+        dose_um?: number | null;
+        dose_range?: [number, number] | null;
+        dose_levels?: number | null;
+        treatment_hours?: number | null;
+      }
+    | undefined;
+}) {
+  if (!meta) return null;
+  const items: Array<{ label: string; value: string }> = [];
+  if (meta.plate_code) items.push({ label: "Set", value: meta.plate_code });
+  if (meta.cell_line) items.push({ label: "Cell", value: meta.cell_line });
+  const doseStr = formatDose(meta);
+  if (doseStr) items.push({ label: "Dose", value: doseStr });
+  if (meta.treatment_hours != null) {
+    items.push({ label: "Observation", value: `${meta.treatment_hours} h` });
+  }
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-body">
+      {items.map((it, i) => (
+        <Fragment key={it.label}>
+          {i > 0 && (
+            <span className="text-ink-muted opacity-50 select-none" aria-hidden>
+              ·
+            </span>
+          )}
+          <span className="inline-flex items-baseline gap-1.5">
+            <span className="text-ink-muted">{it.label}</span>
+            <span className="text-ink-primary font-medium">{it.value}</span>
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 function KpiBlock({
   label,
   value,
@@ -446,8 +534,12 @@ function PlateSummaryBar({
     {
       key: "assetOnly",
       count: s.assetOnly,
+      // "Asset Only" = has analysis assets AND growth-permissive (no
+      // cytotoxic / cytostatic signal). Semantically this matches the
+      // Growth-permissive StatusBadge → use the same green hue rather
+      // than the brand purple (purple read as decorative, not semantic).
       label: "Asset Only",
-      color: "var(--color-brand-primary)",
+      color: "var(--color-status-success)",
     },
     {
       key: "cytotoxic",
@@ -466,22 +558,39 @@ function PlateSummaryBar({
   const filtersActive = s.filtered !== s.total;
 
   return (
-    <section className="panel-card p-5 mb-5">
-      {/* Header: T3 title + caption with totals */}
+    <section className="panel-card p-5 mb-8">
+      {/* Header: section title + filter info (right). 2026-06-02 rev3 —
+       * the "70 compounds" stat used to live here cramped in the corner;
+       * promoted below as the visual hero. */}
       <header className="flex items-baseline justify-between gap-3 mb-3">
         <h2 className="text-title text-ink-primary">Plate Summary</h2>
-        <span className="text-caption text-ink-muted">
-          <span className="text-ink-primary font-semibold">{s.total}</span>{" "}
-          compounds in plate
-          {filtersActive && (
-            <>
-              {" · "}
-              <span className="text-ink-secondary tabular">{s.filtered}</span>{" "}
-              after filters
-            </>
-          )}
-        </span>
+        {filtersActive && (
+          <span className="text-caption text-ink-muted">
+            <span className="text-ink-secondary tabular">{s.filtered}</span>{" "}
+            after filters
+          </span>
+        )}
       </header>
+
+      {/* Hero stat — big number + "compounds" caption.  This is the page's
+       * primary scan target ("how many compounds did this plate produce").
+       * 2026-06-02 rev3: fixed at 32px (deliberate off-scale choice — the
+       * full T2 kpi 48px competed with the page hero; 32px reads as a
+       * prominent stat without overpowering the 48px plate-id h1). */}
+      <div className="flex items-baseline gap-3 mb-4">
+        <span
+          className="text-ink-primary tabular"
+          style={{
+            fontSize:      "32px",
+            lineHeight:    "1",
+            fontWeight:    700 as any,
+            letterSpacing: "-0.025em",
+          }}
+        >
+          {s.total}
+        </span>
+        <span className="text-body text-ink-muted">compounds</span>
+      </div>
 
       {/* Stacked bar — full width, proportional segments */}
       <div
