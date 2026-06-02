@@ -257,10 +257,10 @@ export function DashboardPage() {
                   landscape={d.landscape}
                   highlightCommunity={selectedCommunity}
                   onCommunityClick={handleLandscapeClick}
-                  height={560}
+                  height={556}
                 />
               ) : (
-                <div className="h-[560px] flex items-center justify-center">
+                <div className="h-[556px] flex items-center justify-center">
                   <EmptyBlock />
                 </div>
               )}
