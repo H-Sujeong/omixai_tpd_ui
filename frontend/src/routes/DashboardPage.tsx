@@ -225,7 +225,7 @@ export function DashboardPage() {
           id="overview"
           className="scroll-mt-[200px] flex flex-col gap-4"
         >
-          <ExecutiveSummary insight={d.insight} />
+          <ExecutiveSummary d={d} />
           <KpiStrip kpis={d.kpis} />
           <MechanisticSignatures d={d} />
         </section>
@@ -506,15 +506,20 @@ function DashboardHeader({
                   href={`#${it.id}`}
                   aria-current={isActive ? "true" : undefined}
                   className={`
-                    inline-flex items-center px-3 py-2.5
-                    text-body font-medium
+                    inline-flex items-center px-3.5 py-2.5
+                    text-body
                     border-b-2 transition-colors duration-fast
                     ${
                       isActive
-                        ? "text-brand-primary border-brand-primary"
-                        : "text-ink-secondary border-transparent hover:text-ink-primary hover:border-brand-primary/40"
+                        ? "text-brand-primary border-brand-primary font-semibold"
+                        : "text-ink-secondary border-transparent font-medium hover:text-ink-primary hover:border-brand-primary/40"
                     }
                   `}
+                  style={
+                    isActive
+                      ? { background: "rgb(var(--color-brand-primary-rgb) / 0.10)" }
+                      : undefined
+                  }
                 >
                   {it.label}
                 </a>
@@ -591,31 +596,36 @@ function ExternalRefChips({
 // ===========================================================================
 
 /**
- * Summary panel at the very top of the analysis flow. Tries the explicit
- * `mechanism` paragraph first; falls back to the top key_findings titles
- * if mechanism is empty. The 2-3 line constraint is enforced visually
- * (line-clamp on the bullet list) rather than by slicing — that way new
- * findings remain reachable in source order without UI re-tuning.
+ * Executive Summary — one-liner identity + up to 3 finding bullets.
+ *
+ * Earlier version rendered `insight.mechanism` verbatim (often a 2-3
+ * sentence paragraph), which buried the scan-target. Now we synthesize a
+ * single-line identity from `target_class || drug_group` + the joined
+ * target list, e.g. "PROTAC Degrader targeting SMARCA2 / SMARCA4". The
+ * full mechanism paragraph stays in the API payload for downstream
+ * consumers but is no longer rendered here.
  */
-function ExecutiveSummary({
-  insight,
-}: {
-  insight: DashboardResponse["insight"];
-}) {
-  if (!insight) return null;
-  const lines = insight.key_findings.slice(0, 3).map((f) => f.title);
-  const hasMechanism = Boolean(insight.mechanism);
-  if (!hasMechanism && lines.length === 0) return null;
+function ExecutiveSummary({ d }: { d: DashboardResponse }) {
+  const insight = d.insight;
+  const tp = d.target_profile;
+  const identityKind = tp.target_class ?? tp.drug_group ?? null;
+  const targetList = tp.targets.length > 0 ? tp.targets.join(" / ") : null;
+
+  let identity: string | null = null;
+  if (identityKind && targetList) identity = `${identityKind} targeting ${targetList}`;
+  else if (identityKind) identity = identityKind;
+  else if (targetList) identity = `Targeting ${targetList}`;
+
+  const lines = insight?.key_findings.slice(0, 3).map((f) => f.title) ?? [];
+  if (!identity && lines.length === 0) return null;
 
   return (
-    <PanelCard title="Summary">
-      {hasMechanism && (
-        <p className="text-body-strong text-ink-primary leading-relaxed">
-          {insight.mechanism}
-        </p>
+    <PanelCard title="Executive Summary">
+      {identity && (
+        <p className="text-body-strong text-ink-primary">{identity}</p>
       )}
       {lines.length > 0 && (
-        <ul className={`${hasMechanism ? "mt-2.5" : ""} flex flex-col gap-1.5`}>
+        <ul className={`${identity ? "mt-2.5" : ""} flex flex-col gap-1.5`}>
           {lines.map((line, i) => (
             <li
               key={i}
@@ -652,11 +662,23 @@ function ExecutiveSummary({
  */
 function MechanisticSignatures({ d }: { d: DashboardResponse }) {
   if (d.localization_annotations.length === 0) return null;
+  // Top signature = the entry with the highest level. Marked with a ★
+  // so the dominant interpretive layer is immediately scannable
+  // (ties — first-encountered wins, since `reduce` keeps the first max).
+  const topLevel = d.localization_annotations.reduce(
+    (max, l) => (l.level > max ? l.level : max),
+    -Infinity,
+  );
+  const topIndex = d.localization_annotations.findIndex(
+    (l) => l.level === topLevel,
+  );
+
   return (
     <PanelCard title="Mechanistic Signatures">
       <ul className="flex flex-col gap-2">
-        {d.localization_annotations.map((l: { label: string; level: number }) => {
+        {d.localization_annotations.map((l, idx) => {
           const clamped = Math.max(0, Math.min(5, l.level));
+          const isTop = idx === topIndex && topLevel > 0;
           return (
             <li key={l.label} className="flex items-center gap-3">
               <div
@@ -669,7 +691,7 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
                     return (
                       <span
                         key={i}
-                        className="block w-5 h-3 rounded-sm"
+                        className="block w-6 h-3.5 rounded-sm"
                         style={{ background: "rgb(var(--color-loc-low-rgb) / 0.08)" }}
                       />
                     );
@@ -678,7 +700,7 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
                   return (
                     <span
                       key={i}
-                      className="block w-5 h-3 rounded-sm"
+                      className="block w-6 h-3.5 rounded-sm"
                       style={{
                         background:
                           ratio < 0.5
@@ -689,7 +711,24 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
                   );
                 })}
               </div>
-              <span className="text-body text-ink-secondary">{l.label}</span>
+              <span
+                className={
+                  isTop
+                    ? "text-body text-ink-primary font-semibold inline-flex items-center gap-1.5"
+                    : "text-body text-ink-secondary"
+                }
+              >
+                {l.label}
+                {isTop && (
+                  <span
+                    aria-label="top signature"
+                    title="Top signature for this compound"
+                    className="text-status-warning"
+                  >
+                    ★
+                  </span>
+                )}
+              </span>
             </li>
           );
         })}
