@@ -655,7 +655,7 @@ function CompoundDetailsCard({ d }: { d: DashboardResponse }) {
             <span className="ml-3 text-ink-muted">~ {c.treatment_hours} h</span>
           )}
         </dd>
-        <dt className="text-ink-muted">HY-code</dt>
+        <dt className="text-ink-muted">Code</dt>
         <dd className="col-span-2 font-mono text-meta">{c.hy_code ?? "—"}</dd>
         <dt className="text-ink-muted">SMILES</dt>
         <dd className="col-span-2 font-mono text-meta break-all text-ink-secondary">
@@ -709,7 +709,7 @@ function ReferenceDatabasesCard({ d, target }: { d: DashboardResponse; target: s
   });
   if (d.compound.hy_code) {
     moaLinks.push({
-      label: "HY-code (MedChem)",
+      label: "Code (MedChem)",
       href: `https://www.medchemexpress.com/search.html?q=${encodeURIComponent(
         d.compound.hy_code,
       )}`,

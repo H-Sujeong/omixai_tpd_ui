@@ -28,9 +28,10 @@
     border-bottom: 1px solid var(--color-border-default);
   }
   .panel-title {
-    font-size: var(--font-card-title-size);
-    line-height: var(--font-card-title-lh);
-    font-weight: 600;
+    /* T3 title — 16/600 */
+    font-size: var(--font-title-size);
+    line-height: var(--font-title-lh);
+    font-weight: var(--font-title-weight);
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
   }
@@ -96,7 +97,10 @@
     gap: 4px;
   }
   .sidebar-section__label {
-    font-size: 9px;
+    /* T7 label — 10/600/0.12em uppercase */
+    font-size: var(--font-label-size);
+    line-height: var(--font-label-lh);
+    font-weight: var(--font-label-weight);
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-muted);
@@ -113,7 +117,8 @@
     padding: 10px 6px;
     border-radius: var(--radius-md);
     color: var(--color-text-secondary);
-    font-size: 11px;
+    /* T5 body bumped to 500 weight per sidebar-item spec */
+    font-size: var(--font-body-size);
     line-height: 1.2;
     font-weight: 500;
     text-align: center;
@@ -231,8 +236,11 @@
     border: 1px solid var(--color-border-default);
     background: var(--color-surface-overlay);
     color: var(--color-text-secondary);
-    font-size: var(--font-meta-size);
-    line-height: var(--font-meta-lh);
+    /* Chip uses T6 caption — 11/500/0.04em */
+    font-size: var(--font-caption-size);
+    line-height: var(--font-caption-lh);
+    font-weight: var(--font-caption-weight);
+    letter-spacing: 0.04em;
     transition: background var(--motion-fast) var(--easing-standard),
                 border-color var(--motion-fast) var(--easing-standard);
     white-space: nowrap;
@@ -258,23 +266,66 @@
     color: var(--color-chip-success-text);
   }
 
-  /* === Badge ======================================================== */
+  /* === Badge — soft pill with leading dot (2026-06-02) ====================
+     Tone-on-tone: muted bg, saturated color, thin border. ::before dot
+     reads as a status indicator (●). Weight=500 deliberately — bold
+     badges blow up the scan order ("Badge가 너무 튀기 시작함"). */
   .badge {
     display: inline-flex;
     align-items: center;
-    padding: 2px 10px;
+    gap: 6px;
+    padding: 3px 11px;
     border-radius: var(--radius-pill);
-    font-size: var(--font-meta-size);
-    font-weight: 600;
-    line-height: var(--font-meta-lh);
+    font-size: 12px;          /* fixed at 12px per badge spec */
+    line-height: 16px;
+    font-weight: 500;         /* not 600 */
+    border: 1px solid transparent;
+    background: transparent;
   }
-  .badge--success    { background: var(--color-status-success); color: var(--color-status-success-fg); }
-  .badge--warning    { background: var(--color-status-warning); color: var(--color-status-warning-fg); }
-  .badge--error      { background: var(--color-status-error);   color: var(--color-status-error-fg); }
-  .badge--info       { background: var(--color-status-info);    color: var(--color-status-info-fg); }
-  .badge--neutral    { background: var(--color-surface-overlay);color: var(--color-text-secondary); }
-  .badge--cytotoxic-strong   { background: var(--color-cytotoxic-strong);   color: var(--color-text-inverse); }
-  .badge--cytotoxic-moderate { background: var(--color-cytotoxic-moderate); color: var(--color-text-inverse); }
+  .badge::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .badge--success {
+    background: rgb(var(--color-status-success-rgb) / 0.14);
+    color: var(--color-status-success);
+    border-color: rgb(var(--color-status-success-rgb) / 0.40);
+  }
+  .badge--warning {
+    background: rgb(var(--color-status-warning-rgb) / 0.14);
+    color: var(--color-status-warning);
+    border-color: rgb(var(--color-status-warning-rgb) / 0.40);
+  }
+  .badge--error {
+    background: rgb(var(--color-status-error-rgb) / 0.14);
+    color: var(--color-status-error);
+    border-color: rgb(var(--color-status-error-rgb) / 0.40);
+  }
+  .badge--info {
+    background: rgb(var(--color-status-info-rgb) / 0.14);
+    color: var(--color-status-info);
+    border-color: rgb(var(--color-status-info-rgb) / 0.40);
+  }
+  .badge--neutral {
+    background: var(--color-surface-overlay);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border-default);
+  }
+  .badge--cytotoxic-strong {
+    background: rgb(var(--color-cytotoxic-strong-rgb) / 0.14);
+    color: var(--color-cytotoxic-strong);
+    border-color: rgb(var(--color-cytotoxic-strong-rgb) / 0.40);
+  }
+  .badge--cytotoxic-moderate {
+    background: rgb(var(--color-cytotoxic-moderate-rgb) / 0.14);
+    color: var(--color-cytotoxic-moderate);
+    border-color: rgb(var(--color-cytotoxic-moderate-rgb) / 0.40);
+  }
 
   /* === Buttons ====================================================== */
   .btn {
@@ -328,7 +379,7 @@
     text-decoration-color: var(--color-brand-primary);
   }
 
-  /* === KPI tile (design_02 large purple numeric) ==================== */
+  /* === KPI tile (design_02 large purple numeric) — 2026-06-02 elevation pass */
   .kpi-tile {
     background: linear-gradient(180deg, var(--color-surface-card-top), var(--color-surface-card));
     border: 1px solid var(--color-border-default);
@@ -338,66 +389,124 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
-    transition: border-color var(--motion-fast) var(--easing-standard);
+    box-shadow: var(--shadow-sm);
+    transition: border-color var(--motion-fast) var(--easing-standard),
+                box-shadow var(--motion-fast) var(--easing-standard),
+                transform var(--motion-fast) var(--easing-standard);
   }
   .kpi-tile:hover {
     border-color: rgba(168, 85, 247, 0.4);
+    box-shadow: var(--shadow-md);
   }
   .kpi-tile__label {
-    font-size: var(--font-meta-size);
-    line-height: var(--font-meta-lh);
+    /* T7 label — 10/600/0.12em uppercase */
+    font-size: var(--font-label-size);
+    line-height: var(--font-label-lh);
+    font-weight: var(--font-label-weight);
     color: var(--color-text-muted);
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    font-weight: 600;
   }
   .kpi-tile__value {
-    font-size: 32px;
-    line-height: 38px;
-    font-weight: 700;
+    /* T2 kpi — 48/700/-0.04em/1.0 */
+    font-size: var(--font-kpi-size);
+    line-height: var(--font-kpi-lh);
+    font-weight: var(--font-kpi-weight);
     color: var(--color-brand-primary);
+    letter-spacing: -0.04em;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.015em;
   }
   .kpi-tile__hint {
-    font-size: var(--font-meta-size);
-    color: var(--color-text-muted);
+    /* T6 caption — 11/500/0.04em (NOT uppercase) */
+    font-size: var(--font-caption-size);
+    line-height: var(--font-caption-lh);
+    font-weight: var(--font-caption-weight);
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary);
+  }
+  /* Featured KPI — visual emphasis only (glow + border) so the typography
+   * stays on-scale. We deliberately don't bump the value size — adding a
+   * 9th type variant just for "the big one" would violate the 7-scale. */
+  .kpi-tile--featured {
+    border-color: rgb(var(--color-brand-primary-rgb) / 0.45);
+    box-shadow: var(--shadow-md), 0 0 22px rgb(var(--color-brand-primary-rgb) / 0.18);
   }
 
-  /* === Scientific table (Bloomberg terminal feel) =================== */
+  /* === Scientific table (Bloomberg terminal feel) — 2026-06-02 polished */
   .sci-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;   /* allow sticky col to have its own bg */
+    border-spacing: 0;
     font-variant-numeric: tabular-nums;
   }
   .sci-table thead th {
     position: sticky;
     top: 0;
-    background: var(--color-surface-card-top);
-    color: var(--color-text-muted);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    /* distinct header band (was card-top) so header reads as separate */
+    background: var(--color-surface-elevated);
+    color: var(--color-text-secondary);
+    /* Table header: 11/600/0.08em uppercase */
+    font-size: 11px;
+    line-height: 16px;
     font-weight: 600;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--color-border-default);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--color-border-strong);
     text-align: left;
     user-select: none;
+    z-index: 2;
   }
   .sci-table tbody tr {
-    border-bottom: 1px solid var(--color-table-row-border);
     transition: background var(--motion-fast) var(--easing-standard);
   }
   .sci-table tbody tr:nth-child(even) {
-    background: rgb(var(--color-brand-primary-rgb) / 0.02);
+    background: rgb(var(--color-brand-primary-rgb) / 0.025);
   }
   .sci-table tbody tr:hover {
-    background: rgb(var(--color-brand-primary-rgb) / 0.06);
+    background: rgb(var(--color-brand-primary-rgb) / 0.10);
   }
   .sci-table td {
-    padding: 9px 14px;
+    /* T5 body — 13/400/1.5 */
+    padding: 10px 14px;
     color: var(--color-text-secondary);
     font-size: var(--font-body-size);
+    line-height: var(--font-body-lh);
+    font-weight: var(--font-body-weight);
+    border-bottom: 1px solid var(--color-table-row-border);
+  }
+  /* Sticky first column — keep the row's hero datum visible on horizontal scroll.
+     Apply className="sticky-col" to both the thead th and the tbody td. */
+  .sci-table th.sticky-col,
+  .sci-table td.sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
+  .sci-table th.sticky-col { z-index: 3; }
+  /* Background must be opaque so the rows underneath don't bleed through. */
+  .sci-table tbody td.sticky-col {
+    background: var(--color-surface-card);
+  }
+  .sci-table tbody tr:nth-child(even) td.sticky-col {
+    background: var(--color-surface-card-top);
+  }
+  .sci-table tbody tr:hover td.sticky-col {
+    /* Layered: row-hover tint over opaque card bg so the column reads as fused with the row. */
+    background:
+      linear-gradient(rgb(var(--color-brand-primary-rgb) / 0.10),
+                       rgb(var(--color-brand-primary-rgb) / 0.10)),
+      var(--color-surface-card);
+  }
+  /* Hero column — used for the Drug name. T4 body-strong (14/600). */
+  .sci-table td.col-hero {
+    font-size: var(--font-body-strong-size);
+    line-height: var(--font-body-strong-lh);
+    font-weight: var(--font-body-strong-weight);
+    color: var(--color-text-primary);
+  }
+  .sci-table tbody tr:hover td.col-hero {
+    color: var(--color-brand-primary);
   }
 
   /* === Section header divider ======================================= */

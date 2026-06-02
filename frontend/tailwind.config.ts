@@ -71,11 +71,19 @@ const config: Config = {
         mono: ["var(--font-family-mono)"],
       },
       fontSize: {
-        hero: ["var(--font-heading-hero-size)", { lineHeight: "var(--font-heading-hero-lh)" }],
-        section: ["var(--font-heading-section-size)", { lineHeight: "var(--font-heading-section-lh)" }],
-        card: ["var(--font-card-title-size)", { lineHeight: "var(--font-card-title-lh)" }],
-        body: ["var(--font-body-size)", { lineHeight: "var(--font-body-lh)" }],
-        meta: ["var(--font-meta-size)", { lineHeight: "var(--font-meta-lh)" }],
+        // === 7-scale typography (2026-06-02) ============================
+        display:      ["var(--font-display-size)",      { lineHeight: "var(--font-display-lh)",      fontWeight: "var(--font-display-weight)",      letterSpacing: "var(--font-display-tracking)" }],
+        kpi:          ["var(--font-kpi-size)",          { lineHeight: "var(--font-kpi-lh)",          fontWeight: "var(--font-kpi-weight)",          letterSpacing: "-0.04em" }],
+        title:        ["var(--font-title-size)",        { lineHeight: "var(--font-title-lh)",        fontWeight: "var(--font-title-weight)" }],
+        "body-strong":["var(--font-body-strong-size)",  { lineHeight: "var(--font-body-strong-lh)",  fontWeight: "var(--font-body-strong-weight)" }],
+        body:         ["var(--font-body-size)",         { lineHeight: "var(--font-body-lh)",         fontWeight: "var(--font-body-weight)" }],
+        caption:      ["var(--font-caption-size)",      { lineHeight: "var(--font-caption-lh)",      fontWeight: "var(--font-caption-weight)",      letterSpacing: "0.04em" }],
+        label:        ["var(--font-label-size)",        { lineHeight: "var(--font-label-lh)",        fontWeight: "var(--font-label-weight)",        letterSpacing: "0.12em" }],
+        // === Legacy aliases — back-compat with existing callers =========
+        hero:    ["var(--font-display-size)", { lineHeight: "var(--font-display-lh)" }],
+        section: ["var(--font-title-size)",   { lineHeight: "var(--font-title-lh)" }],
+        card:    ["var(--font-title-size)",   { lineHeight: "var(--font-title-lh)" }],
+        meta:    ["var(--font-caption-size)", { lineHeight: "var(--font-caption-lh)" }],
       },
       borderRadius: {
         sm: "var(--radius-sm)",

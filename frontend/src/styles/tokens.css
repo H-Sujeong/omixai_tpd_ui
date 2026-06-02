@@ -31,8 +31,8 @@
 
   /* === Text ========================================================== */
   --color-text-primary:      #0D1224;
-  --color-text-secondary:    #344066;
-  --color-text-muted:        #5E6E9A;
+  --color-text-secondary:    #2A3656;   /* 2026-06-02: bumped contrast for long sessions */
+  --color-text-muted:        #525F87;   /* was #5E6E9A — slightly darker */
   --color-text-disabled:     #9AA5C7;
   --color-text-inverse:      #EDF3FF;
   --color-text-on-brand:     #F3E8FF;
@@ -80,10 +80,13 @@
   --color-role-info:        var(--color-status-info);
   --color-role-unknown:     var(--color-status-neutral);
 
-  /* Cytotoxic */
-  --color-cytotoxic-strong:   #DB2777;
-  --color-cytotoxic-moderate: #9333EA;
+  /* Cytotoxic — 2026-06-02 recolor to status-aligned scale:
+     strong=red (status-error), moderate=distinct orange, none=muted. */
+  --color-cytotoxic-strong:   #DC2626;
+  --color-cytotoxic-moderate: #EA580C;
   --color-cytotoxic-none:     var(--color-text-muted);
+  --color-cytotoxic-strong-rgb:   220  38  38;
+  --color-cytotoxic-moderate-rgb: 234  88  12;
 
   /* === Component-level color aliases (replaces raw rgba in main.css) = */
   --color-sidebar-active-text:  #6D28D9;
@@ -102,20 +105,64 @@
   --color-scrollbar-thumb:      #C8D3EC;
   --color-scrollbar-hover:      #A8B8D8;
 
-  /* === Typography ===================================================== */
-  --font-family-sans: "Inter", "IBM Plex Sans", "Geist", "Pretendard", system-ui, sans-serif;
-  --font-family-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  /* === Typography — 7-scale system (2026-06-02 overhaul) ==============
+   *
+   *  T1  display    36/700/-0.03em/1.1   — Page title (h1)
+   *  T2  kpi        48/700/-0.04em/1.0   — KPI numeric value
+   *  T3  title      16/600/1.4           — Section title / panel header
+   *  T4  body-str   14/600/1.5           — Table primary (drug name)
+   *  T5  body       13/400/1.5           — Body / table secondary
+   *  T6  caption    11/500/0.04em        — Hints, breadcrumb (NOT uppercase)
+   *  T7  label      10/600/0.12em UPPER  — Sidebar group, KPI label
+   *
+   *  Anything not on the scale is a mistake. The five legacy aliases
+   *  (hero/section/card/body/meta) are remapped onto this scale below
+   *  and in tailwind.config.ts for back-compat. New code should use the
+   *  T-named utilities (text-display, text-kpi, text-title, ...).
+   */
+  --font-family-sans: "Geist", "Inter", "IBM Plex Sans", "Pretendard", system-ui, sans-serif;
+  --font-family-mono: "Geist Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 
-  --font-heading-hero-size: 32px;
-  --font-heading-hero-lh:   42px;
-  --font-heading-section-size: 24px;
-  --font-heading-section-lh:   34px;
-  --font-card-title-size:   18px;
-  --font-card-title-lh:     26px;
-  --font-body-size:         14px;
-  --font-body-lh:           22px;
-  --font-meta-size:         12px;
-  --font-meta-lh:           18px;
+  /* T1 display — page hero. 2026-06-02: bumped 36→60px and 700→800. */
+  --font-display-size:    60px;
+  --font-display-lh:      60px;     /* 1.0 — tight hero */
+  --font-display-weight:  800;
+  --font-display-tracking: -0.04em;
+
+  --font-kpi-size:        48px;
+  --font-kpi-lh:          48px;     /* 1.0 */
+  --font-kpi-weight:      700;
+
+  --font-title-size:      16px;
+  --font-title-lh:        22px;     /* ≈ 1.4 */
+  --font-title-weight:    600;
+
+  --font-body-strong-size:   14px;
+  --font-body-strong-lh:     21px;  /* 1.5 */
+  --font-body-strong-weight: 600;
+
+  --font-body-size:       13px;
+  --font-body-lh:         20px;     /* ≈ 1.5 */
+  --font-body-weight:     400;
+
+  --font-caption-size:    11px;
+  --font-caption-lh:      16px;
+  --font-caption-weight:  500;
+
+  --font-label-size:      10px;
+  --font-label-lh:        14px;
+  --font-label-weight:    600;
+
+  /* Legacy aliases (kept so existing Tailwind utilities like text-hero
+   * still compile until callers migrate to the new T-names). */
+  --font-heading-hero-size:    var(--font-display-size);
+  --font-heading-hero-lh:      var(--font-display-lh);
+  --font-heading-section-size: var(--font-title-size);   /* downsized */
+  --font-heading-section-lh:   var(--font-title-lh);
+  --font-card-title-size:      var(--font-title-size);
+  --font-card-title-lh:        var(--font-title-lh);
+  --font-meta-size:            var(--font-caption-size);
+  --font-meta-lh:              var(--font-caption-lh);
 
   /* === Spacing ======================================================== */
   --space-1:  4px;
@@ -175,8 +222,8 @@
 
   /* === Text =========================================================== */
   --color-text-primary:      #EDF3FF;
-  --color-text-secondary:    #B6C0D6;
-  --color-text-muted:        #8F9BB3;
+  --color-text-secondary:    #C7D1E5;   /* 2026-06-02: brighter for legibility (was #B6C0D6) */
+  --color-text-muted:        #A4AEC5;   /* was #8F9BB3 */
   --color-text-disabled:     #5C677B;
   --color-text-inverse:      #070B14;
   --color-text-on-brand:     #F3E8FF;
@@ -194,15 +241,19 @@
   --color-brand-primary-pressed-rgb: 142  51 234;
   --color-brand-secondary-rgb:        74 168 255;
 
-  /* === Semantic status ================================================ */
+  /* === Semantic status ================================================
+   * 2026-06-02: status-warning split from cytotoxic-moderate. Both were
+   * #FB923C (orange-400) which made Cytotoxic vs Static visually identical
+   * in dark mode (PlateSummaryBar, badges, GR score text). Warning now
+   * uses amber-400 #FBBF24 — a clearly distinct yellow-amber hue. */
   --color-status-success:   #4ADE80;
-  --color-status-warning:   #FB923C;
+  --color-status-warning:   #FBBF24;
   --color-status-error:     #F87171;
   --color-status-info:      #4AA8FF;
   --color-status-neutral:   #8F9BB3;
 
   --color-status-success-rgb:  74 222 128;
-  --color-status-warning-rgb: 251 146  60;
+  --color-status-warning-rgb: 251 191  36;
   --color-status-error-rgb:   248 113 113;
   --color-status-info-rgb:     74 168 255;
   --color-status-neutral-rgb: 143 155 179;
@@ -213,10 +264,12 @@
   --color-status-info-fg:    #061B2E;
   --color-status-neutral-fg: #0B121F;
 
-  /* Cytotoxic */
-  --color-cytotoxic-strong:   #F472B6;
-  --color-cytotoxic-moderate: #C084FC;
+  /* Cytotoxic — 2026-06-02 recolor (red/orange), reduced saturation for dark */
+  --color-cytotoxic-strong:   #F87171;
+  --color-cytotoxic-moderate: #FB923C;
   --color-cytotoxic-none:     var(--color-text-muted);
+  --color-cytotoxic-strong-rgb:   248 113 113;
+  --color-cytotoxic-moderate-rgb: 251 146  60;
 
   /* === Component-level color aliases ================================= */
   --color-sidebar-active-text:  #DDB6FF;
@@ -227,7 +280,7 @@
   --color-chip-success-text:    #BBF7D0;
   --color-chip-success-bg:      rgba(74, 222, 128, 0.14);
   --color-chip-success-border:  rgba(74, 222, 128, 0.45);
-  --color-table-row-border:     rgba(36, 50, 70, 0.5);
+  --color-table-row-border:     rgba(36, 50, 70, 0.85);  /* stronger grid 2026-06-02 */
   --color-ghost-hover-bg:       rgba(255, 255, 255, 0.04);
   --color-item-count-bg:        rgba(255, 255, 255, 0.04);
   --color-link:                 #C084FC;
@@ -251,8 +304,14 @@ html, body {
   font-family: var(--font-family-sans);
   font-size: var(--font-body-size);
   line-height: var(--font-body-lh);
+  font-weight: var(--font-body-weight);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* 2026-06-02: tabular-nums + cv11 (Geist's straight-sided digits) globally
+   * so every number in the dashboard aligns vertically without per-element
+   * .tabular markup. */
+  font-feature-settings: "tnum", "cv11";
+  font-variant-numeric: tabular-nums;
   transition: background-color var(--motion-base) var(--easing-standard),
               color var(--motion-base) var(--easing-standard);
 }

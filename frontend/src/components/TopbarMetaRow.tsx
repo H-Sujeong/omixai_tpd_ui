@@ -7,7 +7,7 @@ interface Props {
 }
 
 /**
- * Compact metadata row beneath the topbar h1. Surfaces dose/HY-code/cell
+ * Compact metadata row beneath the topbar h1. Surfaces dose/code/cell
  * line and primary external references inline so users don't need to open
  * the Overview tab to see core experimental conditions.
  *
