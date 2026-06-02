@@ -2,36 +2,39 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
- * Left sidebar nav (design_02 + style_guide §4.2).
+ * Global icon-rail sidebar (~64px). Carries only the brand, the
+ * Plates entry, and the theme toggle — section labels removed per
+ * user request to drop the "AI SaaS template" feel and give the main
+ * analysis area maximum horizontal space.
  *
- * Structure:
- *   - Brand (top)
- *   - Workspace: Plates (active when on /plates index)
- *   - Footer (mt-auto): Theme slide toggle
+ * Tooltips: `title=` attributes on each control surface the role
+ * since labels are gone.
  *
- * Step 7 (2026-05-21): on <lg the sidebar becomes an off-canvas drawer
- * controlled by AppShell's mobileOpen state. On lg+ it falls back to
- * the original sticky-left position with no transform.
+ * Step 7 (2026-05-21): on <lg the rail becomes an off-canvas drawer
+ * controlled by AppShell's mobileOpen state.
  */
 
 interface Props {
-  /** Off-canvas drawer open state on <lg. Ignored on lg+. */
   isMobileOpen?: boolean;
-  /** Called when a Link inside the drawer is clicked, so the drawer
-   *  closes after navigation. */
   onCloseMobile?: () => void;
 }
 
-const ICON = {
-  plates: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  ),
-} as const;
+const PlatesIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    aria-hidden="true"
+  >
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </svg>
+);
 
 export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
   const location = useLocation();
@@ -45,27 +48,36 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         max-lg:transition-transform max-lg:duration-base
         ${isMobileOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"}
       `}
-      aria-hidden={!isMobileOpen && typeof window !== "undefined" && window.innerWidth < 1024 ? true : undefined}
+      aria-hidden={
+        !isMobileOpen && typeof window !== "undefined" && window.innerWidth < 1024
+          ? true
+          : undefined
+      }
     >
-      <Link to="/plates" className="sidebar-brand" onClick={onCloseMobile} title="OmixAI-TPD · Molecular intelligence">
+      <Link
+        to="/plates"
+        className="sidebar-brand"
+        onClick={onCloseMobile}
+        title="OmixAI-TPD · Workspace"
+      >
         <div className="sidebar-brand__logo">TPD</div>
-        <div className="sidebar-brand__name">OmixAI</div>
       </Link>
 
-      <div className="sidebar-section">
-        <div className="sidebar-section__label">Workspace</div>
+      <nav aria-label="Primary">
         <Link
           to="/plates"
           className={`sidebar-item ${onPlatesIndex ? "sidebar-item--active" : ""}`}
           onClick={onCloseMobile}
+          title="Plates"
+          aria-label="Plates"
         >
-          <span className="sidebar-item__icon">{ICON.plates}</span>
-          <span>Plates</span>
+          <span className="sidebar-item__icon">
+            <PlatesIcon />
+          </span>
         </Link>
-      </div>
+      </nav>
 
       <div className="sidebar-footer mt-auto">
-        <div className="sidebar-section__label">Theme</div>
         <ThemeToggle />
       </div>
     </aside>
