@@ -286,12 +286,6 @@ function PlateCard({
                   </span>
                 ))}
               </div>
-              <p className="mt-3 text-caption text-ink-muted">
-                <span className="text-ink-primary tabular font-semibold">
-                  {buckets.activePct}%
-                </span>{" "}
-                phenotype-active compounds
-              </p>
             </>
           ) : drugsLoading ? (
             <div
@@ -306,9 +300,21 @@ function PlateCard({
         </div>
       </div>
 
+      {/* Footer — phenotype-active % is the headline outcome metric, moved
+       *  here from inside the card body. The legacy "✓ assets ready" line
+       *  was redundant once the outcome bar started rendering composition. */}
       <div className="px-5 py-3 border-t border-line bg-surface-soft flex items-center justify-between text-caption">
-        <span className="text-ink-muted">
-          {plate.has_dashboard_assets ? "✓ assets ready" : "synth fallback"}
+        <span className="text-ink-secondary">
+          {buckets ? (
+            <>
+              <span className="text-ink-primary tabular font-semibold">
+                {buckets.activePct}%
+              </span>{" "}
+              compounds show phenotype effects
+            </>
+          ) : (
+            <span className="text-ink-muted">composition pending</span>
+          )}
         </span>
         <span className="text-brand-primary opacity-80 group-hover:opacity-100 font-medium">
           View Plate →
