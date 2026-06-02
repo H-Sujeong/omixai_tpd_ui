@@ -43,8 +43,14 @@ export function PlateListPage() {
 
   return (
     <div className="flex-1 px-8 py-8 mx-auto w-full max-w-[1400px]">
-      {/* Hero — title + short description + inline workspace stats */}
-      <header className="mb-8">
+      {/* Hero — bounded Summary Surface. Wrapping the workspace summary in
+       *  a softly tinted, bordered panel makes "Workspace" register as a
+       *  distinct layer above the plate grid; the page now reads as
+       *  Workspace → Selection rather than two adjacent same-weight blocks. */}
+      <section
+        className="mb-12 rounded-xl border border-line bg-surface-soft px-8 py-7"
+        aria-label="Workspace summary"
+      >
         <h1
           className="text-ink-primary"
           style={{
@@ -75,9 +81,25 @@ export function PlateListPage() {
             <StatItem value={summary.wells} label="Wells" />
           </div>
         )}
-      </header>
+      </section>
 
-      <h2 className="text-title text-ink-primary mb-4">Experiment Plates</h2>
+      {/* Section break — uppercase T7 label paired with a thin divider line
+       *  reads as a clear "now entering Plate Selection" handoff. */}
+      <div className="mb-5 flex items-center gap-4">
+        <span
+          className="text-ink-muted whitespace-nowrap"
+          style={{
+            fontSize:      "var(--font-label-size)",
+            lineHeight:    "var(--font-label-lh)",
+            fontWeight:    "var(--font-label-weight)" as any,
+            letterSpacing: "var(--font-label-tracking)",
+            textTransform: "uppercase",
+          }}
+        >
+          Experiment Plates
+        </span>
+        <span className="flex-1 border-t border-line" aria-hidden />
+      </div>
 
       {isLoading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
