@@ -1,10 +1,9 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useCommunityPanel, useDashboard, useSwitchCommunity } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { PanelCard } from "@/components/PanelCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { TopbarMetaRow } from "@/components/TopbarMetaRow";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
 import { findRelatedCommunityFromEdge } from "@/features/ppi-graph/relatedCommunity";
 import { Landscape } from "@/features/landscape/Landscape";
@@ -15,18 +14,31 @@ import { KpiStrip } from "@/features/kpi/KpiStrip";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
 /**
- * Single-page dashboard layout (Step 12, 2026-05-21).
+ * Single-page Compound Dashboard (2026-06-02 IA refactor).
  *
- * The previous 3-tab structure (Phenotype/Network/Mechanism) has been
- * collapsed into one continuous page that mirrors design_02 — everything
- * the user needs is visible at once, organized in three columns:
+ * Layout shift — pre-refactor the page was a 4/5/3 column grid where the
+ * right column carried Compound Details, Target Profile, References,
+ * Localization (static metadata). Per user feedback that "scientist should
+ * always know which compound they're looking at while analyzing", static
+ * compound context now lives in a left sticky rail; the main analysis
+ * column gets the freed width as a 2-col 50/50 grid for PPI + Landscape
+ * and Time-lapse + Phenotypic Profiling.
  *
- *   - Left (col-span-4): PPI Network + 3D Landscape, evenly split 50/50
- *   - Center (col-span-5): Time-lapse, Phenotypic Profiling, Pathway Enrichment
- *   - Right (col-span-3): Compound, Target, Cell Line, References,
- *                          Localization, Mechanism of Action (sticky)
+ *   [Context rail 280px, sticky]  [Main analysis flow]
+ *     Current Compound              KPI Summary       (#overview)
+ *     name + chips                  Key Findings 2x2
+ *     dose/cell/observation         ─────
+ *     ─────                         PPI + Landscape   (#ppi / #landscape)
+ *     Sections nav                  Time-lapse + Phenotypic (#imaging)
+ *     · Overview                    Pathway Enrichment (#pathway)
+ *     · PPI                         ─────
+ *     · Landscape                   Optional References (#references)
+ *     · Imaging                       └ Localization + Refs + Compound
+ *     · Pathway                          + Target detail
+ *     · References
  *
- * Legacy ?tab=... URLs are stripped on entry (replace) so bookmarks survive.
+ * Anchor IDs + scroll-mt utility keep the sticky topbar from covering each
+ * section heading when nav links are clicked.
  */
 export function DashboardPage() {
   const { plateId, drugId } = useParams<{ plateId: string; drugId: string }>();
@@ -42,8 +54,6 @@ export function DashboardPage() {
     text: string;
     direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump";
   } | null>(null);
-  // Step 13 (2026-05-21): InteractomeSlide removed; node clicks now jump
-  // the user in-place to the relevant community on the current PPI panel.
 
   const dash = useDashboard(plateId, drugId, target);
 
@@ -51,7 +61,6 @@ export function DashboardPage() {
     if (dash.data && !target) setTarget(dash.data.target_id);
   }, [dash.data, target]);
 
-  // One-way: target state → URL.
   useEffect(() => {
     if (!target) return;
     setSearch(
@@ -65,9 +74,6 @@ export function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
-  // Step 12 (2026-05-21): if a legacy ?tab=... param is still in the URL
-  // from a bookmark, strip it silently — the dashboard is now single-page
-  // and the tab param has no effect. Done once on mount.
   useEffect(() => {
     if (search.get("tab")) {
       setSearch(
@@ -104,7 +110,6 @@ export function DashboardPage() {
 
   const switchCommunity = useSwitchCommunity();
 
-  // PPI node click → jump to other community + open Interactome slide
   const handleNodeClick = (nodeId: string) => {
     setSelectedNode(nodeId);
     setSelectedEdgeId(null);
@@ -136,7 +141,6 @@ export function DashboardPage() {
     }
   };
 
-  // PPI edge click → find most-related community → highlight on landscape
   const handleEdgeClick = (edge: {
     id: string;
     source: string;
@@ -188,8 +192,6 @@ export function DashboardPage() {
       direction: "landscape-to-ppi",
     });
     setSelectedCommunity(cid);
-    // Record the transition on the backend, mirroring the node/edge handlers.
-    // Skip when clicking the already-active community (no-op switch).
     if (cid !== here && plateId && drugId && target) {
       switchCommunity.mutate({
         plateId,
@@ -217,33 +219,26 @@ export function DashboardPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Topbar — design_02 breadcrumb + hero + actions */}
-      <div className="sticky top-0 z-20 bg-surface-elevated">
-        <div className="pl-16 pr-4 lg:px-8 py-4 flex flex-col lg:flex-row items-start lg:justify-between gap-3 lg:gap-4">
-          <div className="min-w-0">
-            <div className="text-meta uppercase tracking-[0.16em] text-ink-muted">
-              <Link to="/plates" className="hover:text-ink-primary">Workspace</Link>
-              <span className="mx-2">›</span>
-              <Link to={`/plates/${plateId}`} className="hover:text-ink-primary">{plateId}</Link>
-              <span className="mx-2">›</span>
-              <span className="text-ink-secondary">{d.drug_name}</span>
-            </div>
-            <div className="flex items-baseline gap-3 mt-1">
-              <h1 className="text-hero font-bold tracking-tight text-ink-primary">{d.drug_name}</h1>
-              <span className="chip">PROTAC Degrader</span>
-              {d.target_profile.drug_group && (
-                <span className="chip">{d.target_profile.drug_group}</span>
-              )}
-              <StatusBadge growth_class={d.phenotypic?.growth_class} />
-            </div>
-            <p className="text-body text-ink-muted mt-1">
-              {d.target_profile.target_class ?? "Targeted protein degradation"} · Targets:{" "}
-              {d.target_profile.targets.join(" / ")}
-            </p>
-            <TopbarMetaRow d={d} target={target ?? d.target_id} />
+      {/* Slim topbar — breadcrumb + target switcher + batch info. The big
+       *  hero (drug name + chips + meta) is gone; that identity now lives
+       *  in the sticky context rail so it stays in view during scroll. */}
+      <div className="sticky top-0 z-20 bg-surface-elevated border-b border-line">
+        <div className="pl-16 pr-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-meta uppercase tracking-[0.16em] text-ink-muted min-w-0">
+            <Link to="/plates" className="hover:text-ink-primary">
+              Workspace
+            </Link>
+            <span className="mx-2">›</span>
+            <Link to={`/plates/${plateId}`} className="hover:text-ink-primary">
+              {plateId}
+            </Link>
+            <span className="mx-2">›</span>
+            <span className="text-ink-secondary normal-case tracking-normal">
+              {d.drug_name}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
-            <div className="flex flex-wrap items-center gap-1 mr-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1">
               <span className="text-meta text-ink-muted mr-2">Target</span>
               {d.available_targets.map((t) => (
                 <button
@@ -261,136 +256,323 @@ export function DashboardPage() {
                 </button>
               ))}
             </div>
-            <div className="text-meta text-ink-muted tabular text-left lg:text-right">
-              <div>batch · {d.provenance.plate_id}</div>
-              <div>v{d.provenance.pipeline_version}</div>
-            </div>
+            <span className="text-meta text-ink-muted tabular ml-2">
+              v{d.provenance.pipeline_version}
+            </span>
           </div>
         </div>
       </div>
 
       <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1">
-        <KpiStrip kpis={d.kpis} />
-
-        <KeyFindingsStrip data={d.insight} />
-
-        {bridgeNotice && (
-          <BridgeNotice
-            notice={bridgeNotice}
-            onReset={resetToTargetCommunity}
-            onDismiss={() => setBridgeNotice(null)}
-          />
-        )}
-
-        {/* Layout (2026-06-01, UI변환안layout.png).
-         *
-         *   Col 1 (col-span-4) | Col 2 (col-span-5) | Col 3 (col-span-3, sticky)
-         *   ─────────────────────────────────────────────────────────────────
-         *   PPI Network  (big) │ Target Landscape  │  Compound Details
-         *                       │  (+ PCC threshold)│  Target Profile
-         *   ───────────────────│───────────────────│  Reference databases
-         *   Time-lapse Imaging │ Pathway Enrichment│  Localization
-         *   Phenotypic Profile │ (GO, tall)        │
-         *
-         *   Landscape + PPI are pulled up into the top "row" to give them
-         *   space (test_viz parity). Col 3 remains the sticky info column.
-         */}
-        <div className="mt-5 grid grid-cols-12 gap-5">
-          {/* === COL 1 (col-span-4): PPI (top) + TimeLapse + Phenotypic ====== */}
-          <div className="col-span-12 xl:col-span-4 flex flex-col gap-5 min-w-0">
-            <PanelCard
-              title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
-              tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = landscape에서 관련 community 자동 선택."
-              accent
-              status={d.status_flags.ppi}
-              meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
-                activePpi?.nodes.length ?? 0
-              } · edges=${activePpi?.edges.length ?? 0}`}
-              actions={<span className="chip">{activePpi?.target}</span>}
-            >
-              {!activePpi ? (
-                <div className="h-[520px] flex items-center justify-center">
-                  <EmptyBlock label="PPI 데이터 없음" />
-                </div>
-              ) : (
-                <PpiGraph
-                  nodes={activePpi.nodes}
-                  edges={activePpi.edges}
-                  targetName={activePpi.target}
-                  selectedNode={selectedNode}
-                  selectedEdgeId={selectedEdgeId}
-                  onNodeClick={handleNodeClick}
-                  onEdgeClick={handleEdgeClick}
-                  height={520}
-                />
-              )}
-            </PanelCard>
-
-            <PanelCard
-              title="Time-lapse Imaging"
-              tooltip="0–48 h timelapse (4 h cadence)"
-              status={d.status_flags.time_lapse}
-              meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
-              actions={<CellLineInline cell={d.cell_line} />}
-            >
-              <TimeLapseViewerPanel data={d.time_lapse} />
-            </PanelCard>
-
-            <PanelCard
-              title="Phenotypic Profiling"
-              tooltip="Growth Rate + Phenome Tracking"
-              status={d.status_flags.phenotypic}
-              meta={
-                d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
-                  ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
-                  : undefined
-              }
-            >
-              <PhenotypicProfilingPanel data={d.phenotypic} />
-            </PanelCard>
-          </div>
-
-          {/* === COL 2 (col-span-5): Landscape (top) + Pathway (GO) ========== */}
-          <div className="col-span-12 xl:col-span-5 flex flex-col gap-5 min-w-0">
-            <PanelCard
-              title="Target Landscape"
-              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
-              status={d.status_flags.landscape}
-            >
-              {d.landscape ? (
-                <Landscape
-                  landscape={d.landscape}
-                  highlightCommunity={selectedCommunity}
-                  onCommunityClick={handleLandscapeClick}
-                  height={520}
-                />
-              ) : (
-                <div className="h-[520px] flex items-center justify-center">
-                  <EmptyBlock />
-                </div>
-              )}
-            </PanelCard>
-
-            <PanelCard
-              title="Pathway Enrichment"
-              tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
-            >
-              <EnrichmentBar terms={d.enrichment} />
-            </PanelCard>
-          </div>
-
-          {/* === COL 3 (col-span-3): sticky info column (unchanged) ========== */}
-          <div className="col-span-12 xl:col-span-3 min-w-0">
-            <div className="flex flex-col gap-4 xl:sticky xl:top-[200px]">
-              <CompoundDetailsCard d={d} />
-              <TargetProfileCard d={d} />
-              <ReferenceDatabasesCard d={d} target={target ?? d.target_id} />
-              <LocalizationCard d={d} />
+        <div className="grid grid-cols-12 gap-6">
+          {/* === COL 1: Context rail (sticky) ============================= */}
+          <aside className="col-span-12 xl:col-span-3 min-w-0">
+            <div className="xl:sticky xl:top-[74px] flex flex-col gap-4">
+              <CurrentCompoundCard d={d} target={target ?? d.target_id} />
+              <SectionNav />
             </div>
+          </aside>
+
+          {/* === COL 2: Main analysis flow ================================ */}
+          <div className="col-span-12 xl:col-span-9 flex flex-col gap-6 min-w-0">
+            {/* Overview — KPI + Key Findings */}
+            <section id="overview" className="scroll-mt-[88px] flex flex-col gap-3">
+              <KpiStrip kpis={d.kpis} />
+              <KeyFindingsStrip data={d.insight} />
+            </section>
+
+            {bridgeNotice && (
+              <BridgeNotice
+                notice={bridgeNotice}
+                onReset={resetToTargetCommunity}
+                onDismiss={() => setBridgeNotice(null)}
+              />
+            )}
+
+            {/* PPI + Landscape — equal 50/50, the two primary analyses. */}
+            <div className="grid grid-cols-12 gap-5">
+              <section
+                id="ppi"
+                className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[88px]"
+              >
+                <PanelCard
+                  title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
+                  tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = landscape에서 관련 community 자동 선택."
+                  accent
+                  status={d.status_flags.ppi}
+                  meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
+                    activePpi?.nodes.length ?? 0
+                  } · edges=${activePpi?.edges.length ?? 0}`}
+                  actions={<span className="chip">{activePpi?.target}</span>}
+                >
+                  {!activePpi ? (
+                    <div className="h-[520px] flex items-center justify-center">
+                      <EmptyBlock label="PPI 데이터 없음" />
+                    </div>
+                  ) : (
+                    <PpiGraph
+                      nodes={activePpi.nodes}
+                      edges={activePpi.edges}
+                      targetName={activePpi.target}
+                      selectedNode={selectedNode}
+                      selectedEdgeId={selectedEdgeId}
+                      onNodeClick={handleNodeClick}
+                      onEdgeClick={handleEdgeClick}
+                      height={520}
+                    />
+                  )}
+                </PanelCard>
+              </section>
+
+              <section
+                id="landscape"
+                className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[88px]"
+              >
+                <PanelCard
+                  title="Target Landscape"
+                  tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
+                  status={d.status_flags.landscape}
+                >
+                  {d.landscape ? (
+                    <Landscape
+                      landscape={d.landscape}
+                      highlightCommunity={selectedCommunity}
+                      onCommunityClick={handleLandscapeClick}
+                      height={520}
+                    />
+                  ) : (
+                    <div className="h-[520px] flex items-center justify-center">
+                      <EmptyBlock />
+                    </div>
+                  )}
+                </PanelCard>
+              </section>
+            </div>
+
+            {/* Imaging — Time-lapse + Phenotypic Profiling 50/50 */}
+            <section
+              id="imaging"
+              className="grid grid-cols-12 gap-5 scroll-mt-[88px]"
+            >
+              <div className="col-span-12 lg:col-span-6 min-w-0">
+                <PanelCard
+                  title="Time-lapse Imaging"
+                  tooltip="0–48 h timelapse (4 h cadence)"
+                  status={d.status_flags.time_lapse}
+                  meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
+                  actions={<CellLineInline cell={d.cell_line} />}
+                >
+                  <TimeLapseViewerPanel data={d.time_lapse} />
+                </PanelCard>
+              </div>
+              <div className="col-span-12 lg:col-span-6 min-w-0">
+                <PanelCard
+                  title="Phenotypic Profiling"
+                  tooltip="Growth Rate + Phenome Tracking"
+                  status={d.status_flags.phenotypic}
+                  meta={
+                    d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
+                      ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
+                      : undefined
+                  }
+                >
+                  <PhenotypicProfilingPanel data={d.phenotypic} />
+                </PanelCard>
+              </div>
+            </section>
+
+            {/* Pathway — full width */}
+            <section id="pathway" className="scroll-mt-[88px]">
+              <PanelCard
+                title="Pathway Enrichment"
+                tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
+              >
+                <EnrichmentBar terms={d.enrichment} />
+              </PanelCard>
+            </section>
+
+            {/* Optional References — bottom strip with detail / refs */}
+            <section
+              id="references"
+              className="scroll-mt-[88px] flex flex-col gap-3"
+            >
+              <div className="flex items-center gap-4">
+                <span
+                  className="text-ink-muted whitespace-nowrap"
+                  style={{
+                    fontSize:      "var(--font-label-size)",
+                    lineHeight:    "var(--font-label-lh)",
+                    fontWeight:    "var(--font-label-weight)" as any,
+                    letterSpacing: "var(--font-label-tracking)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Optional References
+                </span>
+                <span className="flex-1 border-t border-line" aria-hidden />
+              </div>
+
+              <div className="grid grid-cols-12 gap-5">
+                <div className="col-span-12 lg:col-span-6 min-w-0">
+                  <ReferenceDatabasesCard d={d} target={target ?? d.target_id} />
+                </div>
+                <div className="col-span-12 lg:col-span-6 min-w-0">
+                  <LocalizationCard d={d} />
+                </div>
+                <div className="col-span-12 lg:col-span-6 min-w-0">
+                  <CompoundDetailsCard d={d} />
+                </div>
+                <div className="col-span-12 lg:col-span-6 min-w-0">
+                  <TargetProfileCard d={d} />
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Context rail — left column, sticky during scroll
+// ---------------------------------------------------------------------------
+
+/**
+ * Current Compound — sticky identity card. Renders the drug name + the
+ * three primary classification chips (target gene, drug group, growth
+ * class) + the experimental conditions (dose / cell / observation hours).
+ *
+ * Designed to be the always-visible answer to "what am I currently
+ * analyzing?" while the user scrolls through PPI / Landscape / Imaging.
+ */
+function CurrentCompoundCard({
+  d,
+  target,
+}: {
+  d: DashboardResponse;
+  target: string;
+}) {
+  const c = d.compound;
+  return (
+    <section
+      className="rounded-xl border border-line bg-surface-card p-5"
+      aria-label="Current compound"
+    >
+      <span
+        className="block text-ink-muted mb-2"
+        style={{
+          fontSize:      "var(--font-label-size)",
+          lineHeight:    "var(--font-label-lh)",
+          fontWeight:    "var(--font-label-weight)" as any,
+          letterSpacing: "var(--font-label-tracking)",
+          textTransform: "uppercase",
+        }}
+      >
+        Current Compound
+      </span>
+
+      <h2
+        className="text-ink-primary"
+        style={{
+          fontSize:      "22px",
+          lineHeight:    "1.2",
+          fontWeight:    700,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {d.drug_name}
+      </h2>
+      {c.hy_code && (
+        <div className="mt-1 font-mono text-caption text-ink-muted">
+          {c.hy_code}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <span className="chip" title={`Active target: ${target}`}>
+          {target}
+        </span>
+        {d.target_profile.drug_group && (
+          <span className="chip">{d.target_profile.drug_group}</span>
+        )}
+        <StatusBadge growth_class={d.phenotypic?.growth_class} />
+      </div>
+
+      {d.target_profile.target_class && (
+        <p className="mt-3 text-caption text-ink-muted leading-relaxed">
+          {d.target_profile.target_class}
+        </p>
+      )}
+
+      <dl className="mt-4 pt-4 border-t border-line grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-body">
+        {c.dose_um != null && (
+          <>
+            <dt className="text-ink-muted">Dose</dt>
+            <dd className="text-ink-primary tabular font-medium">
+              {c.dose_um} µM
+            </dd>
+          </>
+        )}
+        <dt className="text-ink-muted">Cell</dt>
+        <dd className="text-ink-primary font-medium">{d.cell_line.name}</dd>
+        {c.treatment_hours != null && (
+          <>
+            <dt className="text-ink-muted">Observation</dt>
+            <dd className="text-ink-primary tabular font-medium">
+              {c.treatment_hours} h
+            </dd>
+          </>
+        )}
+      </dl>
+    </section>
+  );
+}
+
+/**
+ * SectionNav — anchor-link list to jump between major analysis sections.
+ * scroll-margin handles the sticky topbar overlap; no JS scroll handler
+ * needed.
+ */
+function SectionNav() {
+  const items: { id: string; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "ppi", label: "PPI" },
+    { id: "landscape", label: "Landscape" },
+    { id: "imaging", label: "Imaging" },
+    { id: "pathway", label: "Pathway" },
+    { id: "references", label: "References" },
+  ];
+  return (
+    <nav
+      className="rounded-xl border border-line bg-surface-card p-4"
+      aria-label="Section navigation"
+    >
+      <span
+        className="block text-ink-muted mb-2"
+        style={{
+          fontSize:      "var(--font-label-size)",
+          lineHeight:    "var(--font-label-lh)",
+          fontWeight:    "var(--font-label-weight)" as any,
+          letterSpacing: "var(--font-label-tracking)",
+          textTransform: "uppercase",
+        }}
+      >
+        Sections
+      </span>
+      <ul className="flex flex-col">
+        {items.map((it) => (
+          <li key={it.id}>
+            <a
+              href={`#${it.id}`}
+              className="block py-1.5 px-2 -mx-2 rounded-md text-body text-ink-secondary hover:text-ink-primary hover:bg-surface-soft transition-colors duration-fast"
+            >
+              {it.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -414,7 +596,7 @@ function BridgeNotice({
       ? "Landscape → PPI"
       : "Node jump";
   return (
-    <div className="mt-3 px-3 py-2 rounded-md border border-brand-primary/40 bg-surface-card text-body text-ink-primary flex items-center gap-3 shadow-md">
+    <div className="px-3 py-2 rounded-md border border-brand-primary/40 bg-surface-card text-body text-ink-primary flex items-center gap-3 shadow-md">
       <span className="text-meta uppercase tracking-wider text-brand-primary font-semibold whitespace-nowrap">
         {arrow}
       </span>
@@ -435,18 +617,9 @@ function BridgeNotice({
 }
 
 // ---------------------------------------------------------------------------
-// Right-column info cards specific to the single-page dashboard
+// Bottom-strip info cards (Optional References section)
 // ---------------------------------------------------------------------------
 
-/**
- * Localization Annotations card — heatmap-style row grid.
- * Step 13 (2026-05-21): colormap switched from brand-primary to
- * Teal→Cyan (--color-loc-low-rgb → --color-loc-high-rgb) so the
- * localization channel is visually distinct from the PPI brand channel.
- * Each row's 5 cells light up cumulatively by `level` (0-5); within the
- * lit range the colors interpolate from teal (low cells) to cyan
- * (high cells), then the cumulative max controls overall brightness.
- */
 function LocalizationCard({ d }: { d: DashboardResponse }) {
   return (
     <PanelCard title="Localization Annotations">
@@ -461,8 +634,6 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
                 className="flex gap-1 shrink-0"
               >
                 {Array.from({ length: 5 }).map((_, i) => {
-                  // Interpolate the lit cells from teal (low) → cyan (high)
-                  // across the bar; unlit cells use a muted teal at 8%.
                   if (i >= clamped) {
                     return (
                       <span
@@ -472,7 +643,7 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
                       />
                     );
                   }
-                  const ratio = i / 4; // 0…1 across the 5 cells
+                  const ratio = i / 4;
                   return (
                     <span
                       key={i}
@@ -507,25 +678,6 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
   );
 }
 
-/**
- * "About this protein — Mechanism of Action" card — REMOVED in Step 13.
- *
- * Per user feedback (2026-05-21): Mechanism of Action and Mechanism Summary
- * panels removed. External references (UniProt / Ensembl / HPA) plus
- * additional MoA-source links now live inside ReferenceDatabasesCard.
- */
-
-// ---------------------------------------------------------------------------
-// Step 13 (2026-05-21) — new helpers below
-// ---------------------------------------------------------------------------
-
-/**
- * KeyFindingsStrip — 2×2 grid of "Key findings" pulled from InsightSummary.
- * Placed directly under the KPI strip so the four most-important
- * conclusions live at the top of the page in the same horizontal band as
- * the four KPIs (matching the user's requested visual rhythm).
- * Renders nothing if there are no findings.
- */
 function KeyFindingsStrip({ data }: { data: DashboardResponse["insight"] }) {
   if (!data || data.key_findings.length === 0) return null;
   const findings = data.key_findings.slice(0, 4);
@@ -554,7 +706,7 @@ function KeyFindingsStrip({ data }: { data: DashboardResponse["insight"] }) {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
       {findings.map((f, i) => (
         <div
           key={i}
@@ -586,12 +738,6 @@ function KeyFindingsStrip({ data }: { data: DashboardResponse["insight"] }) {
   );
 }
 
-/**
- * CellLineInline — replaces the old CellLineCard.
- * Renders a compact pill "U2OS [?]" inside the Time-lapse panel header.
- * Hovering the [?] reveals a small dark-themed popover with Species /
- * Tissue / Morphology / Note (CSS-only via group-hover; no JS).
- */
 function CellLineInline({ cell }: { cell: DashboardResponse["cell_line"] }) {
   return (
     <div className="relative group inline-flex items-center gap-1.5">
@@ -603,7 +749,6 @@ function CellLineInline({ cell }: { cell: DashboardResponse["cell_line"] }) {
       >
         ?
       </button>
-      {/* Popover — appears below the [?] button on hover/focus */}
       <div
         role="tooltip"
         className="
@@ -638,10 +783,6 @@ function CellLineInline({ cell }: { cell: DashboardResponse["cell_line"] }) {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Reusable info cards
-// ---------------------------------------------------------------------------
 
 function CompoundDetailsCard({ d }: { d: DashboardResponse }) {
   const c = d.compound;
@@ -691,8 +832,6 @@ function ReferenceDatabasesCard({ d, target }: { d: DashboardResponse; target: s
   const dataOrder = ["Ensembl", "Entrez", "UniProt", "HPA"] as const;
   const chemOrder = ["MedChemExpress"] as const;
 
-  // External MoA / mechanism sources — built from compound metadata.
-  // Step 13 (2026-05-21): consolidates the deleted MoA card's content.
   const moaLinks: { label: string; href: string }[] = [];
   const drugName = encodeURIComponent(d.drug_name);
   moaLinks.push({
@@ -722,7 +861,7 @@ function ReferenceDatabasesCard({ d, target }: { d: DashboardResponse; target: s
   }: {
     title: string;
     items: { label: string; href: string }[];
-  }) =>
+  }): ReactNode =>
     items.length === 0 ? null : (
       <div>
         <div className="text-meta text-ink-muted uppercase tracking-wider mb-1.5">
