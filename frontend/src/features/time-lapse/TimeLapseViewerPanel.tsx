@@ -33,7 +33,7 @@ export function TimeLapseViewerPanel({ data }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative bg-black rounded-md overflow-hidden h-[426px]">
+      <div className="relative bg-black rounded-md overflow-hidden h-[428px]">
         <img
           src={frame.image_url}
           alt={`t=${frame.t_hours}h`}
