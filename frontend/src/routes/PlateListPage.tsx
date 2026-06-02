@@ -34,14 +34,10 @@ export function PlateListPage() {
 
   const summary = useMemo(() => {
     if (!data) return null;
-    const drugs = data.reduce((s, p) => s + p.n_drugs, 0);
-    const wells = data.reduce((s, p) => s + p.n_wells, 0);
-    const withAssets = data.filter((p) => p.has_dashboard_assets).length;
     return {
       plates: data.length,
-      drugs,
-      wells,
-      coverage: data.length ? Math.round((withAssets / data.length) * 100) : 0,
+      drugs: data.reduce((s, p) => s + p.n_drugs, 0),
+      wells: data.reduce((s, p) => s + p.n_wells, 0),
     };
   }, [data]);
 
@@ -77,18 +73,11 @@ export function PlateListPage() {
             <StatItem value={summary.drugs} label="Compounds" />
             <Dot />
             <StatItem value={summary.wells} label="Wells" />
-            <Dot />
-            <StatItem value={`${summary.coverage}%`} label="Analysis Ready" />
           </div>
         )}
       </header>
 
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-title text-ink-primary">Experiment Plates</h2>
-        <span className="text-caption text-ink-muted tabular">
-          {data?.length ?? 0} plate{(data?.length ?? 0) === 1 ? "" : "s"}
-        </span>
-      </div>
+      <h2 className="text-title text-ink-primary mb-4">Experiment Plates</h2>
 
       {isLoading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
@@ -196,28 +185,22 @@ function PlateCard({
   return (
     <Link
       to={`/plates/${plate.plate_id}`}
-      className="panel-card hover:panel-card--accent transition-shadow duration-base group"
+      className="panel-card hover:panel-card--accent transition-all duration-base hover:-translate-y-0.5 group"
     >
       <div className="px-5 pt-5 pb-4 flex-1">
-        {/* Title */}
-        <div className="flex items-baseline justify-between gap-3">
-          <h3
-            className="text-ink-primary group-hover:text-brand-primary transition-colors tabular"
-            style={{
-              fontSize: "24px",
-              lineHeight: "1.1",
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {plate.plate_id}
-          </h3>
-          {plate.pipeline_version && (
-            <span className="text-caption text-ink-muted tabular shrink-0">
-              {plate.pipeline_version}
-            </span>
-          )}
-        </div>
+        {/* Title — pipeline_version removed (was demo-0.1, not a decision
+         *  input for "which plate do I open"; lives in plate detail header). */}
+        <h3
+          className="text-ink-primary group-hover:text-brand-primary transition-colors tabular"
+          style={{
+            fontSize: "24px",
+            lineHeight: "1.1",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {plate.plate_id}
+        </h3>
 
         {/* Metadata — Set/Cell on one row, Dose/Observation on the next.
          * Same labeled inline pattern as the plate detail header so the
@@ -268,7 +251,9 @@ function PlateCard({
                     />
                   ))}
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-caption">
+              {/* Legend — single row, narrow gap. 2-col grid felt sparse
+               * at card width; inline reads as one composition line. */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption">
                 {segments.map((seg) => (
                   <span
                     key={seg.key}
@@ -310,7 +295,7 @@ function PlateCard({
               <span className="text-ink-primary tabular font-semibold">
                 {buckets.activePct}%
               </span>{" "}
-              compounds show phenotype effects
+              phenotype-active compounds
             </>
           ) : (
             <span className="text-ink-muted">composition pending</span>
