@@ -430,93 +430,89 @@ function DashboardHeader({
 
   return (
     <header className="sticky top-0 z-30 bg-surface-elevated border-b border-line">
-      {/* Breadcrumb row — minimal, 1 line */}
-      <div className="pl-16 pr-4 lg:px-8 pt-3">
-        <div className="text-meta uppercase tracking-[0.16em] text-ink-muted">
-          <Link to="/plates" className="hover:text-ink-primary">
-            Workspace
-          </Link>
-          <span className="mx-2">›</span>
-          <Link to={`/plates/${plateId}`} className="hover:text-ink-primary">
-            {plateId}
-          </Link>
-          <span className="mx-2">›</span>
-          <span className="text-ink-secondary normal-case tracking-normal">
-            {d.drug_name}
-          </span>
-        </div>
+      {/* Top utility row — back link (left) · version (right).
+       *  Replaced the 3-level breadcrumb (Workspace › Plate › Compound)
+       *  with an explicit back affordance: the dominant navigation
+       *  pattern is Compound → Plate (returning to the drug list),
+       *  and "← Back to Plate {id}" reads as a clickable action where
+       *  the breadcrumb read as decoration. */}
+      <div className="pl-16 pr-4 lg:px-8 pt-3 flex items-center justify-between gap-3">
+        <Link
+          to={`/plates/${plateId}`}
+          className="inline-flex items-center gap-1.5 text-meta text-ink-muted hover:text-ink-primary transition-colors duration-fast"
+        >
+          <span aria-hidden>←</span>
+          <span>Back to Plate {plateId}</span>
+        </Link>
+        <span className="text-meta text-ink-muted tabular shrink-0">
+          v{d.provenance.pipeline_version}
+        </span>
       </div>
 
-      {/* Identity row — left: relationship-labeled identity · right:
-       *  switcher + version.  Earlier version was a vertical stack of
-       *  unlabeled rows (drug / targets / chips / conditions); users had
-       *  to infer which row was which role.  Now each role carries a tiny
-       *  muted label ("Target", class as plain class line, conditions as
-       *  plain conditions line) so the relationship reads at a glance
-       *  while StatusBadge stays as the only semantic chip — outcome is
-       *  the one field where color carries meaning. */}
-      <div className="pl-16 pr-4 lg:px-8 pt-2 pb-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0">
-          <h1
-            className="text-ink-primary tracking-tight"
-            style={{
-              fontSize: "30px",
-              lineHeight: "1.15",
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {d.drug_name}
-          </h1>
+      {/* Identity body — single column (no right cluster). Each role
+       *  carries an explicit relationship label so the user can read
+       *  "what is what" at a glance, and Target switching happens
+       *  inline as a chip row rather than off in the corner. */}
+      <div className="pl-16 pr-4 lg:px-8 pt-2 pb-3">
+        <h1
+          className="text-ink-primary tracking-tight"
+          style={{
+            fontSize: "30px",
+            lineHeight: "1.15",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {d.drug_name}
+        </h1>
 
-          {d.target_profile.targets.length > 0 && (
-            <p className="mt-1.5 text-body">
-              <span className="text-ink-muted mr-2">Target</span>
-              <span className="text-ink-primary font-semibold">
-                {d.target_profile.targets.join(", ")}
-              </span>
-            </p>
-          )}
-
-          {d.target_profile.drug_group && (
-            <p className="mt-1 text-body text-ink-secondary">
-              {formatDrugGroup(d.target_profile.drug_group)}
-            </p>
-          )}
-
-          <div className="mt-2">
-            <StatusBadge growth_class={d.phenotypic?.growth_class} />
-          </div>
-
-          {conditions.length > 0 && (
-            <p className="mt-2 text-body text-ink-muted tabular">
-              {conditions.join(" · ")}
-            </p>
-          )}
-
-          {/* External reference chips — moved here from the right cluster.
-           * Keeps the right side reserved for analysis controls (target
-           * switcher / version) and gives identity a single coherent block. */}
-          <ExternalRefChips d={d} target={target} />
-        </div>
-
-        <div className="flex flex-col items-start lg:items-end gap-2 shrink-0">
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-meta text-ink-muted mr-2">Target</span>
-            {d.available_targets.map((t) => (
-              <button
-                key={t}
-                className={t === target ? "chip chip--active" : "chip"}
-                onClick={() => onTargetChange(t)}
-              >
-                {t}
-              </button>
-            ))}
-            <span className="ml-3 text-meta text-ink-muted tabular">
-              v{d.provenance.pipeline_version}
+        {d.available_targets.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="text-ink-muted text-body">
+              {d.available_targets.length === 1 ? "Target" : "Targets"}
             </span>
+            {d.available_targets.length === 1 ? (
+              <span className="text-body text-ink-primary font-semibold">
+                {d.available_targets[0]}
+              </span>
+            ) : (
+              <div
+                role="group"
+                aria-label="Switch active target"
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                {d.available_targets.map((t) => (
+                  <button
+                    key={t}
+                    className={t === target ? "chip chip--active" : "chip"}
+                    onClick={() => onTargetChange(t)}
+                    aria-pressed={t === target}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+        )}
+
+        {d.target_profile.drug_group && (
+          <p className="mt-1 text-body text-ink-secondary">
+            {formatDrugGroup(d.target_profile.drug_group)}
+          </p>
+        )}
+
+        <div className="mt-2">
+          <StatusBadge growth_class={d.phenotypic?.growth_class} />
         </div>
+
+        {conditions.length > 0 && (
+          <p className="mt-2 text-body text-ink-muted tabular">
+            {conditions.join(" · ")}
+          </p>
+        )}
+
+        <ExternalRefChips d={d} target={target} />
       </div>
 
       {/* Sticky horizontal section tab nav — with scroll-spy active state.
