@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Plot from "react-plotly.js";
+import { useTheme } from "@/hooks/useTheme";
 import type { LandscapePanel } from "@/types/api";
 
 interface Props {
@@ -22,9 +23,9 @@ interface Props {
  *     BridgeNotice and the PPI panel switching to the chosen community)
  *
  * New (2026-06-01):
- *   - PCC threshold slider — filter scatter points (and dim the surface
- *     band) where |PCC| < threshold. Useful for surfacing only modules
- *     with strong positive / negative correlation.
+ *   - PCC threshold slider — filter scatter points by signed avg(PCC)
+ *     (z >= threshold). Range −0.5 … 0.5, step 0.001 for fine tuning.
+ *     Default sits at min (−0.5) so all communities are visible.
  */
 
 const COLORSCALE_2D: Array<[number, string]> = [
@@ -52,14 +53,27 @@ export function Landscape({
   onCommunityClick,
   height = 380,
 }: Props) {
-  const [mode, setMode] = useState<"2d" | "3d">("2d");
-  // |PCC| ≥ threshold to remain visible. 0 means show all.
-  const [pccThreshold, setPccThreshold] = useState<number>(0);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  // Plotly takes literal color strings, not CSS vars, so we branch here.
+  // In light mode the original near-black axis text was fine; in dark
+  // mode the same color disappeared into the dark page background, so
+  // axis ticks and titles were invisible per user report.
+  const axisTextColor = isDark ? "#E2E8F0" : "#2C2C2A";
+  const axisGridColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
+  const sceneBgColor = isDark ? "rgba(20,24,40,0.55)" : "rgba(240,240,240,0.25)";
+  const sceneGridColor = isDark ? "#3B4459" : "#D3D1C7";
 
-  // Filter scatter by |z| ≥ threshold (z is PCC for the module/community)
+  const [mode, setMode] = useState<"2d" | "3d">("2d");
+  // Signed PCC threshold: a community remains visible iff its z >= threshold.
+  // Range −0.5 … 0.5, default −0.5 = show everything. Earlier this used the
+  // absolute value of z; switched to signed so users can isolate strong
+  // positive correlations without losing negative ones at the extreme.
+  const [pccThreshold, setPccThreshold] = useState<number>(-0.5);
+
   const visibleScatter = useMemo(() => {
-    if (pccThreshold <= 0) return landscape.scatter;
-    return landscape.scatter.filter((p) => Math.abs(p.z) >= pccThreshold);
+    if (pccThreshold <= -0.5) return landscape.scatter;
+    return landscape.scatter.filter((p) => p.z >= pccThreshold);
   }, [landscape.scatter, pccThreshold]);
 
   const scTarget = visibleScatter.filter((p) => p.is_target);
@@ -132,19 +146,21 @@ export function Landscape({
       });
     }
 
-    // 4. Target community — amber cross ✚
+    // 4. Target community — amber cross marker only.
+    //    Earlier this stacked a `text: "✚"` overlay on top of the marker,
+    //    which read as two separate target indicators (the larger orange
+    //    glyph and the smaller marker just below it). Per user feedback
+    //    we only mark the target *community*; the target node itself
+    //    does not get an extra glyph.
     if (scTarget.length > 0) {
       t.push({
         type: "scatter",
-        mode: "markers+text",
+        mode: "markers",
         x: scTarget.map((p) => p.x),
         y: scTarget.map((p) => p.y),
         customdata: scTarget.map((p) => p.community_id),
-        text: scTarget.map(() => "✚"),
-        textposition: "top center",
-        textfont: { size: 16, color: COLOR_TARGET_FILL },
         marker: {
-          size: 14,
+          size: 16,
           symbol: "cross",
           color: COLOR_TARGET_FILL,
           line: { width: 2.5, color: COLOR_TARGET_EDGE },
@@ -245,7 +261,7 @@ export function Landscape({
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "rgba(0,0,0,0)",
           height,
-          font: { family: "Inter, system-ui, sans-serif", size: 11, color: "#2C2C2A" },
+          font: { family: "Inter, system-ui, sans-serif", size: 11, color: axisTextColor },
           // 'event' only (no 'select') — Plotly's default 'event+select' makes
           // the first click toggle Plotly's internal selectedpoints, which can
           // race with our click dispatch on subsequent clicks (the symptom:
@@ -253,14 +269,16 @@ export function Landscape({
           clickmode: "event" as const,
           dragmode: "zoom" as const,
           xaxis: {
-            title: { text: landscape.axes.x ?? "Distance from anchor", font: { size: 11 } },
+            title: { text: landscape.axes.x ?? "Distance from anchor", font: { size: 11, color: axisTextColor } },
             autorange: "reversed" as const,
-            gridcolor: "rgba(0,0,0,0.06)",
+            gridcolor: axisGridColor,
+            tickfont: { color: axisTextColor },
             zeroline: false,
           },
           yaxis: {
-            title: { text: landscape.axes.y ?? "−log10(p)", font: { size: 11 } },
-            gridcolor: "rgba(0,0,0,0.06)",
+            title: { text: landscape.axes.y ?? "−log10(p)", font: { size: 11, color: axisTextColor } },
+            gridcolor: axisGridColor,
+            tickfont: { color: axisTextColor },
             zeroline: false,
           },
         }
@@ -268,27 +286,30 @@ export function Landscape({
           margin: { l: 0, r: 0, b: 0, t: 20 },
           paper_bgcolor: "rgba(0,0,0,0)",
           height,
-          font: { family: "Inter, system-ui, sans-serif", size: 11, color: "#2C2C2A" },
+          font: { family: "Inter, system-ui, sans-serif", size: 11, color: axisTextColor },
           clickmode: "event" as const,
           scene: {
             xaxis: {
-              title: { text: landscape.axes.x ?? "x", font: { size: 10 } },
+              title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
               autorange: "reversed" as const,
-              gridcolor: "#D3D1C7",
-              backgroundcolor: "rgba(240,240,240,0.25)",
+              gridcolor: sceneGridColor,
+              tickfont: { color: axisTextColor },
+              backgroundcolor: sceneBgColor,
               showbackground: true,
             },
             yaxis: {
-              title: { text: landscape.axes.y ?? "y", font: { size: 10 } },
-              gridcolor: "#D3D1C7",
-              backgroundcolor: "rgba(240,240,240,0.25)",
+              title: { text: landscape.axes.y ?? "y", font: { size: 10, color: axisTextColor } },
+              gridcolor: sceneGridColor,
+              tickfont: { color: axisTextColor },
+              backgroundcolor: sceneBgColor,
               showbackground: true,
             },
             zaxis: {
-              title: { text: landscape.axes.z ?? "z", font: { size: 10 } },
+              title: { text: landscape.axes.z ?? "z", font: { size: 10, color: axisTextColor } },
               range: [-0.5, 0.5],
-              gridcolor: "#D3D1C7",
-              backgroundcolor: "rgba(240,240,240,0.25)",
+              gridcolor: sceneGridColor,
+              tickfont: { color: axisTextColor },
+              backgroundcolor: sceneBgColor,
               showbackground: true,
             },
             camera: { eye: { x: 1.5, y: -1.5, z: 0.9 } },
@@ -301,8 +322,8 @@ export function Landscape({
   const visibleCount = visibleScatter.length;
 
   const clampThreshold = (v: number) => {
-    if (Number.isNaN(v)) return 0;
-    return Math.max(0, Math.min(0.5, v));
+    if (Number.isNaN(v)) return -0.5;
+    return Math.max(-0.5, Math.min(0.5, v));
   };
 
   return (
@@ -338,33 +359,34 @@ export function Landscape({
           </button>
         </div>
 
-        {/* PCC threshold — number input + slider */}
+        {/* PCC threshold — signed (−0.5 … 0.5), 0.001 step for fine tuning.
+         *  Input widened so a 6-char value like "-0.345" is not clipped. */}
         <div
           className="flex items-center gap-2 rounded-md border border-line bg-surface-elevated px-2 py-1"
-          title="|avg(PCC)| ≥ threshold 인 community 만 표시"
+          title="avg(PCC) ≥ threshold 인 community 만 표시 (부호 그대로, 0.001 단위)"
         >
-          <span className="whitespace-nowrap">|PCC| ≥</span>
+          <span className="whitespace-nowrap">PCC ≥</span>
           <input
             type="number"
-            min={0}
+            min={-0.5}
             max={0.5}
-            step={0.05}
-            value={pccThreshold.toFixed(2)}
+            step={0.001}
+            value={pccThreshold.toFixed(3)}
             onChange={(e) => setPccThreshold(clampThreshold(parseFloat(e.target.value)))}
-            className="w-14 tabular rounded border border-line bg-transparent px-1.5 py-0.5 text-ink-primary text-right focus:outline-none focus:border-brand-primary"
+            className="w-20 tabular rounded border border-line bg-transparent px-1.5 py-0.5 text-ink-primary text-right focus:outline-none focus:border-brand-primary"
             aria-label="PCC threshold value"
           />
           <input
             type="range"
-            min={0}
+            min={-0.5}
             max={0.5}
-            step={0.05}
+            step={0.001}
             value={pccThreshold}
             onChange={(e) => setPccThreshold(parseFloat(e.target.value))}
             className="w-48 accent-brand-primary"
             aria-label="PCC threshold slider"
           />
-          {pccThreshold > 0 && (
+          {pccThreshold > -0.5 && (
             <span className="text-ink-muted whitespace-nowrap">
               ({visibleCount}/{totalPoints})
             </span>
