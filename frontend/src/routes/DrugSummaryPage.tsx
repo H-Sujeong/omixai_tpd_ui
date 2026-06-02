@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Fragment, useMemo, useState } from "react";
 import { useDrugSummary, usePlates } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
@@ -106,12 +106,23 @@ export function DrugSummaryPage() {
 
   return (
     <div className="flex-1 px-8 py-7 mx-auto w-full max-w-[1500px]">
-      {/* Page title (T1 display). 2026-06-02: breadcrumb removed — Sidebar
-       * already conveys current location, and the h1 below shows the plate
-       * id at 60px, so a small "Workspace / Plates / D3_10" line above was
-       * redundant noise. Inline style binds all four T1 properties from CSS
-       * vars so this survives a Tailwind config that hasn't recompiled yet. */}
-      <header className="mt-1 mb-5">
+      {/* Back affordance mirroring the Dashboard's "← Back to Plate {id}".
+       *  The sidebar's "Plates" item is the structural workspace target,
+       *  but it reads as a section switcher in the icon rail rather than
+       *  as a back action. This small meta-style link makes upward
+       *  navigation explicit at every hierarchy level. */}
+      <Link
+        to="/plates"
+        className="inline-flex items-center gap-1.5 text-meta text-ink-muted hover:text-ink-primary transition-colors duration-fast"
+      >
+        <span aria-hidden>←</span>
+        <span>Workspace</span>
+      </Link>
+
+      {/* Page title (T1 display). 2026-06-02: 3-level breadcrumb removed
+       * earlier; the back link above now carries the upward affordance
+       * and the h1 below shows the plate id at the display scale. */}
+      <header className="mt-2 mb-5">
         <h1
           className="text-ink-primary"
           style={{
