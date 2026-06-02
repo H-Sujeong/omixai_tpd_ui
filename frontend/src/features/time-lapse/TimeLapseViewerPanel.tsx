@@ -37,7 +37,7 @@ export function TimeLapseViewerPanel({ data }: Props) {
         <img
           src={frame.image_url}
           alt={`t=${frame.t_hours}h`}
-          className="w-full block object-contain max-h-[423px]"
+          className="w-full block object-contain max-h-[426px]"
           loading="lazy"
         />
         <div className="absolute top-2 left-2 text-white text-caption font-mono bg-black/60 px-2 py-0.5 rounded">
