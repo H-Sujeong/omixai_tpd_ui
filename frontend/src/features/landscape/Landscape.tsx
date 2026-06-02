@@ -66,10 +66,10 @@ export function Landscape({
 
   const [mode, setMode] = useState<"2d" | "3d">("2d");
   // Signed PCC threshold: a community remains visible iff its z >= threshold.
-  // Range −0.5 … 0.5, default −0.5 = show everything. Earlier this used the
-  // absolute value of z; switched to signed so users can isolate strong
-  // positive correlations without losing negative ones at the extreme.
-  const [pccThreshold, setPccThreshold] = useState<number>(-0.5);
+  // Range −0.5 … 0.5, default 0 — per user instruction the slider's base
+  // sits at zero (show only non-negative correlations). Users slide left
+  // to include negative tail or right to isolate strong positive.
+  const [pccThreshold, setPccThreshold] = useState<number>(0);
 
   const visibleScatter = useMemo(() => {
     if (pccThreshold <= -0.5) return landscape.scatter;
@@ -322,7 +322,7 @@ export function Landscape({
   const visibleCount = visibleScatter.length;
 
   const clampThreshold = (v: number) => {
-    if (Number.isNaN(v)) return -0.5;
+    if (Number.isNaN(v)) return 0;
     return Math.max(-0.5, Math.min(0.5, v));
   };
 
@@ -386,7 +386,7 @@ export function Landscape({
             className="w-48 accent-brand-primary"
             aria-label="PCC threshold slider"
           />
-          {pccThreshold > -0.5 && (
+          {pccThreshold !== 0 && (
             <span className="text-ink-muted whitespace-nowrap">
               ({visibleCount}/{totalPoints})
             </span>
