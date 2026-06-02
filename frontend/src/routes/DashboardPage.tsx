@@ -1,5 +1,5 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCommunityPanel, useDashboard, useSwitchCommunity } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { PanelCard } from "@/components/PanelCard";
@@ -14,31 +14,25 @@ import { KpiStrip } from "@/features/kpi/KpiStrip";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
 /**
- * Single-page Compound Dashboard (2026-06-02 IA refactor).
+ * Compound Dashboard — 2026-06-02 IA refactor (proposal #2).
  *
- * Layout shift — pre-refactor the page was a 4/5/3 column grid where the
- * right column carried Compound Details, Target Profile, References,
- * Localization (static metadata). Per user feedback that "scientist should
- * always know which compound they're looking at while analyzing", static
- * compound context now lives in a left sticky rail; the main analysis
- * column gets the freed width as a 2-col 50/50 grid for PPI + Landscape
- * and Time-lapse + Phenotypic Profiling.
+ * The dashboard-specific left rail is gone. Compound identity now lives
+ * in the sticky page header; a horizontal tab nav under the header
+ * provides section jumps. The freed horizontal space is given to the
+ * primary visualizations (PPI + Landscape) and a Pathway / Imaging row.
  *
- *   [Context rail 280px, sticky]  [Main analysis flow]
- *     Current Compound              KPI Summary       (#overview)
- *     name + chips                  Key Findings 2x2
- *     dose/cell/observation         ─────
- *     ─────                         PPI + Landscape   (#ppi / #landscape)
- *     Sections nav                  Time-lapse + Phenotypic (#imaging)
- *     · Overview                    Pathway Enrichment (#pathway)
- *     · PPI                         ─────
- *     · Landscape                   Optional References (#references)
- *     · Imaging                       └ Localization + Refs + Compound
- *     · Pathway                          + Target detail
- *     · References
+ *   [Sticky Header]
+ *     breadcrumb
+ *     drug name + targets + chips + conditions ··· target switcher / refs
+ *     [tab nav: Overview · PPI · Landscape · Pathway · Imaging]
  *
- * Anchor IDs + scroll-mt utility keep the sticky topbar from covering each
- * section heading when nav links are clicked.
+ *   #overview        KPI strip → Key Findings → Mechanistic Signatures
+ *   #ppi / #landscape  PPI 50% │ Landscape 50%
+ *   #pathway / #imaging Pathway 50% │ (Time-lapse on top, Phenotypic below)
+ *
+ * Optional References, Compound Details, Target Profile cards removed —
+ * compound info is already in the header; reference links are absorbed
+ * into the header's right cluster as chip-style external links.
  */
 export function DashboardPage() {
   const { plateId, drugId } = useParams<{ plateId: string; drugId: string }>();
@@ -216,413 +210,369 @@ export function DashboardPage() {
   if (dash.error) return <ErrorBlock error={dash.error} />;
   if (!dash.data) return <EmptyBlock />;
   const d = dash.data;
+  const activeTarget = target ?? d.target_id;
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Slim topbar — breadcrumb + target switcher + batch info. The big
-       *  hero (drug name + chips + meta) is gone; that identity now lives
-       *  in the sticky context rail so it stays in view during scroll. */}
-      <div className="sticky top-0 z-20 bg-surface-elevated border-b border-line">
-        <div className="pl-16 pr-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-meta uppercase tracking-[0.16em] text-ink-muted min-w-0">
-            <Link to="/plates" className="hover:text-ink-primary">
-              Workspace
-            </Link>
-            <span className="mx-2">›</span>
-            <Link to={`/plates/${plateId}`} className="hover:text-ink-primary">
-              {plateId}
-            </Link>
-            <span className="mx-2">›</span>
-            <span className="text-ink-secondary normal-case tracking-normal">
-              {d.drug_name}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-meta text-ink-muted mr-2">Target</span>
-              {d.available_targets.map((t) => (
-                <button
-                  key={t}
-                  className={t === target ? "chip chip--active" : "chip"}
-                  onClick={() => {
-                    setTarget(t);
-                    setSelectedCommunity(null);
-                    setSelectedNode(null);
-                    setSelectedEdgeId(null);
-                    setBridgeNotice(null);
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <span className="text-meta text-ink-muted tabular ml-2">
-              v{d.provenance.pipeline_version}
-            </span>
-          </div>
+      <DashboardHeader
+        d={d}
+        plateId={plateId}
+        target={activeTarget}
+        onTargetChange={(t) => {
+          setTarget(t);
+          setSelectedCommunity(null);
+          setSelectedNode(null);
+          setSelectedEdgeId(null);
+          setBridgeNotice(null);
+        }}
+      />
+
+      <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1 flex flex-col gap-6">
+        {/* === #overview — KPI · Key Findings · Mechanistic Signatures ==== */}
+        <section
+          id="overview"
+          className="scroll-mt-[180px] flex flex-col gap-4"
+        >
+          <KpiStrip kpis={d.kpis} />
+          <KeyFindingsStrip data={d.insight} />
+          <MechanisticSignatures d={d} />
+        </section>
+
+        {bridgeNotice && (
+          <BridgeNotice
+            notice={bridgeNotice}
+            onReset={resetToTargetCommunity}
+            onDismiss={() => setBridgeNotice(null)}
+          />
+        )}
+
+        {/* === Row 1: PPI 50% + Landscape 50% ============================ */}
+        <div className="grid grid-cols-12 gap-5">
+          <section
+            id="ppi"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px]"
+          >
+            <PanelCard
+              title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
+              tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = landscape에서 관련 community 자동 선택."
+              accent
+              status={d.status_flags.ppi}
+              meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
+                activePpi?.nodes.length ?? 0
+              } · edges=${activePpi?.edges.length ?? 0}`}
+              actions={<span className="chip">{activePpi?.target}</span>}
+            >
+              {!activePpi ? (
+                <div className="h-[520px] flex items-center justify-center">
+                  <EmptyBlock label="PPI 데이터 없음" />
+                </div>
+              ) : (
+                <PpiGraph
+                  nodes={activePpi.nodes}
+                  edges={activePpi.edges}
+                  targetName={activePpi.target}
+                  selectedNode={selectedNode}
+                  selectedEdgeId={selectedEdgeId}
+                  onNodeClick={handleNodeClick}
+                  onEdgeClick={handleEdgeClick}
+                  height={520}
+                />
+              )}
+            </PanelCard>
+          </section>
+
+          <section
+            id="landscape"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px]"
+          >
+            <PanelCard
+              title="Target Landscape"
+              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
+              status={d.status_flags.landscape}
+            >
+              {d.landscape ? (
+                <Landscape
+                  landscape={d.landscape}
+                  highlightCommunity={selectedCommunity}
+                  onCommunityClick={handleLandscapeClick}
+                  height={520}
+                />
+              ) : (
+                <div className="h-[520px] flex items-center justify-center">
+                  <EmptyBlock />
+                </div>
+              )}
+            </PanelCard>
+          </section>
         </div>
-      </div>
 
-      <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1">
-        <div className="grid grid-cols-12 gap-6">
-          {/* === COL 1: Context rail (sticky) ============================= */}
-          <aside className="col-span-12 xl:col-span-3 min-w-0">
-            <div className="xl:sticky xl:top-[74px] flex flex-col gap-4">
-              <CurrentCompoundCard d={d} target={target ?? d.target_id} />
-              <SectionNav />
-            </div>
-          </aside>
-
-          {/* === COL 2: Main analysis flow ================================ */}
-          <div className="col-span-12 xl:col-span-9 flex flex-col gap-6 min-w-0">
-            {/* Overview — KPI + Key Findings */}
-            <section id="overview" className="scroll-mt-[88px] flex flex-col gap-3">
-              <KpiStrip kpis={d.kpis} />
-              <KeyFindingsStrip data={d.insight} />
-            </section>
-
-            {bridgeNotice && (
-              <BridgeNotice
-                notice={bridgeNotice}
-                onReset={resetToTargetCommunity}
-                onDismiss={() => setBridgeNotice(null)}
-              />
-            )}
-
-            {/* PPI + Landscape — equal 50/50, the two primary analyses. */}
-            <div className="grid grid-cols-12 gap-5">
-              <section
-                id="ppi"
-                className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[88px]"
-              >
-                <PanelCard
-                  title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
-                  tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = landscape에서 관련 community 자동 선택."
-                  accent
-                  status={d.status_flags.ppi}
-                  meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
-                    activePpi?.nodes.length ?? 0
-                  } · edges=${activePpi?.edges.length ?? 0}`}
-                  actions={<span className="chip">{activePpi?.target}</span>}
-                >
-                  {!activePpi ? (
-                    <div className="h-[520px] flex items-center justify-center">
-                      <EmptyBlock label="PPI 데이터 없음" />
-                    </div>
-                  ) : (
-                    <PpiGraph
-                      nodes={activePpi.nodes}
-                      edges={activePpi.edges}
-                      targetName={activePpi.target}
-                      selectedNode={selectedNode}
-                      selectedEdgeId={selectedEdgeId}
-                      onNodeClick={handleNodeClick}
-                      onEdgeClick={handleEdgeClick}
-                      height={520}
-                    />
-                  )}
-                </PanelCard>
-              </section>
-
-              <section
-                id="landscape"
-                className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[88px]"
-              >
-                <PanelCard
-                  title="Target Landscape"
-                  tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
-                  status={d.status_flags.landscape}
-                >
-                  {d.landscape ? (
-                    <Landscape
-                      landscape={d.landscape}
-                      highlightCommunity={selectedCommunity}
-                      onCommunityClick={handleLandscapeClick}
-                      height={520}
-                    />
-                  ) : (
-                    <div className="h-[520px] flex items-center justify-center">
-                      <EmptyBlock />
-                    </div>
-                  )}
-                </PanelCard>
-              </section>
-            </div>
-
-            {/* Imaging — Time-lapse + Phenotypic Profiling 50/50 */}
-            <section
-              id="imaging"
-              className="grid grid-cols-12 gap-5 scroll-mt-[88px]"
+        {/* === Row 2: Pathway 50% + Imaging-column 50% (Time-lapse + Phenotypic stacked) === */}
+        <div className="grid grid-cols-12 gap-5">
+          <section
+            id="pathway"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px]"
+          >
+            <PanelCard
+              title="Pathway Enrichment"
+              tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
             >
-              <div className="col-span-12 lg:col-span-6 min-w-0">
-                <PanelCard
-                  title="Time-lapse Imaging"
-                  tooltip="0–48 h timelapse (4 h cadence)"
-                  status={d.status_flags.time_lapse}
-                  meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
-                  actions={<CellLineInline cell={d.cell_line} />}
-                >
-                  <TimeLapseViewerPanel data={d.time_lapse} />
-                </PanelCard>
-              </div>
-              <div className="col-span-12 lg:col-span-6 min-w-0">
-                <PanelCard
-                  title="Phenotypic Profiling"
-                  tooltip="Growth Rate + Phenome Tracking"
-                  status={d.status_flags.phenotypic}
-                  meta={
-                    d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
-                      ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
-                      : undefined
-                  }
-                >
-                  <PhenotypicProfilingPanel data={d.phenotypic} />
-                </PanelCard>
-              </div>
-            </section>
+              <EnrichmentBar terms={d.enrichment} />
+            </PanelCard>
+          </section>
 
-            {/* Pathway — full width */}
-            <section id="pathway" className="scroll-mt-[88px]">
-              <PanelCard
-                title="Pathway Enrichment"
-                tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
-              >
-                <EnrichmentBar terms={d.enrichment} />
-              </PanelCard>
-            </section>
-
-            {/* Optional References — bottom strip with detail / refs */}
-            <section
-              id="references"
-              className="scroll-mt-[88px] flex flex-col gap-3"
+          <section
+            id="imaging"
+            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[180px] flex flex-col gap-5"
+          >
+            <PanelCard
+              title="Time-lapse Imaging"
+              tooltip="0–48 h timelapse (4 h cadence)"
+              status={d.status_flags.time_lapse}
+              meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
+              actions={<CellLineInline cell={d.cell_line} />}
             >
-              <div className="flex items-center gap-4">
-                <span
-                  className="text-ink-muted whitespace-nowrap"
-                  style={{
-                    fontSize:      "var(--font-label-size)",
-                    lineHeight:    "var(--font-label-lh)",
-                    fontWeight:    "var(--font-label-weight)" as any,
-                    letterSpacing: "var(--font-label-tracking)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Optional References
-                </span>
-                <span className="flex-1 border-t border-line" aria-hidden />
-              </div>
+              <TimeLapseViewerPanel data={d.time_lapse} />
+            </PanelCard>
 
-              <div className="grid grid-cols-12 gap-5">
-                <div className="col-span-12 lg:col-span-6 min-w-0">
-                  <ReferenceDatabasesCard d={d} target={target ?? d.target_id} />
-                </div>
-                <div className="col-span-12 lg:col-span-6 min-w-0">
-                  <LocalizationCard d={d} />
-                </div>
-                <div className="col-span-12 lg:col-span-6 min-w-0">
-                  <CompoundDetailsCard d={d} />
-                </div>
-                <div className="col-span-12 lg:col-span-6 min-w-0">
-                  <TargetProfileCard d={d} />
-                </div>
-              </div>
-            </section>
-          </div>
+            <PanelCard
+              title="Phenotypic Profiling"
+              tooltip="Growth Rate + Phenome Tracking"
+              status={d.status_flags.phenotypic}
+              meta={
+                d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
+                  ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
+                  : undefined
+              }
+            >
+              <PhenotypicProfilingPanel data={d.phenotypic} />
+            </PanelCard>
+          </section>
         </div>
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Context rail — left column, sticky during scroll
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Header (sticky) — identity + target switcher + external refs + section tabs
+// ===========================================================================
+
+const SECTION_NAV: { id: string; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "ppi", label: "PPI" },
+  { id: "landscape", label: "Landscape" },
+  { id: "pathway", label: "Pathway" },
+  { id: "imaging", label: "Imaging" },
+];
+
+function DashboardHeader({
+  d,
+  plateId,
+  target,
+  onTargetChange,
+}: {
+  d: DashboardResponse;
+  plateId: string | undefined;
+  target: string;
+  onTargetChange: (t: string) => void;
+}) {
+  const c = d.compound;
+
+  const conditions = [
+    c.dose_um != null ? `${c.dose_um} µM` : null,
+    d.cell_line.name,
+    c.treatment_hours != null ? `${c.treatment_hours} h` : null,
+  ].filter(Boolean) as string[];
+
+  return (
+    <header className="sticky top-0 z-30 bg-surface-elevated border-b border-line">
+      {/* Breadcrumb row — minimal, 1 line */}
+      <div className="pl-16 pr-4 lg:px-8 pt-3">
+        <div className="text-meta uppercase tracking-[0.16em] text-ink-muted">
+          <Link to="/plates" className="hover:text-ink-primary">
+            Workspace
+          </Link>
+          <span className="mx-2">›</span>
+          <Link to={`/plates/${plateId}`} className="hover:text-ink-primary">
+            {plateId}
+          </Link>
+          <span className="mx-2">›</span>
+          <span className="text-ink-secondary normal-case tracking-normal">
+            {d.drug_name}
+          </span>
+        </div>
+      </div>
+
+      {/* Identity row — left: compound identity · right: switcher + refs */}
+      <div className="pl-16 pr-4 lg:px-8 pt-2 pb-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        {/* LEFT: identity block */}
+        <div className="min-w-0">
+          <h1
+            className="text-ink-primary tracking-tight"
+            style={{
+              fontSize: "30px",
+              lineHeight: "1.15",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {d.drug_name}
+          </h1>
+
+          {d.target_profile.targets.length > 0 && (
+            <p className="mt-1 text-body-strong text-ink-secondary">
+              {d.target_profile.targets.join(" / ")}
+            </p>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {d.target_profile.drug_group && (
+              <span className="chip">{d.target_profile.drug_group}</span>
+            )}
+            <StatusBadge growth_class={d.phenotypic?.growth_class} />
+          </div>
+
+          {conditions.length > 0 && (
+            <p className="mt-2 text-body text-ink-muted tabular">
+              {conditions.join(" · ")}
+            </p>
+          )}
+        </div>
+
+        {/* RIGHT: target switcher + version + external links */}
+        <div className="flex flex-col items-start lg:items-end gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-meta text-ink-muted mr-2">Target</span>
+            {d.available_targets.map((t) => (
+              <button
+                key={t}
+                className={t === target ? "chip chip--active" : "chip"}
+                onClick={() => onTargetChange(t)}
+              >
+                {t}
+              </button>
+            ))}
+            <span className="ml-3 text-meta text-ink-muted tabular">
+              v{d.provenance.pipeline_version}
+            </span>
+          </div>
+          <ExternalRefChips d={d} target={target} />
+        </div>
+      </div>
+
+      {/* Sticky horizontal section tab nav */}
+      <nav
+        className="pl-16 pr-4 lg:px-8 border-t border-line"
+        aria-label="Dashboard sections"
+      >
+        <ul className="flex items-center gap-1 -mb-px overflow-x-auto">
+          {SECTION_NAV.map((it) => (
+            <li key={it.id}>
+              <a
+                href={`#${it.id}`}
+                className="
+                  inline-flex items-center px-3 py-2.5
+                  text-body font-medium text-ink-secondary
+                  border-b-2 border-transparent
+                  hover:text-ink-primary hover:border-brand-primary/40
+                  transition-colors duration-fast
+                "
+              >
+                {it.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </header>
+  );
+}
 
 /**
- * Current Compound — sticky identity card. Renders the drug name + the
- * three primary classification chips (target gene, drug group, growth
- * class) + the experimental conditions (dose / cell / observation hours).
- *
- * Designed to be the always-visible answer to "what am I currently
- * analyzing?" while the user scrolls through PPI / Landscape / Imaging.
+ * ExternalRefChips — flattened reference list shown as chip-style links
+ * in the header right cluster. Replaces the dedicated Reference Databases
+ * card. Order: target-gene refs first (UniProt / Ensembl / Entrez / HPA),
+ * then compound refs (MedChemExpress), then derived MoA / literature
+ * search links (PubChem / ChEMBL / DrugBank).
  */
-function CurrentCompoundCard({
+function ExternalRefChips({
   d,
   target,
 }: {
   d: DashboardResponse;
   target: string;
 }) {
-  const c = d.compound;
+  const refs =
+    d.references.by_target[target] ?? d.references.by_target[d.target_id] ?? {};
+
+  const items: { label: string; href: string }[] = [];
+
+  for (const k of ["UniProt", "Ensembl", "Entrez", "HPA"]) {
+    if (refs[k]) items.push({ label: k, href: refs[k] });
+  }
+  if (refs["MedChemExpress"]) {
+    items.push({ label: "MedChem", href: refs["MedChemExpress"] });
+  }
+
+  const drugName = encodeURIComponent(d.drug_name);
+  items.push({
+    label: "PubChem",
+    href: `https://pubchem.ncbi.nlm.nih.gov/#query=${drugName}`,
+  });
+  items.push({
+    label: "ChEMBL",
+    href: `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${drugName}`,
+  });
+  items.push({
+    label: "DrugBank",
+    href: `https://go.drugbank.com/unearth/q?query=${drugName}&searcher=drugs`,
+  });
+
+  if (items.length === 0) return null;
+
   return (
-    <section
-      className="rounded-xl border border-line bg-surface-card p-5"
-      aria-label="Current compound"
-    >
-      <span
-        className="block text-ink-muted mb-2"
-        style={{
-          fontSize:      "var(--font-label-size)",
-          lineHeight:    "var(--font-label-lh)",
-          fontWeight:    "var(--font-label-weight)" as any,
-          letterSpacing: "var(--font-label-tracking)",
-          textTransform: "uppercase",
-        }}
-      >
-        Current Compound
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta justify-start lg:justify-end max-w-[520px]">
+      <span className="text-ink-muted uppercase tracking-wider mr-1">
+        External
       </span>
-
-      <h2
-        className="text-ink-primary"
-        style={{
-          fontSize:      "22px",
-          lineHeight:    "1.2",
-          fontWeight:    700,
-          letterSpacing: "-0.02em",
-        }}
-      >
-        {d.drug_name}
-      </h2>
-      {c.hy_code && (
-        <div className="mt-1 font-mono text-caption text-ink-muted">
-          {c.hy_code}
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        <span className="chip" title={`Active target: ${target}`}>
-          {target}
+      {items.map((it, i) => (
+        <span key={it.label} className="inline-flex items-baseline gap-2">
+          {i > 0 && (
+            <span className="text-ink-muted opacity-50 select-none" aria-hidden>
+              ·
+            </span>
+          )}
+          <a
+            href={it.href}
+            target="_blank"
+            rel="noreferrer"
+            className="a-link"
+          >
+            {it.label}
+          </a>
         </span>
-        {d.target_profile.drug_group && (
-          <span className="chip">{d.target_profile.drug_group}</span>
-        )}
-        <StatusBadge growth_class={d.phenotypic?.growth_class} />
-      </div>
-
-      {d.target_profile.target_class && (
-        <p className="mt-3 text-caption text-ink-muted leading-relaxed">
-          {d.target_profile.target_class}
-        </p>
-      )}
-
-      <dl className="mt-4 pt-4 border-t border-line grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-body">
-        {c.dose_um != null && (
-          <>
-            <dt className="text-ink-muted">Dose</dt>
-            <dd className="text-ink-primary tabular font-medium">
-              {c.dose_um} µM
-            </dd>
-          </>
-        )}
-        <dt className="text-ink-muted">Cell</dt>
-        <dd className="text-ink-primary font-medium">{d.cell_line.name}</dd>
-        {c.treatment_hours != null && (
-          <>
-            <dt className="text-ink-muted">Observation</dt>
-            <dd className="text-ink-primary tabular font-medium">
-              {c.treatment_hours} h
-            </dd>
-          </>
-        )}
-      </dl>
-    </section>
-  );
-}
-
-/**
- * SectionNav — anchor-link list to jump between major analysis sections.
- * scroll-margin handles the sticky topbar overlap; no JS scroll handler
- * needed.
- */
-function SectionNav() {
-  const items: { id: string; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "ppi", label: "PPI" },
-    { id: "landscape", label: "Landscape" },
-    { id: "imaging", label: "Imaging" },
-    { id: "pathway", label: "Pathway" },
-    { id: "references", label: "References" },
-  ];
-  return (
-    <nav
-      className="rounded-xl border border-line bg-surface-card p-4"
-      aria-label="Section navigation"
-    >
-      <span
-        className="block text-ink-muted mb-2"
-        style={{
-          fontSize:      "var(--font-label-size)",
-          lineHeight:    "var(--font-label-lh)",
-          fontWeight:    "var(--font-label-weight)" as any,
-          letterSpacing: "var(--font-label-tracking)",
-          textTransform: "uppercase",
-        }}
-      >
-        Sections
-      </span>
-      <ul className="flex flex-col">
-        {items.map((it) => (
-          <li key={it.id}>
-            <a
-              href={`#${it.id}`}
-              className="block py-1.5 px-2 -mx-2 rounded-md text-body text-ink-secondary hover:text-ink-primary hover:bg-surface-soft transition-colors duration-fast"
-            >
-              {it.label}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Bridge notice (community switch feedback, with direction icon)
-// ---------------------------------------------------------------------------
-
-function BridgeNotice({
-  notice,
-  onReset,
-  onDismiss,
-}: {
-  notice: { text: string; direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump" };
-  onReset: () => void;
-  onDismiss: () => void;
-}) {
-  const arrow =
-    notice.direction === "ppi-to-landscape"
-      ? "PPI → Landscape"
-      : notice.direction === "landscape-to-ppi"
-      ? "Landscape → PPI"
-      : "Node jump";
-  return (
-    <div className="px-3 py-2 rounded-md border border-brand-primary/40 bg-surface-card text-body text-ink-primary flex items-center gap-3 shadow-md">
-      <span className="text-meta uppercase tracking-wider text-brand-primary font-semibold whitespace-nowrap">
-        {arrow}
-      </span>
-      <span className="flex-1 min-w-0 truncate text-ink-secondary">{notice.text}</span>
-      <button className="btn btn--ghost text-meta" onClick={onReset}>
-        target community 복귀
-      </button>
-      <button
-        className="btn btn--ghost text-meta"
-        onClick={onDismiss}
-        aria-label="Dismiss"
-        title="Dismiss"
-      >
-        ✕
-      </button>
+      ))}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Bottom-strip info cards (Optional References section)
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Mechanistic Signatures (formerly Localization Annotations) — heatmap rows
+// ===========================================================================
 
-function LocalizationCard({ d }: { d: DashboardResponse }) {
+/**
+ * Renames the existing localization_annotations payload to "Mechanistic
+ * Signatures" and lifts it from the bottom #references strip into the
+ * Overview band, between KPI/Key Findings and the main analysis grid.
+ *
+ * Visual format unchanged — 5-cell teal→cyan heatmap per row — so this is
+ * purely a placement + label change at the UI layer. Backend payload
+ * (`d.localization_annotations`) is reused as-is.
+ */
+function MechanisticSignatures({ d }: { d: DashboardResponse }) {
+  if (d.localization_annotations.length === 0) return null;
   return (
-    <PanelCard title="Localization Annotations">
+    <PanelCard title="Mechanistic Signatures">
       <ul className="space-y-2.5">
         {d.localization_annotations.map((l: { label: string; level: number }) => {
           const clamped = Math.max(0, Math.min(5, l.level));
@@ -675,6 +625,46 @@ function LocalizationCard({ d }: { d: DashboardResponse }) {
         <span>High</span>
       </div>
     </PanelCard>
+  );
+}
+
+// ===========================================================================
+// Existing helpers (KeyFindings, Bridge notice, CellLineInline)
+// ===========================================================================
+
+function BridgeNotice({
+  notice,
+  onReset,
+  onDismiss,
+}: {
+  notice: { text: string; direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump" };
+  onReset: () => void;
+  onDismiss: () => void;
+}) {
+  const arrow =
+    notice.direction === "ppi-to-landscape"
+      ? "PPI → Landscape"
+      : notice.direction === "landscape-to-ppi"
+      ? "Landscape → PPI"
+      : "Node jump";
+  return (
+    <div className="px-3 py-2 rounded-md border border-brand-primary/40 bg-surface-card text-body text-ink-primary flex items-center gap-3 shadow-md">
+      <span className="text-meta uppercase tracking-wider text-brand-primary font-semibold whitespace-nowrap">
+        {arrow}
+      </span>
+      <span className="flex-1 min-w-0 truncate text-ink-secondary">{notice.text}</span>
+      <button className="btn btn--ghost text-meta" onClick={onReset}>
+        target community 복귀
+      </button>
+      <button
+        className="btn btn--ghost text-meta"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        title="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
   );
 }
 
@@ -781,124 +771,5 @@ function CellLineInline({ cell }: { cell: DashboardResponse["cell_line"] }) {
         </dl>
       </div>
     </div>
-  );
-}
-
-function CompoundDetailsCard({ d }: { d: DashboardResponse }) {
-  const c = d.compound;
-  return (
-    <PanelCard title="Compound Details">
-      <dl className="grid grid-cols-3 gap-y-2 text-body">
-        <dt className="text-ink-muted">Dose</dt>
-        <dd className="col-span-2 tabular">
-          {c.dose_um ? `${c.dose_um} µM` : "—"}
-          {c.treatment_hours && (
-            <span className="ml-3 text-ink-muted">~ {c.treatment_hours} h</span>
-          )}
-        </dd>
-        <dt className="text-ink-muted">Code</dt>
-        <dd className="col-span-2 font-mono text-meta">{c.hy_code ?? "—"}</dd>
-        <dt className="text-ink-muted">SMILES</dt>
-        <dd className="col-span-2 font-mono text-meta break-all text-ink-secondary">
-          {c.smiles ?? "—"}
-        </dd>
-      </dl>
-    </PanelCard>
-  );
-}
-
-function TargetProfileCard({ d }: { d: DashboardResponse }) {
-  const t = d.target_profile;
-  return (
-    <PanelCard title="Target Profile">
-      <dl className="grid grid-cols-3 gap-y-2 text-body">
-        <dt className="text-ink-muted">Target</dt>
-        <dd className="col-span-2 font-medium">{t.targets.join(", ")}</dd>
-        <dt className="text-ink-muted">Class</dt>
-        <dd className="col-span-2">{t.target_class ?? "—"}</dd>
-        <dt className="text-ink-muted">Pathway</dt>
-        <dd className="col-span-2">{t.pathway ?? "—"}</dd>
-        <dt className="text-ink-muted">MoA</dt>
-        <dd className="col-span-2 text-ink-secondary">
-          {t.moa ? (t.moa.length > 160 ? `${t.moa.slice(0, 160)}…` : t.moa) : "—"}
-        </dd>
-      </dl>
-    </PanelCard>
-  );
-}
-
-function ReferenceDatabasesCard({ d, target }: { d: DashboardResponse; target: string }) {
-  const refs = d.references.by_target[target] ?? d.references.by_target[d.target_id] ?? {};
-  const dataOrder = ["Ensembl", "Entrez", "UniProt", "HPA"] as const;
-  const chemOrder = ["MedChemExpress"] as const;
-
-  const moaLinks: { label: string; href: string }[] = [];
-  const drugName = encodeURIComponent(d.drug_name);
-  moaLinks.push({
-    label: "PubChem",
-    href: `https://pubchem.ncbi.nlm.nih.gov/#query=${drugName}`,
-  });
-  moaLinks.push({
-    label: "ChEMBL",
-    href: `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${drugName}`,
-  });
-  moaLinks.push({
-    label: "DrugBank",
-    href: `https://go.drugbank.com/unearth/q?query=${drugName}&searcher=drugs`,
-  });
-  if (d.compound.hy_code) {
-    moaLinks.push({
-      label: "Code (MedChem)",
-      href: `https://www.medchemexpress.com/search.html?q=${encodeURIComponent(
-        d.compound.hy_code,
-      )}`,
-    });
-  }
-
-  const Section = ({
-    title,
-    items,
-  }: {
-    title: string;
-    items: { label: string; href: string }[];
-  }): ReactNode =>
-    items.length === 0 ? null : (
-      <div>
-        <div className="text-meta text-ink-muted uppercase tracking-wider mb-1.5">
-          {title}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-body">
-          {items.map((it) => (
-            <a
-              key={it.label}
-              href={it.href}
-              target="_blank"
-              rel="noreferrer"
-              className="a-link"
-            >
-              {it.label}
-            </a>
-          ))}
-        </div>
-      </div>
-    );
-
-  return (
-    <PanelCard title="Reference databases">
-      <div className="flex flex-col gap-3">
-        <Section
-          title="Target gene"
-          items={dataOrder.filter((k) => refs[k]).map((k) => ({ label: k, href: refs[k] }))}
-        />
-        <Section
-          title="Compound"
-          items={chemOrder.filter((k) => refs[k]).map((k) => ({ label: k, href: refs[k] }))}
-        />
-        <Section title="Mechanism & literature" items={moaLinks} />
-        {Object.keys(refs).length === 0 && moaLinks.length === 0 && (
-          <span className="text-ink-muted">없음</span>
-        )}
-      </div>
-    </PanelCard>
   );
 }
