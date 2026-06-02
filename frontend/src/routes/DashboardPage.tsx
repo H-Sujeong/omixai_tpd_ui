@@ -654,7 +654,7 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
   if (d.localization_annotations.length === 0) return null;
   return (
     <PanelCard title="Mechanistic Signatures">
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-2">
         {d.localization_annotations.map((l: { label: string; level: number }) => {
           const clamped = Math.max(0, Math.min(5, l.level));
           return (
@@ -662,14 +662,14 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
               <div
                 role="img"
                 aria-label={`${l.label} level ${l.level} of 5`}
-                className="flex gap-0.5 shrink-0"
+                className="flex gap-1 shrink-0"
               >
                 {Array.from({ length: 5 }).map((_, i) => {
                   if (i >= clamped) {
                     return (
                       <span
                         key={i}
-                        className="block w-3 h-2 rounded-sm"
+                        className="block w-5 h-3 rounded-sm"
                         style={{ background: "rgb(var(--color-loc-low-rgb) / 0.08)" }}
                       />
                     );
@@ -678,7 +678,7 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
                   return (
                     <span
                       key={i}
-                      className="block w-3 h-2 rounded-sm"
+                      className="block w-5 h-3 rounded-sm"
                       style={{
                         background:
                           ratio < 0.5
