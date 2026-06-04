@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { LoginPage } from "@/routes/LoginPage";
+import { ResetPasswordPage } from "@/routes/ResetPasswordPage";
 import { PlateListPage } from "@/routes/PlateListPage";
 import { DrugSummaryPage } from "@/routes/DrugSummaryPage";
 import { DashboardPage } from "@/routes/DashboardPage";
@@ -11,6 +12,7 @@ import { NotFoundPage } from "@/routes/NotFoundPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/reset", element: <ResetPasswordPage /> },
   {
     path: "/",
     element: (

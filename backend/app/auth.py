@@ -14,6 +14,7 @@ from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session as DbSession
 
 from .db import get_db
+from .models import PasswordResetToken
 from .models import Session as SessionRow
 from .models import User
 
@@ -76,6 +77,37 @@ def _user_from_token(db: DbSession, token: str | None) -> User | None:
         return None
     user = row.user
     return user if user and user.is_active else None
+
+
+# --- password reset tokens ---------------------------------------------------
+
+def create_reset_token(db: DbSession, user: User) -> str:
+    from .config import get_settings
+
+    token = secrets.token_urlsafe(32)
+    ttl = get_settings().reset_token_ttl_min
+    db.add(PasswordResetToken(
+        token=token, user_id=user.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=ttl),
+    ))
+    db.commit()
+    return token
+
+
+def validate_reset_token(db: DbSession, token: str | None) -> PasswordResetToken | None:
+    if not token:
+        return None
+    row = db.get(PasswordResetToken, token)
+    if not row or row.used:
+        return None
+    exp = row.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        return None
+    if not row.user or not row.user.is_active:
+        return None
+    return row
 
 
 def set_session_cookie(response: Response, token: str) -> None:

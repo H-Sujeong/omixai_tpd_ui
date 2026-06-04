@@ -41,6 +41,18 @@ class Session(Base):
     user: Mapped[User] = relationship()
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    token: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(default=_now)
+    expires_at: Mapped[datetime] = mapped_column()
+    used: Mapped[bool] = mapped_column(default=False)
+
+    user: Mapped[User] = relationship()
+
+
 class Plate(Base):
     """Ownership + metadata pointer for one experiment plate. The actual data
     (CSVs, json assets, time-lapse images) stays in the folder at ``data_dir``."""

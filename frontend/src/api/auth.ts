@@ -27,6 +27,18 @@ export function useLogin() {
   });
 }
 
+export function useRequestReset() {
+  return useMutation<{ ok: boolean }, Error, string>({
+    mutationFn: (email) => apiPostJson<{ ok: boolean }>("/api/v1/auth/forgot", { email }),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation<{ ok: boolean }, Error, { token: string; password: string }>({
+    mutationFn: (b) => apiPostJson<{ ok: boolean }>("/api/v1/auth/reset", b),
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation<{ ok: boolean }, Error, void>({

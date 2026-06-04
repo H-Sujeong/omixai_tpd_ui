@@ -46,6 +46,16 @@ class Settings(BaseSettings):
     # Seed admin account (web Admin console access). Created on first startup.
     admin_email: str = "admin@omixai.local"
     admin_password: str = "admin1234"
+    # Password reset. The link points at the frontend /reset?token=… page.
+    # If smtp_host is empty the reset URL is logged instead of emailed (dev).
+    app_base_url: str = "http://localhost:5173"
+    reset_token_ttl_min: int = 60
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "OmixAI-TPD <no-reply@omixai.local>"
+    smtp_tls: bool = True
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
