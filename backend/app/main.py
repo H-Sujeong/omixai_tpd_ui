@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.v1 import drugs as drugs_router
 from .api.v1 import files as files_router
 from .api.v1 import plates as plates_router
+from .api.v1 import proteins as proteins_router
 from .config import get_settings
 from .data_loader import get_registry
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(plates_router.router)
     app.include_router(drugs_router.router)
     app.include_router(files_router.router)
+    app.include_router(proteins_router.router)
 
     @app.on_event("startup")
     def _warm() -> None:

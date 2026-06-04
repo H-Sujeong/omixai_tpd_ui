@@ -7,7 +7,17 @@ import type {
   InteractomeNodeResponse,
   PlateSummary,
   PpiPanel,
+  ProteinInfo,
 } from "@/types/api";
+
+export function useProtein(gene: string | null) {
+  return useQuery<ProteinInfo>({
+    queryKey: ["protein", gene],
+    enabled: !!gene,
+    staleTime: 1000 * 60 * 60, // protein metadata is stable; cache for an hour
+    queryFn: () => apiGet<ProteinInfo>(`/api/v1/proteins/${encodeURIComponent(gene as string)}`),
+  });
+}
 
 export function usePlates() {
   return useQuery<PlateSummary[]>({

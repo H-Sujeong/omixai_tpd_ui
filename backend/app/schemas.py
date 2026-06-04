@@ -109,6 +109,23 @@ class PhenotypicProfiling(BaseModel):
     phenome_dmso: list[PhenomeTrackingPoint] = []
 
 
+class ProteinInfo(BaseModel):
+    """UniProt-sourced protein metadata + external DB links for a gene symbol."""
+
+    gene: str
+    found: bool = False
+    accession: str | None = None
+    protein_name: str | None = None
+    function: str | None = None
+    families: list[str] = Field(default_factory=list)
+    length: int | None = None          # amino acids
+    mass_kda: float | None = None      # molecular mass, kDa
+    subcellular: list[str] = Field(default_factory=list)
+    pdb_ids: list[str] = Field(default_factory=list)
+    pdb_count: int = 0
+    links: dict[str, str] = Field(default_factory=dict)  # uniprot / string / pdb
+
+
 class TimeLapseFrame(BaseModel):
     t_hours: float
     image_url: str

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # (parents[2] = omixai_tpd_ui repo root; .parent = Documents/.)
     data_root: Path = Path(__file__).resolve().parents[2].parent / "TPD_UI_DB"
     drug_info_cache: Path = Path(__file__).resolve().parents[1] / "var" / "drug_info_cache.json"
+    protein_info_cache: Path = Path(__file__).resolve().parents[1] / "var" / "protein_info_cache.json"
     db_path: Path = Path(__file__).resolve().parents[1] / "var" / "omixai.db"
     cors_origins: list[str] = [
         "http://localhost:5173",
@@ -33,5 +34,6 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     s = Settings()
     s.drug_info_cache.parent.mkdir(parents=True, exist_ok=True)
+    s.protein_info_cache.parent.mkdir(parents=True, exist_ok=True)
     s.db_path.parent.mkdir(parents=True, exist_ok=True)
     return s

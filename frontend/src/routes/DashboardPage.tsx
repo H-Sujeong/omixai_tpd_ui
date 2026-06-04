@@ -5,6 +5,7 @@ import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock"
 import { PanelCard } from "@/components/PanelCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
+import { ProteinInfoPanel } from "@/features/ppi-graph/ProteinInfoPanel";
 import { findRelatedCommunityFromEdge } from "@/features/ppi-graph/relatedCommunity";
 import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
@@ -281,22 +282,29 @@ export function DashboardPage() {
               } · edges=${activePpi?.edges.length ?? 0}`}
               actions={<span className="chip">{activePpi?.target}</span>}
             >
-              {!activePpi ? (
-                <div className="h-[520px] flex items-center justify-center">
-                  <EmptyBlock label="PPI 데이터 없음" />
-                </div>
-              ) : (
-                <PpiGraph
-                  nodes={activePpi.nodes}
-                  edges={activePpi.edges}
-                  targetName={activePpi.target}
-                  selectedNode={selectedNode}
-                  selectedEdgeId={selectedEdgeId}
-                  onNodeClick={handleNodeClick}
-                  onEdgeClick={handleEdgeClick}
-                  height={520}
+              <div className="relative overflow-hidden">
+                {!activePpi ? (
+                  <div className="h-[520px] flex items-center justify-center">
+                    <EmptyBlock label="PPI 데이터 없음" />
+                  </div>
+                ) : (
+                  <PpiGraph
+                    nodes={activePpi.nodes}
+                    edges={activePpi.edges}
+                    targetName={activePpi.target}
+                    selectedNode={selectedNode}
+                    selectedEdgeId={selectedEdgeId}
+                    onNodeClick={handleNodeClick}
+                    onEdgeClick={handleEdgeClick}
+                    height={520}
+                  />
+                )}
+                {/* Protein info slides in from the right when a node is selected */}
+                <ProteinInfoPanel
+                  gene={selectedNode}
+                  onClose={() => setSelectedNode(null)}
                 />
-              )}
+              </div>
             </PanelCard>
           </section>
         </div>

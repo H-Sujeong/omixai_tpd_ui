@@ -76,6 +76,21 @@ export interface PhenotypicProfiling {
   phenome_dmso: PhenomeTrackingPoint[];
 }
 
+export interface ProteinInfo {
+  gene: string;
+  found: boolean;
+  accession: string | null;
+  protein_name: string | null;
+  function: string | null;
+  families: string[];
+  length: number | null;
+  mass_kda: number | null;
+  subcellular: string[];
+  pdb_ids: string[];
+  pdb_count: number;
+  links: { uniprot?: string; string?: string; pdb?: string };
+}
+
 export interface TimeLapseFrame { t_hours: number; image_url: string; n_cells?: number | null; }
 export interface TimeLapseViewer {
   frames: TimeLapseFrame[];
