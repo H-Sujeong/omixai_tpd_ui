@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LangToggle } from "@/components/LangToggle";
 import { useMe, useLogout } from "@/api/auth";
@@ -8,13 +8,19 @@ const SignOutButton = () => {
   const t = useT();
   const { data: me } = useMe();
   const logout = useLogout();
-  const navigate = useNavigate();
+  // Hard redirect after logout: a full reload guarantees a clean logged-out
+  // state (no stale cache / no unmount-race with the router) regardless of
+  // timing. The session cookie is already cleared by the logout response.
+  const signOut = async () => {
+    try { await logout.mutateAsync(); } catch { /* clear client state anyway */ }
+    window.location.assign("/login");
+  };
   return (
     <button
       type="button"
       title={`${me?.email ?? ""} · ${t("로그아웃", "Sign out")}`}
       aria-label={t("로그아웃", "Sign out")}
-      onClick={() => logout.mutate(undefined, { onSuccess: () => navigate("/login", { replace: true }) })}
+      onClick={signOut}
       className="sidebar-item__icon text-ink-muted hover:text-status-error transition-colors"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
