@@ -1,11 +1,10 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
 import { useDrugSummary, usePlates } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useDrugListFilters, type DrugSortKey as SortKey } from "@/store/drugListFilters";
 import type { DrugSummaryRow } from "@/types/api";
-
-type SortKey = "drug_name" | "gr_score" | "growth_class" | "drug_group";
 
 /**
  * Drug summary table — design_02 / style_guide compact "Bloomberg terminal" feel.
@@ -21,12 +20,10 @@ export function DrugSummaryPage() {
     [platesQ.data, plateId],
   );
 
-  const [search, setSearch] = useState("");
-  const [filterGroup, setFilterGroup] = useState<string>("");
-  const [filterEffect, setFilterEffect] = useState<string>("");
-  const [assetsOnly, setAssetsOnly] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>("drug_name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // Filter/sort state lives in a store so it survives navigating into a drug
+  // and back (the page unmounts on route change).
+  const { search, filterGroup, filterEffect, assetsOnly, sortKey, sortDir, set, clearFilters } =
+    useDrugListFilters();
 
   const groups = useMemo(() => {
     const s = new Set<string>();
@@ -70,11 +67,8 @@ export function DrugSummaryPage() {
   }, [data, search, filterGroup, filterEffect, assetsOnly, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
-    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(k);
-      setSortDir("asc");
-    }
+    if (sortKey === k) set({ sortDir: sortDir === "asc" ? "desc" : "asc" });
+    else set({ sortKey: k, sortDir: "asc" });
   };
 
   const openDashboard = (drug: DrugSummaryRow, target?: string) => {
@@ -147,13 +141,13 @@ export function DrugSummaryPage() {
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => set({ search: e.target.value })}
           placeholder="약물 이름 · code · target 검색"
           className="flex-1 min-w-[260px] border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary placeholder:text-ink-muted focus:border-brand-primary outline-none transition-colors duration-fast"
         />
         <select
           value={filterGroup}
-          onChange={(e) => setFilterGroup(e.target.value)}
+          onChange={(e) => set({ filterGroup: e.target.value })}
           className="border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary outline-none focus:border-brand-primary"
         >
           <option value="">All groups</option>
@@ -165,7 +159,7 @@ export function DrugSummaryPage() {
         </select>
         <select
           value={filterEffect}
-          onChange={(e) => setFilterEffect(e.target.value)}
+          onChange={(e) => set({ filterEffect: e.target.value })}
           className="border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary outline-none focus:border-brand-primary"
         >
           <option value="">All effects</option>
@@ -179,7 +173,7 @@ export function DrugSummaryPage() {
           type="button"
           role="switch"
           aria-checked={assetsOnly}
-          onClick={() => setAssetsOnly((v) => !v)}
+          onClick={() => set({ assetsOnly: !assetsOnly })}
           title="실측 PPI / landscape 자산이 있는 약물만 표시"
           className={`border rounded-md px-3 py-2 text-body transition-colors duration-fast inline-flex items-center gap-1.5 ${
             assetsOnly
@@ -198,12 +192,7 @@ export function DrugSummaryPage() {
         {(search || filterGroup || filterEffect || assetsOnly) && (
           <button
             className="btn btn--ghost text-meta"
-            onClick={() => {
-              setSearch("");
-              setFilterGroup("");
-              setFilterEffect("");
-              setAssetsOnly(false);
-            }}
+            onClick={() => clearFilters()}
           >
             Reset
           </button>

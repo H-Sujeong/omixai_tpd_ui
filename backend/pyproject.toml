@@ -1,6 +1,6 @@
 [project]
 name = "omixai-tpd-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "OmixAI-TPD backend (FastAPI) — Target Protein Degradation plate viewer"
 requires-python = ">=3.11"
 dependencies = [
