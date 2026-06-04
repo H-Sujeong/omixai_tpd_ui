@@ -435,9 +435,10 @@ export function Landscape({
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
-              // Normal (not reversed) so low Distance-from-anchor — where the
-              // target community sits — lands at the front-left/origin corner.
-              autorange: true,
+              // Reversed so low Distance-from-anchor — where the target sits —
+              // lands at the front-LEFT with the original camera (normal put it
+              // on the right).
+              autorange: "reversed" as const,
               gridcolor: sceneGridColor,
               tickfont: { color: axisTextColor },
               backgroundcolor: sceneBgColor,
@@ -461,10 +462,10 @@ export function Landscape({
               backgroundcolor: sceneBgColor,
               showbackground: true,
             },
-            // Low grazing start view, mirrored in x (eye.x < 0) so the target
-            // community's corner (low Distance, low −log10p) sits at the front-
-            // LEFT instead of the front-right.
-            camera: { eye: { x: -1.35, y: -1.35, z: 0.32 } },
+            // Low grazing start view (original framing — a mirrored eye.x
+            // cropped the scene). Target lands front-left via the reversed
+            // Distance axis below, not via the camera.
+            camera: { eye: { x: 1.35, y: -1.35, z: 0.32 } },
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
           },
