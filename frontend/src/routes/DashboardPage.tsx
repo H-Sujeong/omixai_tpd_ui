@@ -187,11 +187,13 @@ export function DashboardPage() {
     }
   };
 
-  const resetToTargetCommunity = () => {
-    if (!dash.data?.ppi) return;
-    setSelectedCommunity(dash.data.ppi.target_community_id);
-    setSelectedEdgeId(null);
+  // Clear the activation triggered by clicking a specific protein (node):
+  // close the protein info panel, drop node/edge highlights, and return the
+  // PPI to the target (home) community.
+  const clearProteinSelection = () => {
     setSelectedNode(null);
+    setSelectedEdgeId(null);
+    if (dash.data?.ppi) setSelectedCommunity(dash.data.ppi.target_community_id);
     setBridgeNotice(null);
   };
 
@@ -233,7 +235,7 @@ export function DashboardPage() {
         {bridgeNotice && (
           <BridgeNotice
             notice={bridgeNotice}
-            onReset={resetToTargetCommunity}
+            onReset={clearProteinSelection}
             onDismiss={() => setBridgeNotice(null)}
           />
         )}
@@ -319,7 +321,7 @@ export function DashboardPage() {
                 {/* Protein info slides in from the right when a node is selected */}
                 <ProteinInfoPanel
                   gene={selectedNode}
-                  onClose={() => setSelectedNode(null)}
+                  onClose={clearProteinSelection}
                 />
               </div>
             </PanelCard>
@@ -844,7 +846,7 @@ function BridgeNotice({
       </span>
       <span className="flex-1 min-w-0 truncate text-ink-secondary">{notice.text}</span>
       <button className="btn btn--ghost text-meta" onClick={onReset}>
-        target community 복귀
+        단백질 선택 해제
       </button>
       <button
         className="btn btn--ghost text-meta"
