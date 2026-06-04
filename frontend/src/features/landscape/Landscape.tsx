@@ -187,8 +187,9 @@ export function Landscape({
         type: "contour",
         x: g.xi,
         y: g.yi,
-        z: maskedZ ?? g.z,
-        connectgaps: false,
+        // 2D contour can't interpolate a mostly-null grid (it renders blank), so
+        // keep the full grid here; the 0-fill plane is only an issue in 3D.
+        z: g.z,
         colorscale: COLORSCALE_2D,
         zmin: -0.5,
         zmax: 0.5,
