@@ -8,13 +8,21 @@ import { useT } from "@/store/uiLang";
  * navigating back → exporting data. Bilingual via useT.
  */
 
-type Section = "plate" | "drug" | "dashboard";
+type Section = "sidebar" | "plate" | "drug" | "dashboard";
 
 interface Note {
   n: number;
   ko: string;
   en: string;
 }
+
+const SIDEBAR: Note[] = [
+  { n: 1, ko: "TPD 로고 — 워크스페이스(플레이트 목록) 홈으로 이동.", en: "TPD logo — go to the workspace home (plate list)." },
+  { n: 2, ko: "플레이트 아이콘 — 플레이트 목록 페이지.", en: "Plate icon — the plate list page." },
+  { n: 3, ko: "(i) 아이콘 — 지금 보고 있는 이 사용 설명서.", en: "(i) icon — this user guide you're reading now." },
+  { n: 4, ko: "언어 토글(한/EN) — 전체 UI를 한국어/영어로 전환.", en: "Language toggle (한/EN) — switch the whole UI between Korean and English." },
+  { n: 5, ko: "테마 토글 — 다크/라이트 모드 전환.", en: "Theme toggle — switch dark / light mode." },
+];
 
 const PLATE: Note[] = [
   { n: 1, ko: "워크스페이스 요약 — 전체 plate · 화합물 · well 수.", en: "Workspace summary — total plates · compounds · wells." },
@@ -31,28 +39,38 @@ const DRUG: Note[] = [
   { n: 1, ko: "← Plates — 워크스페이스(플레이트 목록)로 돌아가기.", en: "← Plates — back to the workspace (plate list)." },
   { n: 2, ko: "검색/필터 — 약물명·코드·타깃 검색, 그룹·효과 필터.", en: "Search / filters — by drug name·code·target, plus group & effect filters." },
   { n: 3, ko: "Assets only — 분석 자산이 있는 약물만 표시.", en: "Assets only — show only drugs that have analysis assets." },
-  { n: 4, ko: "약물 행 — 약물명 클릭 = 기본 타깃 대시보드로 진입.", en: "Drug row — click the name = open the default-target dashboard." },
-  { n: 5, ko: "Target chip — 클릭하면 해당 타깃의 대시보드로 진입(멀티타깃).", en: "Target chip — click to open that specific target's dashboard (multi-target)." },
-  { n: 6, ko: "GR score / Class — 성장률 점수와 효과 분류(세포독성 등).", en: "GR score / Class — growth-rate score and effect classification (e.g. cytotoxic)." },
-  { n: 7, ko: "Asset ✓/○ — 분석 자산 유무(○ = 자산 없음).", en: "Asset ✓/○ — whether analysis assets exist (○ = none)." },
-  { n: 8, ko: "Export plate ⬇ — 플레이트 단위 일괄 ZIP(약물/타깃/포맷 체크박스 선택).", en: "Export plate ⬇ — plate-level bulk ZIP (pick drugs / targets / formats)." },
+  { n: 4, ko: "Composition 바 — 이 플레이트 화합물의 결과 구성(Asset Only/Cytotoxic/Static/No Asset)을 한눈에.", en: "Composition bar — the plate's compound result mix (Asset Only / Cytotoxic / Static / No Asset) at a glance." },
+  { n: 5, ko: "약물 행 — 약물명 클릭 = 기본 타깃 대시보드로 진입.", en: "Drug row — click the name = open the default-target dashboard." },
+  { n: 6, ko: "Target chip — 클릭하면 해당 타깃의 대시보드로 진입(멀티타깃).", en: "Target chip — click to open that specific target's dashboard (multi-target)." },
+  { n: 7, ko: "GR score / Class — 성장률 점수와 효과 분류(세포독성 등).", en: "GR score / Class — growth-rate score and effect classification (e.g. cytotoxic)." },
+  { n: 8, ko: "Asset ✓/○ — 분석 자산 유무(○ = 자산 없음).", en: "Asset ✓/○ — whether analysis assets exist (○ = none)." },
+  { n: 9, ko: "Export plate ⬇ — 플레이트 단위 일괄 ZIP(약물/타깃/포맷 체크박스 선택).", en: "Export plate ⬇ — plate-level bulk ZIP (pick drugs / targets / formats)." },
 ];
 
 const DASHBOARD: Note[] = [
-  { n: 1, ko: "← D3_10 — 이 plate의 약물 목록으로 돌아가기.", en: "← D3_10 — back to this plate's drug list." },
-  { n: 2, ko: "Target 전환 chip — 멀티타깃 화합물에서 타깃 변경(PPI·Landscape 재구성).", en: "Target switcher chips — change target for multi-target compounds (PPI & landscape rebuild)." },
+  { n: 1, ko: "← Back to Plate — 이 plate의 약물 목록으로 돌아가기(헤더 좌상단).", en: "← Back to Plate — return to this plate's drug list (top-left of the header)." },
+  { n: 2, ko: "헤더 — 화합물명(dBET6) + Target 전환 chip(멀티타깃 시 클릭하면 PPI·Landscape 재구성) + 약물군.", en: "Header — compound name (dBET6) + Target switcher chips (click to rebuild PPI & landscape for that target) + drug group." },
   { n: 3, ko: "Export ⬇ — 현재 타깃의 선택 항목을 일괄 ZIP으로(체크박스).", en: "Export ⬇ — bundle the current target's selected items into one ZIP (checkboxes)." },
-  { n: 4, ko: "KPI strip — GR score · Effect · Target · Community 등 핵심 지표(색 점 = 상태).", en: "KPI strip — key metrics: GR score · effect · target · community (colored dot = sentiment)." },
-  { n: 5, ko: "Target Landscape — community 분포(x=거리, y=−log10p, z=avg(PCC)). ✚=타깃, 점 클릭→PPI 재구성.", en: "Target Landscape — community map (x = distance, y = −log10p, z = avg(PCC)). ✚ = target; click a point → rebuild PPI." },
-  { n: 6, ko: "PPI Network — 단백질 상호작용(노드=단백질, 엣지 두께=STRING 신뢰도, 가까울수록 강함). 노드 클릭=단백질 정보.", en: "PPI Network — protein interactions (nodes = proteins, edge thickness = STRING confidence, closer = stronger). Node click = protein info." },
-  { n: 7, ko: "Pathway Enrichment — 현재 community의 GO 기능 농축(막대=score, 색=BP/MF/CC).", en: "Pathway Enrichment — GO functional enrichment of the current community (bar = score, color = BP/MF/CC)." },
-  { n: 8, ko: "Time-lapse Imaging — 0–48h 세포 이미지(0.5h 촬영), 간격 조절 + GIF export, 스케일바.", en: "Time-lapse Imaging — cell images 0–48 h (0.5 h capture), interval selector + GIF export, scale bar." },
-  { n: 9, ko: "Phenotypic Profiling — GR(t) 곡선(DMSO 대비 성장, 1=DMSO수준·0=정지·<0=사멸) + Phenome 이탈.", en: "Phenotypic Profiling — GR(t) curve vs DMSO (1 = DMSO rate, 0 = stasis, <0 = death) + Phenome deviation." },
-  { n: 10, ko: "Mechanistic Signatures — 기전 시그니처 강도(5칸 = level/5, ★=최강).", en: "Mechanistic Signatures — signature strength (5 cells = level/5, ★ = strongest)." },
-  { n: 11, ko: "패널별 CSV ⬇ / ⓘ — 각 박스 데이터를 CSV·전용 포맷으로 내보내기, ⓘ 위에 마우스를 올리면 해석 도움말.", en: "Per-panel CSV ⬇ / ⓘ — export each box's data (CSV / dedicated formats); hover ⓘ for how-to-read help." },
+  { n: 4, ko: "Executive Summary — 화합물 기전 한 줄 요약(모든 박스가 공유하는 컨텍스트).", en: "Executive Summary — one-line mechanism summary (shared context for every box)." },
+  { n: 5, ko: "KPI strip — Phenotype Shift · Cell Viability · Target Confidence · Toxicity (색 점 = 상태).", en: "KPI strip — Phenotype Shift · Cell Viability · Target Confidence · Toxicity (colored dot = sentiment)." },
+  { n: 6, ko: "Mechanistic Signatures — 기전 시그니처 강도(각 행 5칸 = level/5).", en: "Mechanistic Signatures — signature strength (each row's 5 cells = level/5)." },
+  { n: 7, ko: "Target Landscape — community 분포(x=거리, y=−log10p, z=avg(PCC)). ✚=타깃, 점 클릭→PPI 재구성.", en: "Target Landscape — community map (x = distance, y = −log10p, z = avg(PCC)). ✚ = target; click a point → rebuild PPI." },
+  { n: 8, ko: "PPI Network — 단백질 상호작용(엣지 두께=STRING 신뢰도, 가까울수록 강함). 노드 클릭=단백질 정보.", en: "PPI Network — protein interactions (edge thickness = STRING confidence, closer = stronger). Node click = protein info." },
+  { n: 9, ko: "Pathway Enrichment — 현재 community의 GO 기능 농축(막대=score, 색=BP/MF/CC).", en: "Pathway Enrichment — GO functional enrichment of the current community (bar = score, color = BP/MF/CC)." },
+  { n: 10, ko: "Time-lapse Imaging — 0–48h 세포 이미지(0.5h 촬영), 간격 조절 + GIF export, 스케일바.", en: "Time-lapse Imaging — cell images 0–48 h (0.5 h capture), interval selector + GIF export, scale bar." },
+  { n: 11, ko: "Phenotypic Profiling — GR(t) 곡선(DMSO 대비, 1=DMSO수준·0=정지·<0=사멸) + Phenome 이탈.", en: "Phenotypic Profiling — GR(t) curve vs DMSO (1 = DMSO rate, 0 = stasis, <0 = death) + Phenome deviation." },
+  { n: 12, ko: "패널별 CSV ⬇ / ⓘ — 각 박스 데이터를 CSV·전용 포맷으로 export, ⓘ 위에 마우스를 올리면 해석 도움말.", en: "Per-panel CSV ⬇ / ⓘ — export each box's data (CSV / dedicated formats); hover ⓘ for how-to-read help." },
 ];
 
 const SECTIONS: Record<Section, { img: string; notes: Note[]; titleKo: string; titleEn: string; descKo: string; descEn: string }> = {
+  sidebar: {
+    img: "/guide/sidebar.svg",
+    notes: SIDEBAR,
+    titleKo: "0. 사이드바 (전역 내비게이션)",
+    titleEn: "0. Sidebar (global navigation)",
+    descKo: "왼쪽 64px 아이콘 레일은 앱 어디서나 보이는 전역 내비게이션입니다. 상단은 페이지 이동, 하단은 언어·테마 전환.",
+    descEn: "The 64px icon rail on the left is the global navigation, visible everywhere. Top icons move between pages; the bottom toggles language and theme.",
+  },
   plate: {
     img: "/guide/plate.svg",
     notes: PLATE,
@@ -81,10 +99,11 @@ const SECTIONS: Record<Section, { img: string; notes: Note[]; titleKo: string; t
 
 export function GuidePage() {
   const t = useT();
-  const [section, setSection] = useState<Section>("plate");
+  const [section, setSection] = useState<Section>("sidebar");
   const s = SECTIONS[section];
 
   const tabs: Array<{ k: Section; label: string }> = [
+    { k: "sidebar", label: t("사이드바", "Sidebar") },
     { k: "plate", label: t("플레이트", "Plate") },
     { k: "drug", label: t("약물", "Drug") },
     { k: "dashboard", label: t("대시보드", "Dashboard") },
