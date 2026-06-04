@@ -49,17 +49,10 @@ export function LoginPage() {
   const fieldStyle: React.CSSProperties = { background: glass.field, borderColor: glass.fieldBorder };
 
   return (
-    <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-6 bg-surface-base">
-      {/* Aurora background — soft purple/indigo blobs */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -left-24 w-[42rem] h-[42rem] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, rgb(var(--color-brand-primary-rgb) / 0.55), transparent 60%)", opacity: isDark ? 0.55 : 0.4 }} />
-        <div className="absolute top-1/3 -right-24 w-[38rem] h-[38rem] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.5), transparent 60%)", opacity: isDark ? 0.5 : 0.35 }} />
-        <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, rgba(139,92,246,0.45), transparent 60%)", opacity: isDark ? 0.45 : 0.3 }} />
-      </div>
-
+    <div
+      className="relative min-h-screen overflow-hidden flex items-center justify-center p-6"
+      style={{ background: auroraBackground(isDark) }}
+    >
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1">
         <LangToggle />
         <ThemeToggle />
@@ -161,6 +154,21 @@ export function LoginPage() {
       </div>
     </div>
   );
+}
+
+/** Layered purple/indigo aurora painted straight onto the page background, so
+ *  it always shows (no reliance on faint blurred blobs). Tones soften in light. */
+export function auroraBackground(isDark: boolean): string {
+  // Big, overlapping blooms + a wide centre glow so the whole frame is washed in
+  // colour (like the reference), not just the corners.
+  const a = isDark ? [0.7, 0.62, 0.58, 0.42] : [0.46, 0.4, 0.36, 0.24];
+  return [
+    `radial-gradient(75rem 62rem at 18% 12%, rgb(var(--color-brand-primary-rgb) / ${a[0]}), transparent 72%)`,
+    `radial-gradient(72rem 60rem at 88% 32%, rgba(99,102,241,${a[1]}), transparent 72%)`,
+    `radial-gradient(80rem 66rem at 38% 118%, rgba(139,92,246,${a[2]}), transparent 72%)`,
+    `radial-gradient(130rem 100rem at 55% 45%, rgba(124,58,237,${a[3]}), transparent 78%)`,
+    `var(--color-surface-base)`,
+  ].join(", ");
 }
 
 function Field({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {

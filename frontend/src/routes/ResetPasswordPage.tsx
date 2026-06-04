@@ -5,6 +5,7 @@ import { useT } from "@/store/uiLang";
 import { useTheme } from "@/hooks/useTheme";
 import { LangToggle } from "@/components/LangToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { auroraBackground } from "@/routes/LoginPage";
 
 export function ResetPasswordPage() {
   const t = useT();
@@ -31,14 +32,10 @@ export function ResetPasswordPage() {
   const fieldStyle: React.CSSProperties = { background: glass.field, borderColor: glass.fieldBorder };
 
   return (
-    <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-6 bg-surface-base">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -left-24 w-[42rem] h-[42rem] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, rgb(var(--color-brand-primary-rgb) / 0.55), transparent 60%)", opacity: isDark ? 0.55 : 0.4 }} />
-        <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, rgba(139,92,246,0.45), transparent 60%)", opacity: isDark ? 0.45 : 0.3 }} />
-      </div>
-
+    <div
+      className="relative min-h-screen overflow-hidden flex items-center justify-center p-6"
+      style={{ background: auroraBackground(isDark) }}
+    >
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1">
         <LangToggle />
         <ThemeToggle />
