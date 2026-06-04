@@ -58,10 +58,11 @@ const COLORSCALE_3D_JET: Array<[number, string]> = [
 
 const COLOR_TARGET_FILL = "#F59E0B";
 const COLOR_TARGET_EDGE = "#92400E";
-// Target community absent from the PPI data: same cross, yellow → dark grey,
-// drawn at the would-be target position (landscape.target_point).
-const COLOR_TARGET_ABSENT_FILL = "#4B5563";
-const COLOR_TARGET_ABSENT_EDGE = "#1F2937";
+// Target community absent from the PPI data: drawn at the would-be target
+// position (landscape.target_point) as a HOLLOW (open) cross so it reads as a
+// pseudo/placeholder marker, in a light slate that stays visible on the dark 3D
+// scene as well as the light 2D plot (the old dark-grey was buried in dark mode).
+const COLOR_TARGET_ABSENT = "#94A3B8";
 const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
 const COLOR_OTHER_EDGE  = "#FFFFFF";
 const REF_LINE_COLOR    = "#1F2937";
@@ -116,6 +117,9 @@ export function Landscape({
   }, [landscape.scatter]);
 
   const effectiveThreshold = Math.max(rangeMin, Math.min(rangeMax, pccThreshold));
+  // Symmetric color limit so 0 = neutral (white/green centre) and the scale is
+  // tightened to the real data range (the old ±0.5 washed everything out).
+  const zlim = Math.max(Math.abs(rangeMin), Math.abs(rangeMax)) || 0.5;
 
   const [distMin, distMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
@@ -177,22 +181,50 @@ export function Landscape({
 
   function build2D(): any[] {
     const t: any[] = [];
+    const g = landscape.grid;
 
-    // 1. y = 1 reference line (significance cutoff for -log10(p))
-    t.push({
-      type: "scatter",
-      mode: "lines",
-      x: [distMin, distMax],
-      y: [1, 1],
-      line: { color: REF_LINE_COLOR, width: 1.5, dash: "dash" },
-      hoverinfo: "none",
-      showlegend: false,
-    });
+    // 1. Filled smooth contour — color on the plane (v1), normalized to the
+    //    real data range (symmetric, 0 = neutral) so differences show.
+    if (g) {
+      t.push({
+        type: "contour",
+        x: g.xi,
+        y: g.yi,
+        z: g.z,
+        colorscale: COLORSCALE_2D,
+        zmin: -zlim,
+        zmax: zlim,
+        contours: {
+          coloring: "heatmap",
+          showlabels: false,
+          start: -zlim,
+          end: zlim,
+          size: (2 * zlim) / 100 || 0.001,
+        },
+        line: { width: 0, smoothing: 1.5 },
+        ncontours: 100,
+        colorbar: {
+          title: { text: "avg(PCC)", side: "right" },
+          len: 0.85,
+          thickness: 14,
+          tickfont: { size: 10 },
+        },
+        hovertemplate: "x=%{x:.2f}  y=%{y:.2f}<br>PCC=%{z:.3f}<extra></extra>",
+      });
 
-    // 2. Communities as value-colored points (avg(PCC), normalized to the data
-    //    range with 0 = neutral). No surface/contour — a continuous surface over
-    //    these few scattered communities only ever looked spiky or smeared, so
-    //    each community reads clearly as its own colored point.
+      // 2. y = 1 reference line (significance cutoff for -log10(p))
+      t.push({
+        type: "scatter",
+        mode: "lines",
+        x: [g.xi[0], g.xi[g.xi.length - 1]],
+        y: [1, 1],
+        line: { color: REF_LINE_COLOR, width: 1.5, dash: "dash" },
+        hoverinfo: "none",
+        showlegend: false,
+      });
+    }
+
+    // 3. Other community scatter — grey circles
     if (scOther.length > 0) {
       t.push({
         type: "scatter",
@@ -201,33 +233,19 @@ export function Landscape({
         y: scOther.map((p) => p.y),
         customdata: scOther.map((p) => p.community_id),
         marker: {
-          size: 13,
+          size: 9,
           symbol: "circle",
-          color: scOther.map((p) => p.z),
-          colorscale: COLORSCALE_2D,
-          cmin: rangeMin,
-          cmax: rangeMax,
-          cmid: 0,
-          showscale: true,
-          colorbar: {
-            title: { text: "avg(PCC)", side: "right" },
-            len: 0.85,
-            thickness: 14,
-            tickfont: { size: 10 },
-          },
-          line: { width: 1, color: "rgba(30,30,30,0.55)" },
+          color: COLOR_OTHER_FILL,
+          line: { width: 1.5, color: COLOR_OTHER_EDGE },
         },
         hovertemplate:
-          "<b>community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<br>PCC=%{marker.color:.3f}<extra></extra>",
+          "<b>community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
         showlegend: false,
       });
     }
 
-    // 4. Target community marker.  When SHOW_TARGET_GLYPH is on a larger
-    //    ✚ text overlay rides on top to also highlight the target node
-    //    itself; default is off, so by default only the community is
-    //    marked.  All overlay-related props are still passed when the
-    //    flag is on, just to keep the code path warm.
+    // 4. Target community marker — real = filled yellow cross; absent = hollow
+    //    pseudo cross at the would-be target position.
     if (scTarget.length > 0) {
       const trace: any = {
         type: "scatter",
@@ -252,18 +270,16 @@ export function Landscape({
       }
       t.push(trace);
     } else if (landscape.target_point) {
-      // No target community in the PPI data — mark its would-be position with a
-      // dark-grey cross (same glyph as the real target).
       t.push({
         type: "scatter",
         mode: "markers",
         x: [landscape.target_point.x],
         y: [landscape.target_point.y],
         marker: {
-          size: 16,
-          symbol: "cross",
-          color: COLOR_TARGET_ABSENT_FILL,
-          line: { width: 2.5, color: COLOR_TARGET_ABSENT_EDGE },
+          size: 18,
+          symbol: "cross-open",
+          color: COLOR_TARGET_ABSENT,
+          line: { width: 3, color: COLOR_TARGET_ABSENT },
         },
         hovertemplate: `<b>${absentTargetLabel}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
         showlegend: false,
@@ -275,45 +291,41 @@ export function Landscape({
 
   function build3D(): any[] {
     const t: any[] = [];
+    const g = landscape.grid;
 
-    // No continuous surface — over these few scattered communities it only ever
-    // looked spiky or smeared. Instead: value-colored points at height =
-    // avg(PCC) with drop-stems to z=0, which gives a landscape/elevation feel
-    // while every community stays distinct.
-    const pts3d = [...scOther, ...scTarget];
-    if (pts3d.length > 0) {
-      const sx: (number | null)[] = [];
-      const sy: (number | null)[] = [];
-      const sz: (number | null)[] = [];
-      for (const p of pts3d) {
-        sx.push(p.x, p.x, null);
-        sy.push(p.y, p.y, null);
-        sz.push(0, p.z, null);
-      }
+    // Surface — color on the plane (v1), normalized to the real data range.
+    if (g) {
+      t.push({
+        type: "surface",
+        x: g.xi,
+        y: g.yi,
+        z: g.z,
+        colorscale: COLORSCALE_3D_JET,
+        cmin: -zlim,
+        cmax: zlim,
+        cauto: false,
+        opacity: 1,
+        contours: { x: { show: false }, y: { show: false }, z: { show: false } },
+        colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 14 },
+        hoverinfo: "none",
+      });
+
+      // y=1 reference line in 3D (along x at y=1, z=0)
+      const xMin = g.xi[0];
+      const xMax = g.xi[g.xi.length - 1];
+      const xL: number[] = [];
+      for (let i = 0; i < 50; i++) xL.push(xMin + (i * (xMax - xMin)) / 49);
       t.push({
         type: "scatter3d",
         mode: "lines",
-        x: sx,
-        y: sy,
-        z: sz,
-        line: { color: "rgba(140,150,170,0.45)", width: 1 },
-        hoverinfo: "none",
+        x: xL,
+        y: xL.map(() => 1),
+        z: xL.map(() => 0),
+        line: { color: REF_LINE_COLOR, width: 3, dash: "dash" },
         showlegend: false,
+        hoverinfo: "none",
       });
     }
-
-    // y=1 reference line in 3D (significance cutoff), at z=0
-    t.push({
-      type: "scatter3d",
-      mode: "lines",
-      x: [distMin, distMax],
-      y: [1, 1],
-      z: [0, 0],
-      line: { color: REF_LINE_COLOR, width: 3, dash: "dash" },
-      showlegend: false,
-      hoverinfo: "none",
-    });
-
     if (scOther.length > 0) {
       t.push({
         type: "scatter3d",
@@ -323,18 +335,12 @@ export function Landscape({
         z: scOther.map((p) => p.z),
         customdata: scOther.map((p) => p.community_id),
         marker: {
-          size: 5,
-          color: scOther.map((p) => p.z),
-          colorscale: COLORSCALE_3D_JET,
-          cmin: rangeMin,
-          cmax: rangeMax,
-          cmid: 0,
-          showscale: true,
-          colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 14 },
-          line: { width: 0.5, color: "rgba(255,255,255,0.7)" },
+          size: 4,
+          color: "rgba(30,30,30,0.85)",
+          line: { width: 1, color: "rgba(255,255,255,0.9)" },
         },
         hovertemplate:
-          "community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<br>PCC=%{marker.color:.3f}<extra></extra>",
+          "community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
         showlegend: false,
       });
     }
@@ -362,7 +368,7 @@ export function Landscape({
       }
       t.push(trace);
     } else if (landscape.target_point) {
-      // No target community in the PPI data — dark-grey cross at its would-be spot.
+      // No target community — hollow pseudo cross at its would-be spot.
       t.push({
         type: "scatter3d",
         mode: "markers",
@@ -370,10 +376,11 @@ export function Landscape({
         y: [landscape.target_point.y],
         z: [landscape.target_point.z],
         marker: {
-          size: 11,
-          color: COLOR_TARGET_ABSENT_FILL,
+          size: 13,
+          color: COLOR_TARGET_ABSENT,
           symbol: "cross",
-          line: { width: 2, color: COLOR_TARGET_ABSENT_EDGE },
+          opacity: 0.55,
+          line: { width: 2, color: COLOR_TARGET_ABSENT },
         },
         hovertemplate: `${absentTargetLabel}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
         showlegend: false,
@@ -400,7 +407,9 @@ export function Landscape({
           dragmode: "zoom" as const,
           xaxis: {
             title: { text: landscape.axes.x ?? "Distance from anchor", font: { size: 11, color: axisTextColor } },
-            autorange: "reversed" as const,
+            // Normal (not reversed): low Distance-from-anchor — where the target
+            // community sits — goes to the bottom-left/origin.
+            autorange: true as const,
             gridcolor: axisGridColor,
             tickfont: { color: axisTextColor },
             zeroline: false,
@@ -421,7 +430,8 @@ export function Landscape({
           clickmode: "event" as const,
           // Preserve the user's camera across slider/community updates; the
           // explicit camera below is only the initial fixed-start view.
-          uirevision: "landscape-3d",
+          // (bumped to -v2 so the new lower-left orientation actually applies.)
+          uirevision: "landscape-3d-v2",
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
@@ -451,10 +461,10 @@ export function Landscape({
               backgroundcolor: sceneBgColor,
               showbackground: true,
             },
-            // Low grazing start view (user-fixed): looks across the surface so
-            // the target-community spike, the above/below-zero peaks, and the
-            // PCC height profile are all readable at a glance.
-            camera: { eye: { x: 1.35, y: -1.35, z: 0.32 } },
+            // Low grazing start view, mirrored in x (eye.x < 0) so the target
+            // community's corner (low Distance, low −log10p) sits at the front-
+            // LEFT instead of the front-right.
+            camera: { eye: { x: -1.35, y: -1.35, z: 0.32 } },
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
           },
