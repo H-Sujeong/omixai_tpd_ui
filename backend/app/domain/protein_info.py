@@ -129,6 +129,7 @@ def _empty(gene: str) -> dict[str, Any]:
         "accession": None,
         "protein_name": None,
         "function": None,
+        "summary": [],
         "families": [],
         "length": None,
         "mass_kda": None,
@@ -139,15 +140,69 @@ def _empty(gene: str) -> dict[str, Any]:
     }
 
 
+def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> list[str]:
+    """Summarize the English UniProt function into Korean 개조식 bullets via the
+    local Ollama model. Gene/protein/domain names and technical terms stay in
+    English. Returns [] on any failure (panel then shows the English text)."""
+    s = get_settings()
+    prompt = (
+        f"다음은 인간 단백질 {gene}"
+        + (f" ({protein_name})" if protein_name else "")
+        + "의 기능 설명(영문)이다. 이를 한국어 개조식(불릿)으로 3~5줄로 요약하라.\n"
+        "규칙:\n"
+        "- 각 줄은 '- '로 시작.\n"
+        "- 유전자명·단백질명·도메인명·복합체명 등 고유명사는 영어 원문 그대로.\n"
+        "- 생화학/분자생물학 전문용어(예: ubiquitination, degradation, transcription, "
+        "phosphorylation, chromatin, acetylation)도 번역하지 말고 영어 그대로 쓸 것 "
+        "(절대 한글로 음차/혼용하지 말 것).\n"
+        "- 나머지 서술은 자연스러운 한국어로.\n"
+        "- 불릿 외 다른 말(머리말/맺음말)은 출력하지 말 것.\n\n"
+        f"영문 설명:\n{function_text}"
+    )
+    try:
+        r = httpx.post(
+            f"{s.ollama_url}/api/generate",
+            json={"model": s.ollama_model, "prompt": prompt, "stream": False,
+                  "options": {"temperature": 0.2}},
+            timeout=60.0,
+        )
+        r.raise_for_status()
+        text = (r.json().get("response") or "").strip()
+        bullets: list[str] = []
+        for ln in text.splitlines():
+            ln = ln.strip()
+            if ln[:1] in ("-", "•", "*"):
+                ln = ln[1:].strip()
+            if ln:
+                bullets.append(ln)
+        return bullets[:6]
+    except Exception as exc:                                      # noqa: BLE001
+        log.info("Ollama summary unavailable for %s: %s", gene, exc)
+        return []
+
+
 def get_protein_info(gene: str) -> dict[str, Any]:
-    """Return protein info dict for a human gene symbol (cached, never raises)."""
+    """Return protein info dict for a human gene symbol (cached, never raises).
+
+    UniProt facts are cached on first lookup. The Korean summary is filled in
+    lazily and retried until the local model succeeds, then cached too — so a
+    protein fetched while Ollama was down still gets summarized later.
+    """
     gene = (gene or "").strip()
     if not gene:
         return _empty(gene)
     cache = _load()
     key = gene.upper()
-    if key in cache:
-        return cache[key]
+    info = cache.get(key)
+    if info is not None:
+        info.setdefault("summary", [])
+        if info.get("found") and info.get("function") and not info["summary"]:
+            bullets = _summarize_ko(gene, info.get("protein_name"), info["function"])
+            if bullets:
+                info["summary"] = bullets
+                cache[key] = info
+                _persist()
+        return info
 
     result = _empty(gene)
     try:
@@ -185,12 +240,14 @@ def get_protein_info(gene: str) -> dict[str, Any]:
                 links["string"] = f"https://string-db.org/network/{string_id}"
             if pdb:
                 links["pdb"] = f"https://www.rcsb.org/structure/{pdb[0]}"
+            fn = _function(e)
             result = {
                 "gene": gene,
                 "found": True,
                 "accession": acc,
                 "protein_name": pname,
-                "function": _function(e),
+                "function": fn,
+                "summary": _summarize_ko(gene, pname, fn) if fn else [],
                 "families": _families(e),
                 "length": length,
                 "mass_kda": round(mol / 1000.0, 1) if mol else None,
@@ -204,6 +261,8 @@ def get_protein_info(gene: str) -> dict[str, Any]:
         # keep graceful empty result (do NOT cache failures so we retry later)
         return result
 
-    cache[key] = result
-    _persist()
+    # Only cache successful UniProt lookups so failures retry next time.
+    if result.get("found"):
+        cache[key] = result
+        _persist()
     return result

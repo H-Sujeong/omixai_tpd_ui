@@ -116,7 +116,8 @@ class ProteinInfo(BaseModel):
     found: bool = False
     accession: str | None = None
     protein_name: str | None = None
-    function: str | None = None
+    function: str | None = None             # raw UniProt English text
+    summary: list[str] = Field(default_factory=list)  # Korean 개조식 bullets (LLM)
     families: list[str] = Field(default_factory=list)
     length: int | None = None          # amino acids
     mass_kda: float | None = None      # molecular mass, kDa

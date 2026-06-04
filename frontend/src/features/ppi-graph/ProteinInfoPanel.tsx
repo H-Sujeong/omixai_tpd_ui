@@ -21,7 +21,7 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
 
   return (
     <aside
-      className={`absolute inset-y-0 right-0 w-[62%] max-w-[420px] bg-surface-panel border-l border-line shadow-lg z-20 flex flex-col transition-transform duration-200 ${
+      className={`absolute inset-y-0 right-0 w-[62%] max-w-[420px] bg-surface-card border-l border-line shadow-lg z-20 flex flex-col transition-transform duration-200 ${
         open ? "translate-x-0" : "translate-x-full"
       }`}
       aria-hidden={!open}
@@ -50,7 +50,17 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
                     {data.protein_name}
                   </div>
                 )}
-                <Field label="기능">{data.function ?? "—"}</Field>
+                <Field label="기능">
+                  {data.summary.length ? (
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {data.summary.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    data.function ?? "—"
+                  )}
+                </Field>
                 <Field label="패밀리 / 도메인">
                   {data.families.length ? data.families.join(" · ") : "—"}
                 </Field>

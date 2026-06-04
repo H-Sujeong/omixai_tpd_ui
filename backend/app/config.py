@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     drug_info_cache: Path = Path(__file__).resolve().parents[1] / "var" / "drug_info_cache.json"
     protein_info_cache: Path = Path(__file__).resolve().parents[1] / "var" / "protein_info_cache.json"
     db_path: Path = Path(__file__).resolve().parents[1] / "var" / "omixai.db"
+    # Local LLM (Ollama) for Korean function summaries. If unreachable, the
+    # protein panel falls back to the English UniProt text.
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "exaone3.5:2.4b"
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
