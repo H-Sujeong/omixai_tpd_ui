@@ -286,6 +286,10 @@ def _landscape_panel_from_asset(
         scatter_raw = scatter_source.get("scatter")
     if not scatter_raw:
         scatter_raw = payload.get("scatter", [])
+    # `is_target` comes straight from the per-community flag. We deliberately do
+    # NOT synthesize it from `target_community`: an audit showed 18/80 assets
+    # carry a placeholder target_community (0/1) whose target protein is absent
+    # from the PPI data — forcing a ✚ there would mark a fabricated target.
     scatter = [LandscapePoint(
         x=float(s["x"]),
         y=float(s["y"]),

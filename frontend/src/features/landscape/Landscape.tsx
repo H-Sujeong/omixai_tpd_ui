@@ -42,6 +42,19 @@ const COLORSCALE_3D: Array<[number, string]> = [
   [1,   "rgb(255,0,0)"],
 ];
 
+// Jet-style ramp for the 3D terrain: deep-blue valleys → green mid → red
+// peaks. Color tracks height (z = avg PCC) so the relief reads like the
+// reference landscape instead of a flat sheet.
+const COLORSCALE_3D_JET: Array<[number, string]> = [
+  [0.0,  "rgb(0,0,160)"],
+  [0.12, "rgb(0,80,255)"],
+  [0.35, "rgb(0,220,255)"],
+  [0.5,  "rgb(0,225,120)"],
+  [0.65, "rgb(170,255,0)"],
+  [0.85, "rgb(255,150,0)"],
+  [1.0,  "rgb(210,0,0)"],
+];
+
 const COLOR_TARGET_FILL = "#F59E0B";
 const COLOR_TARGET_EDGE = "#92400E";
 const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
@@ -81,6 +94,9 @@ export function Landscape({
   // in the plot. Base value is 0 (user preference); if 0 lies outside
   // the data range we clamp to the nearest bound via effectiveThreshold.
   const [pccThreshold, setPccThreshold] = useState<number>(0);
+  // Distance (x = Distance from anchor) lower-bound filter: show only points
+  // with x >= threshold. Default 0 clamps to data min (= no filter).
+  const [distThreshold, setDistThreshold] = useState<number>(0);
 
   const [rangeMin, rangeMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
@@ -95,13 +111,33 @@ export function Landscape({
 
   const effectiveThreshold = Math.max(rangeMin, Math.min(rangeMax, pccThreshold));
 
+  const [distMin, distMax] = useMemo(() => {
+    if (landscape.scatter.length === 0) return [0, 0];
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const p of landscape.scatter) {
+      if (p.x < lo) lo = p.x;
+      if (p.x > hi) hi = p.x;
+    }
+    return [lo, hi];
+  }, [landscape.scatter]);
+
+  const effectiveDist = Math.max(distMin, Math.min(distMax, distThreshold));
+
   const visibleScatter = useMemo(() => {
-    if (effectiveThreshold <= rangeMin) return landscape.scatter;
-    return landscape.scatter.filter((p) => p.z >= effectiveThreshold);
-  }, [landscape.scatter, effectiveThreshold, rangeMin]);
+    // The target community (✚) is the anchor reference — always keep it
+    // visible even when the PCC / distance filters would otherwise hide it.
+    return landscape.scatter.filter(
+      (p) => p.is_target || (p.z >= effectiveThreshold && p.x >= effectiveDist),
+    );
+  }, [landscape.scatter, effectiveThreshold, effectiveDist]);
 
   const scTarget = visibleScatter.filter((p) => p.is_target);
   const scOther  = visibleScatter.filter((p) => !p.is_target);
+
+  // Some assets carry no target community at all (the target protein is absent
+  // from the PPI data). Flag it honestly instead of silently omitting the ✚.
+  const dataHasTarget = landscape.scatter.some((p) => p.is_target);
 
   const traces: any[] = mode === "2d" ? build2D() : build3D();
 
@@ -212,10 +248,10 @@ export function Landscape({
         x: g.xi,
         y: g.yi,
         z: g.z,
-        colorscale: COLORSCALE_3D,
-        cmin: -0.5,
-        cmax: 0.5,
-        opacity: 0.88,
+        colorscale: COLORSCALE_3D_JET,
+        // No fixed cmin/cmax: let color span the actual height range so the
+        // terrain uses the full jet ramp (valleys blue → peaks red).
+        opacity: 1,
         contours: { x: { show: false }, y: { show: false }, z: { show: false } },
         colorbar: {
           title: { text: "avg(PCC)", side: "right" },
@@ -250,9 +286,9 @@ export function Landscape({
         z: scOther.map((p) => p.z),
         customdata: scOther.map((p) => p.community_id),
         marker: {
-          size: 5,
-          color: "rgba(60,60,60,0.65)",
-          line: { width: 1.5, color: "#FFFFFF" },
+          size: 4,
+          color: "rgba(30,30,30,0.85)",
+          line: { width: 1, color: "rgba(255,255,255,0.9)" },
         },
         hovertemplate:
           "community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
@@ -299,6 +335,8 @@ export function Landscape({
           // race with our click dispatch on subsequent clicks (the symptom:
           // "first click works, later clicks ignored"). Force pure event mode.
           clickmode: "event" as const,
+          // Keep the user's zoom/pan across community-click / slider updates.
+          uirevision: "landscape-2d",
           dragmode: "zoom" as const,
           xaxis: {
             title: { text: landscape.axes.x ?? "Distance from anchor", font: { size: 11, color: axisTextColor } },
@@ -320,6 +358,9 @@ export function Landscape({
           height,
           font: { family: "Inter, system-ui, sans-serif", size: 11, color: axisTextColor },
           clickmode: "event" as const,
+          // Preserve the user's camera across slider/community updates; the
+          // explicit camera below is only the initial fixed-start view.
+          uirevision: "landscape-3d",
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
@@ -338,13 +379,18 @@ export function Landscape({
             },
             zaxis: {
               title: { text: landscape.axes.z ?? "z", font: { size: 10, color: axisTextColor } },
-              range: [-0.5, 0.5],
+              // Autorange (no fixed [-0.5,0.5]) so the small avg-PCC relief
+              // (~±0.13) fills the vertical and reads as real terrain.
+              autorange: true,
               gridcolor: sceneGridColor,
               tickfont: { color: axisTextColor },
               backgroundcolor: sceneBgColor,
               showbackground: true,
             },
-            camera: { eye: { x: 1.5, y: -1.5, z: 0.9 } },
+            // Low grazing start view (user-fixed): looks across the surface so
+            // the target-community spike, the above/below-zero peaks, and the
+            // PCC height profile are all readable at a glance.
+            camera: { eye: { x: 1.35, y: -1.35, z: 0.32 } },
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
           },
@@ -356,6 +402,10 @@ export function Landscape({
   const clampThreshold = (v: number) => {
     if (Number.isNaN(v)) return effectiveThreshold;
     return Math.max(rangeMin, Math.min(rangeMax, v));
+  };
+  const clampDist = (v: number) => {
+    if (Number.isNaN(v)) return effectiveDist;
+    return Math.max(distMin, Math.min(distMax, v));
   };
 
   return (
@@ -416,16 +466,51 @@ export function Landscape({
             step={0.001}
             value={effectiveThreshold}
             onChange={(e) => setPccThreshold(parseFloat(e.target.value))}
-            className="w-48 accent-brand-primary"
+            className="w-40 accent-brand-primary"
             aria-label="PCC threshold slider"
           />
-          {effectiveThreshold > rangeMin && (
-            <span className="text-ink-muted whitespace-nowrap">
-              ({visibleCount}/{totalPoints})
-            </span>
-          )}
         </div>
+
+        {/* Distance (x) lower-bound filter — show only far-enough communities */}
+        <div
+          className="flex items-center gap-2 rounded-md border border-line bg-surface-elevated px-2 py-1"
+          title={`Distance from anchor ≥ threshold 인 community 만 표시 (data range: ${distMin.toFixed(2)} … ${distMax.toFixed(2)})`}
+        >
+          <span className="whitespace-nowrap">Dist ≥</span>
+          <input
+            type="number"
+            min={distMin}
+            max={distMax}
+            step={0.01}
+            value={effectiveDist.toFixed(2)}
+            onChange={(e) => setDistThreshold(clampDist(parseFloat(e.target.value)))}
+            className="w-16 tabular rounded border border-line bg-transparent px-1.5 py-0.5 text-ink-primary text-right focus:outline-none focus:border-brand-primary"
+            aria-label="Distance threshold value"
+          />
+          <input
+            type="range"
+            min={distMin}
+            max={distMax}
+            step={0.01}
+            value={effectiveDist}
+            onChange={(e) => setDistThreshold(parseFloat(e.target.value))}
+            className="w-40 accent-brand-primary"
+            aria-label="Distance threshold slider"
+          />
+        </div>
+
+        {visibleCount < totalPoints && (
+          <span className="text-ink-muted whitespace-nowrap">
+            ({visibleCount}/{totalPoints})
+          </span>
+        )}
       </div>
+
+      {!dataHasTarget && landscape.scatter.length > 0 && (
+        <div className="mb-2 text-meta text-ink-muted" title="on_target.json 의 PPI 데이터에 target 단백질 노드가 없어 target community(✚)를 표시할 수 없음">
+          ⓘ target community 미표시 — 이 약물의 PPI 데이터에 target 단백질이 없습니다.
+        </div>
+      )}
 
       <Plot
         data={traces}
