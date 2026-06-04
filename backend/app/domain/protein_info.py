@@ -140,6 +140,44 @@ def _empty(gene: str) -> dict[str, Any]:
     }
 
 
+# Restore key biochem terms to English (the model tends to translate them).
+# Ordered: compound terms before their substrings.
+_TERM_MAP: list[tuple[str, str]] = [
+    ("유비퀴틴 리가제", "ubiquitin ligase"),
+    ("유비퀴틴화", "ubiquitination"),
+    ("유비퀴틴", "ubiquitin"),
+    ("프로테아좀", "proteasome"),
+    ("탈인산화", "dephosphorylation"),
+    ("인산화", "phosphorylation"),
+    ("탈아세틸화", "deacetylation"),
+    ("아세틸화", "acetylation"),
+    ("메틸화", "methylation"),
+    ("자가포식", "autophagy"),
+    ("세포자멸사", "apoptosis"),
+    ("세포자멸", "apoptosis"),
+    ("세포 자멸", "apoptosis"),
+    ("세포사멸", "apoptosis"),
+    ("세포 사멸", "apoptosis"),
+    ("아폽토시스", "apoptosis"),
+    ("전사 인자", "transcription factor"),
+    ("전사", "transcription"),
+    ("염색질", "chromatin"),
+    ("히스톤", "histone"),
+    ("후성유전학적", "epigenetic"),
+    ("후성유전학", "epigenetics"),
+    ("에피제네틱", "epigenetic"),
+    ("리가제", "ligase"),
+    ("키나아제", "kinase"),
+    ("키네이스", "kinase"),
+]
+
+
+def _anglicize_terms(text: str) -> str:
+    for ko, en in _TERM_MAP:
+        text = text.replace(ko, en)
+    return text
+
+
 def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> list[str]:
     """Summarize the English UniProt function into Korean 개조식 bullets via the
     local Ollama model. Gene/protein/domain names and technical terms stay in
@@ -164,7 +202,7 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
             f"{s.ollama_url}/api/generate",
             json={"model": s.ollama_model, "prompt": prompt, "stream": False,
                   "options": {"temperature": 0.2}},
-            timeout=60.0,
+            timeout=120.0,
         )
         r.raise_for_status()
         text = (r.json().get("response") or "").strip()
@@ -174,7 +212,7 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
             if ln[:1] in ("-", "•", "*"):
                 ln = ln[1:].strip()
             if ln:
-                bullets.append(ln)
+                bullets.append(_anglicize_terms(ln))
         return bullets[:6]
     except Exception as exc:                                      # noqa: BLE001
         log.info("Ollama summary unavailable for %s: %s", gene, exc)
