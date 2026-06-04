@@ -6,6 +6,7 @@ import { PanelCard } from "@/components/PanelCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
 import { ProteinInfoPanel } from "@/features/ppi-graph/ProteinInfoPanel";
+import { NetworkExportMenu } from "@/features/ppi-graph/NetworkExportMenu";
 import { findRelatedCommunityFromEdge } from "@/features/ppi-graph/relatedCommunity";
 import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
@@ -280,7 +281,17 @@ export function DashboardPage() {
               meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
                 activePpi?.nodes.length ?? 0
               } · edges=${activePpi?.edges.length ?? 0}`}
-              actions={<span className="chip">{activePpi?.target}</span>}
+              actions={
+                <div className="flex items-center gap-1.5">
+                  <span className="chip">{activePpi?.target}</span>
+                  {activePpi && (
+                    <NetworkExportMenu
+                      panel={activePpi}
+                      baseName={`${d.drug_id}_${activePpi.target}_c${activePpi.current_community_id}`}
+                    />
+                  )}
+                </div>
+              }
             >
               <div className="relative overflow-hidden">
                 {!activePpi ? (
