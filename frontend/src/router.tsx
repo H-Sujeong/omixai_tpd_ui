@@ -6,6 +6,7 @@ import { PlateListPage } from "@/routes/PlateListPage";
 import { DrugSummaryPage } from "@/routes/DrugSummaryPage";
 import { DashboardPage } from "@/routes/DashboardPage";
 import { GuidePage } from "@/routes/GuidePage";
+import { AdminPage } from "@/routes/AdminPage";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "plates/:plateId", element: <DrugSummaryPage /> },
       { path: "plates/:plateId/drugs/:drugId", element: <DashboardPage /> },
       { path: "guide", element: <GuidePage /> },
+      { path: "admin", element: <AdminPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

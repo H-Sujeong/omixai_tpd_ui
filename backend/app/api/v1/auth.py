@@ -33,10 +33,12 @@ class UserOut(BaseModel):
     email: str
     display_name: str | None = None
     is_demo: bool = False
+    is_admin: bool = False
 
 
 def _to_out(u: User) -> UserOut:
-    return UserOut(id=u.id, email=u.email, display_name=u.display_name, is_demo=u.is_demo)
+    return UserOut(id=u.id, email=u.email, display_name=u.display_name,
+                   is_demo=u.is_demo, is_admin=u.is_admin)
 
 
 @router.post("/login", response_model=UserOut)

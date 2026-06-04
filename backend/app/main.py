@@ -5,12 +5,13 @@ import logging
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.v1 import admin as admin_router
 from .api.v1 import auth as auth_router
 from .api.v1 import drugs as drugs_router
 from .api.v1 import files as files_router
 from .api.v1 import plates as plates_router
 from .api.v1 import proteins as proteins_router
-from .auth import ensure_demo_user, require_user
+from .auth import ensure_admin_user, ensure_demo_user, require_user
 from .config import get_settings
 from .data_loader import get_registry
 from .db import SessionLocal, init_db
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     # Auth is open; all data routers require a logged-in session.
     gated = [Depends(require_user)]
     app.include_router(auth_router.router)
+    app.include_router(admin_router.router)  # admin-gated internally
     app.include_router(plates_router.router, dependencies=gated)
     app.include_router(drugs_router.router, dependencies=gated)
     app.include_router(files_router.router, dependencies=gated)
@@ -47,9 +49,10 @@ def create_app() -> FastAPI:
     def _warm() -> None:
         init_db()
         demo = ensure_demo_user()
+        admin = ensure_admin_user()
         n = len(get_registry().list_plates())
         _seed_demo_plates(demo.id)
-        logging.info("db ready; demo %s owns the %d bundled plates", demo.email, n)
+        logging.info("db ready; demo %s owns %d plates; admin %s", demo.email, n, admin.email)
 
     @app.get("/health")
     def _health() -> dict[str, str]:

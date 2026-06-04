@@ -107,6 +107,12 @@ def require_user(request: Request, db: DbSession = Depends(get_db)) -> User:
     return user
 
 
+def require_admin(user: User = Depends(require_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+    return user
+
+
 # --- seeding -----------------------------------------------------------------
 
 def ensure_demo_user() -> User:
@@ -129,6 +135,34 @@ def ensure_demo_user() -> User:
             db.add(user)
             db.commit()
             db.refresh(user)
+        return user
+    finally:
+        db.close()
+
+
+def ensure_admin_user() -> User:
+    """Create the seed admin account on first run (idempotent)."""
+    from .config import get_settings
+    from .db import SessionLocal
+
+    s = get_settings()
+    email = s.admin_email.strip().lower()
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            user = User(
+                email=email,
+                password_hash=hash_password(s.admin_password),
+                display_name="Admin",
+                is_admin=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        elif not user.is_admin:
+            user.is_admin = True
+            db.commit()
         return user
     finally:
         db.close()

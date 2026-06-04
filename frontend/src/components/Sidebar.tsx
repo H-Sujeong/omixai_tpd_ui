@@ -84,10 +84,19 @@ const GuideIcon = () => (
   </svg>
 );
 
+const AdminIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" strokeLinejoin="round" />
+    <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
   const location = useLocation();
+  const { data: me } = useMe();
   const onPlatesIndex = location.pathname === "/plates";
   const onGuide = location.pathname === "/guide";
+  const onAdmin = location.pathname === "/admin";
 
   return (
     <aside
@@ -135,6 +144,19 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
             <GuideIcon />
           </span>
         </Link>
+        {me?.is_admin && (
+          <Link
+            to="/admin"
+            className={`sidebar-item ${onAdmin ? "sidebar-item--active" : ""}`}
+            onClick={onCloseMobile}
+            title="Admin"
+            aria-label="Admin"
+          >
+            <span className="sidebar-item__icon">
+              <AdminIcon />
+            </span>
+          </Link>
+        )}
       </nav>
 
       <div className="sidebar-footer mt-auto flex flex-col items-center gap-1">

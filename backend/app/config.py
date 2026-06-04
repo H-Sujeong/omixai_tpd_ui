@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # account owns the bundled TPD_UI_DB plates so reviewers can log straight in.
     demo_email: str = "demo@omixai.local"
     demo_password: str = "demo1234"
+    # Seed admin account (web Admin console access). Created on first startup.
+    admin_email: str = "admin@omixai.local"
+    admin_password: str = "admin1234"
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

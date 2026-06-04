@@ -39,7 +39,17 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create tables if they don't exist (called on startup)."""
+    """Create tables if they don't exist (called on startup) + tiny migrations."""
     from . import models  # noqa: F401  (register mappers)
 
     Base.metadata.create_all(engine)
+    _migrate()
+
+
+def _migrate() -> None:
+    """Additive column migrations for existing SQLite DBs (create_all won't add
+    columns to tables that already exist)."""
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(users)")}
+        if "is_admin" not in cols:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0")

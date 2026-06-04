@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   display_name: string | null;
   is_demo: boolean;
+  is_admin: boolean;
 }
 
 /** Current session user; 401 (not logged in) surfaces as a query error. */

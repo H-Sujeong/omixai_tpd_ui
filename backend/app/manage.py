@@ -50,7 +50,7 @@ def cmd_list_users(_args) -> int:
             return 0
         for u in rows:
             n_plates = db.query(Plate).filter(Plate.owner_id == u.id).count()
-            flags = ",".join(f for f, on in (("demo", u.is_demo), ("inactive", not u.is_active)) if on)
+            flags = ",".join(f for f, on in (("admin", u.is_admin), ("demo", u.is_demo), ("inactive", not u.is_active)) if on)
             print(f"#{u.id:<3} {u.email:<32} plates={n_plates:<3} {flags}")
         return 0
     finally:
@@ -82,6 +82,21 @@ def _set_active(email: str, active: bool) -> int:
         u.is_active = active
         db.commit()
         print(f"{'activated' if active else 'deactivated'}: {u.email}")
+        return 0
+    finally:
+        db.close()
+
+
+def cmd_set_admin(args) -> int:
+    db = SessionLocal()
+    try:
+        u = _get_user(db, args.email)
+        if not u:
+            print(f"no such user: {args.email}", file=sys.stderr)
+            return 1
+        u.is_admin = not args.off
+        db.commit()
+        print(f"{'granted' if u.is_admin else 'revoked'} admin: {u.email}")
         return 0
     finally:
         db.close()
@@ -140,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("set-password"); c.add_argument("--email", required=True); c.add_argument("--password", required=True); c.set_defaults(fn=cmd_set_password)
     c = sub.add_parser("deactivate"); c.add_argument("--email", required=True); c.set_defaults(fn=lambda a: _set_active(a.email, False))
     c = sub.add_parser("activate"); c.add_argument("--email", required=True); c.set_defaults(fn=lambda a: _set_active(a.email, True))
+    c = sub.add_parser("set-admin"); c.add_argument("--email", required=True); c.add_argument("--off", action="store_true", help="revoke admin"); c.set_defaults(fn=cmd_set_admin)
     c = sub.add_parser("assign-plate"); c.add_argument("--email", required=True); c.add_argument("--plate-id", required=True); c.set_defaults(fn=cmd_assign_plate)
     c = sub.add_parser("revoke-plate"); c.add_argument("--email", required=True); c.add_argument("--plate-id", required=True); c.set_defaults(fn=cmd_revoke_plate)
 
