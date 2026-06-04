@@ -79,8 +79,9 @@ export function TimeLapseViewerPanel({ data }: Props) {
           className="w-full h-full block object-contain"
           loading="lazy"
         />
-        <div className="absolute top-2 left-2 text-white text-caption font-mono bg-black/60 px-2 py-0.5 rounded">
-          Well {data.well_id ?? "—"} : {cells ?? "—"} cells — {fmtHours(frame.t_hours)} h
+        <div className="absolute top-2 left-2 text-white text-caption font-mono bg-black/60 px-2 py-1 rounded leading-snug">
+          <div>{fmtHours(frame.t_hours)} h</div>
+          <div>{cells ?? "—"} cells</div>
         </div>
         <div className="absolute bottom-2 left-2 text-white text-caption font-mono">
           <div className="flex items-center gap-1.5">
