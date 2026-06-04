@@ -151,6 +151,14 @@ export function Landscape({
   // Precomputed here because inside build2D/build3D the local `t` is the traces
   // array (shadows the useT() translator).
   const absentTargetLabel = t("target community (PPI 데이터 없음)", "target community (no PPI data)");
+  // The would-be target position. Some assets store a {0,0,0} sentinel meaning
+  // "no position" — drawing a pseudo cross there pins the axis to the origin and
+  // leaves the contour (which only covers the data range) filling half the plot.
+  // Treat all-zero as no position and skip the marker.
+  const pseudoTarget = (() => {
+    const tp = landscape.target_point;
+    return tp && (tp.x !== 0 || tp.y !== 0 || tp.z !== 0) ? tp : null;
+  })();
 
   // -log10(p) outlier clip. Degenerate p≈0 communities (p underflowed to 0 →
   // -log10(p) capped at ~300) blow the y-axis out and squash every real point
@@ -269,12 +277,12 @@ export function Landscape({
         trace.textfont = { size: 16, color: COLOR_TARGET_FILL };
       }
       t.push(trace);
-    } else if (landscape.target_point) {
+    } else if (pseudoTarget) {
       t.push({
         type: "scatter",
         mode: "markers",
-        x: [landscape.target_point.x],
-        y: [landscape.target_point.y],
+        x: [pseudoTarget.x],
+        y: [pseudoTarget.y],
         marker: {
           size: 18,
           symbol: "cross-open",
@@ -367,14 +375,14 @@ export function Landscape({
         trace.textfont = { color: COLOR_TARGET_FILL, size: 20, family: "Arial Black" };
       }
       t.push(trace);
-    } else if (landscape.target_point) {
+    } else if (pseudoTarget) {
       // No target community — hollow pseudo cross at its would-be spot.
       t.push({
         type: "scatter3d",
         mode: "markers",
-        x: [landscape.target_point.x],
-        y: [landscape.target_point.y],
-        z: [landscape.target_point.z],
+        x: [pseudoTarget.x],
+        y: [pseudoTarget.y],
+        z: [pseudoTarget.z],
         marker: {
           size: 13,
           color: COLOR_TARGET_ABSENT,
