@@ -189,7 +189,9 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
             className="bg-surface-2 border border-line rounded px-1 py-0.5 text-ink-primary"
           >
             {INTERVAL_OPTIONS.map((h) => (
-              <option key={h} value={h}>
+              // The native dropdown popup has a light background even in dark
+              // mode, so force dark option text or the numbers vanish.
+              <option key={h} value={h} style={{ color: "#1a1a1a", backgroundColor: "#fff" }}>
                 {fmtHours(h)}h
               </option>
             ))}

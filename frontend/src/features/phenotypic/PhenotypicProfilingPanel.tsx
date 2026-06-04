@@ -63,7 +63,7 @@ export function PhenotypicProfilingPanel({ data }: Props) {
             // The curve already spans exactly the drug-effect window (e.g.
             // 10–23.5h at 0.5h steps), so the x-axis range itself conveys the
             // window — no separate shaded sub-region is drawn.
-            xaxis: { title: { text: "Time (hr)" }, zeroline: false },
+            xaxis: { title: { text: "Time (h)" }, zeroline: false },
             yaxis: { title: { text: "GR(t)" }, zeroline: false, range: [-0.5, 1.5] },
           }}
           config={{ displayModeBar: false, responsive: true }}
