@@ -64,7 +64,7 @@ export function DashboardExportMenu({ ctx, zipBase }: Props) {
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="btn btn--ghost text-caption px-2.5 py-1"
+        className="btn btn--ghost text-body font-medium px-3 py-1.5"
         onClick={() => setOpen((o) => !o)}
         title="현재 target의 선택 항목을 ZIP으로 일괄 내보내기"
       >

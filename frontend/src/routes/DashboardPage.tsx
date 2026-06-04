@@ -502,16 +502,13 @@ function DashboardHeader({
       <div className="pl-16 pr-4 lg:px-8 pt-3 flex items-center justify-between gap-3">
         <Link
           to={`/plates/${plateId}`}
-          className="inline-flex items-center gap-1.5 text-meta text-ink-muted hover:text-ink-primary transition-colors duration-fast"
+          className="inline-flex items-center gap-1.5 text-body font-medium text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
         >
           <span aria-hidden>←</span>
           <span>Back to Plate {plateId}</span>
         </Link>
         <div className="flex items-center gap-3 shrink-0">
           <DashboardExportMenu ctx={exportCtx} zipBase={zipBase} />
-          <span className="text-meta text-ink-muted tabular">
-            v{d.provenance.pipeline_version}
-          </span>
         </div>
       </div>
 

@@ -108,7 +108,7 @@ export function DrugSummaryPage() {
        *  navigation explicit at every hierarchy level. */}
       <Link
         to="/plates"
-        className="inline-flex items-center gap-1.5 text-meta text-ink-muted hover:text-ink-primary transition-colors duration-fast"
+        className="inline-flex items-center gap-1.5 text-body font-medium text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
       >
         <span aria-hidden>←</span>
         <span>Workspace</span>

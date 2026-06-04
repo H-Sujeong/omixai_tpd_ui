@@ -100,7 +100,7 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
 
   return (
     <>
-      <button type="button" className="btn btn--ghost text-meta" onClick={() => setOpen(true)}>
+      <button type="button" className="btn btn--ghost text-body font-medium px-3 py-1.5" onClick={() => setOpen(true)}>
         Export plate ⬇
       </button>
       {open && (
@@ -117,7 +117,7 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
             <div className="px-4 py-3 overflow-y-auto text-meta space-y-3">
               {/* Formats */}
               <div>
-                <div className="text-ink-secondary font-medium mb-1">포맷 (box)</div>
+                <div className="text-ink-secondary font-medium mb-1">포맷</div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                   {FORMATS.map((f) => (
                     <label key={f.id} className="flex items-center gap-1.5 text-ink-secondary">
@@ -131,8 +131,11 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
                     </label>
                   ))}
                 </div>
+                <div className="text-ink-muted mt-1">
+                  * 선택 항목에 따라 시간이 오래 소요될 수 있습니다.
+                </div>
                 {formats.has("timelapse.gif") && (
-                  <div className="text-status-warning mt-1">⚠ GIF는 약물마다 인코딩이라 느리고 용량이 큽니다.</div>
+                  <div className="text-status-warning mt-0.5">⚠ GIF는 약물마다 인코딩이라 느리고 용량이 큽니다.</div>
                 )}
               </div>
 
