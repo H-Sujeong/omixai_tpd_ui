@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { useProtein, useProteinSummary } from "@/api/queries";
-import { LoadingBlock } from "@/components/LoadingBlock";
+import { useProtein } from "@/api/queries";
 import type { ProteinInfo } from "@/types/api";
 
 interface Props {
@@ -17,7 +16,6 @@ interface Props {
  */
 export function ProteinInfoPanel({ gene, onClose }: Props) {
   const { data, isLoading } = useProtein(gene);
-  const summaryQ = useProteinSummary(gene);
   const open = !!gene;
 
   return (
@@ -41,7 +39,7 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
 
       <div className="flex-1 overflow-y-auto p-4 text-body">
         {isLoading || !data ? (
-          <LoadingBlock />
+          <ProteinSkeleton />
         ) : (
           <div className="space-y-3">
             {data.found ? (
@@ -52,14 +50,12 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
                   </div>
                 )}
                 <Field label="기능">
-                  {summaryQ.data?.summary.length ? (
+                  {data.summary.length ? (
                     <ul className="list-disc pl-4 space-y-0.5">
-                      {summaryQ.data.summary.map((b, i) => (
+                      {data.summary.map((b, i) => (
                         <li key={i}>{b}</li>
                       ))}
                     </ul>
-                  ) : summaryQ.isLoading ? (
-                    <span className="text-ink-muted">한글 요약 생성 중…</span>
                   ) : (
                     data.function ?? "—"
                   )}
@@ -95,6 +91,34 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
         )}
       </div>
     </aside>
+  );
+}
+
+/** Pulsing skeleton shown while the protein info (incl. LLM summary) loads. */
+function ProteinSkeleton() {
+  const bar = "rounded bg-surface-overlay";
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className={`${bar} h-4 w-2/3`} />
+      <div className="space-y-1.5">
+        <div className="text-meta text-ink-muted">기능</div>
+        <div className={`${bar} h-3 w-full`} />
+        <div className={`${bar} h-3 w-11/12`} />
+        <div className={`${bar} h-3 w-4/5`} />
+      </div>
+      {["패밀리 / 도메인", "크기", "세포내 위치", "구조 (PDB)"].map((l) => (
+        <div key={l} className="space-y-1">
+          <div className="text-meta text-ink-muted">{l}</div>
+          <div className={`${bar} h-3 w-1/2`} />
+        </div>
+      ))}
+      <div className="flex gap-2 pt-2">
+        <div className={`${bar} h-5 w-16`} />
+        <div className={`${bar} h-5 w-16`} />
+        <div className={`${bar} h-5 w-16`} />
+      </div>
+      <div className="text-meta text-ink-muted pt-1">불러오는 중…</div>
+    </div>
   );
 }
 

@@ -10,27 +10,15 @@ import type {
   ProteinInfo,
 } from "@/types/api";
 
+// Protein info incl. Korean summary (local LLM). Can be slow on first fetch of
+// a protein; the panel shows a loading shimmer. Cached for the session.
 export function useProtein(gene: string | null) {
   return useQuery<ProteinInfo>({
     queryKey: ["protein", gene],
     enabled: !!gene,
-    staleTime: 1000 * 60 * 60, // protein metadata is stable; cache for an hour
-    queryFn: () => apiGet<ProteinInfo>(`/api/v1/proteins/${encodeURIComponent(gene as string)}`),
-  });
-}
-
-// Korean function summary — separate (slow, local LLM) so the info panel never
-// blocks on it. Long timeout tolerated; cached for the session.
-export function useProteinSummary(gene: string | null) {
-  return useQuery<{ gene: string; summary: string[] }>({
-    queryKey: ["protein-summary", gene],
-    enabled: !!gene,
     staleTime: 1000 * 60 * 60,
     retry: false,
-    queryFn: () =>
-      apiGet<{ gene: string; summary: string[] }>(
-        `/api/v1/proteins/${encodeURIComponent(gene as string)}/summary`,
-      ),
+    queryFn: () => apiGet<ProteinInfo>(`/api/v1/proteins/${encodeURIComponent(gene as string)}`),
   });
 }
 
