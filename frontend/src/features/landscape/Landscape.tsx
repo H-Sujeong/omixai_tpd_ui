@@ -166,6 +166,61 @@ export function Landscape({
     return [lo, inMax + pad];
   }, [landscape.scatter]);
 
+  // Smooth terrain for the 3D surface. The precomputed grid doesn't track the
+  // communities and a raw Delaunay mesh through them is jagged (spikes where
+  // neighbouring communities differ), so kernel-smooth (Gaussian-weighted mean)
+  // the real community avg(PCC) onto a regular grid: peaks/valleys follow the
+  // data but local triangle spikes are damped. Cells far from any community are
+  // left null so the surface doesn't bleed into empty space. Real data only —
+  // just a smoothed read of the points, no fabricated values.
+  const smoothGrid = useMemo(() => {
+    const pts = landscape.scatter.filter(
+      (p) =>
+        Number.isFinite(p.x) &&
+        Number.isFinite(p.y) &&
+        Number.isFinite(p.z) &&
+        (!yClip || p.y <= yClip[1]),
+    );
+    if (pts.length < 3) return null;
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const zs = pts.map((p) => p.z);
+    const xMin = Math.min(...xs), xMax = Math.max(...xs);
+    const yMin = Math.min(...ys), yMax = Math.max(...ys);
+    const xSpan = xMax - xMin || 1, ySpan = yMax - yMin || 1;
+    const N = 46;
+    const h = 0.16;          // smoothing bandwidth (normalized axis units)
+    const h2 = h * h;
+    const maxD = 0.2;        // mask cells whose nearest community is farther
+    const xg: number[] = [];
+    const yg: number[] = [];
+    for (let i = 0; i < N; i++) {
+      xg.push(xMin + (xSpan * i) / (N - 1));
+      yg.push(yMin + (ySpan * i) / (N - 1));
+    }
+    const zg: (number | null)[][] = [];
+    for (let r = 0; r < N; r++) {
+      const yn = (yg[r] - yMin) / ySpan;
+      const row: (number | null)[] = [];
+      for (let c = 0; c < N; c++) {
+        const xn = (xg[c] - xMin) / xSpan;
+        let wsum = 0, zsum = 0, dmin = Infinity;
+        for (let k = 0; k < pts.length; k++) {
+          const dx = (xs[k] - xMin) / xSpan - xn;
+          const dy = (ys[k] - yMin) / ySpan - yn;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < dmin) dmin = d2;
+          const w = Math.exp(-d2 / h2);
+          wsum += w;
+          zsum += w * zs[k];
+        }
+        row.push(Math.sqrt(dmin) > maxD || wsum === 0 ? null : zsum / wsum);
+      }
+      zg.push(row);
+    }
+    return { xg, yg, zg };
+  }, [landscape.scatter, yClip]);
+
   const traces: any[] = mode === "2d" ? build2D() : build3D();
 
   function build2D(): any[] {
@@ -272,33 +327,22 @@ export function Landscape({
     const t: any[] = [];
     const g = landscape.grid;
 
-    // Terrain = a Delaunay surface through the REAL community points. The
-    // precomputed grid (landscape.grid) doesn't track the communities — in the
-    // data-dense region it's a flat ~0 sheet — so triangulating the actual
-    // points gives a height field that passes through them. Use all communities
-    // within the −log10(p) clip (not the PCC/dist marker filter) so the surface
-    // is stable as the user moves the sliders. Not synthetic: it only connects
-    // real points.
-    const terr = landscape.scatter.filter(
-      (p) =>
-        Number.isFinite(p.x) &&
-        Number.isFinite(p.y) &&
-        Number.isFinite(p.z) &&
-        (!yClip || p.y <= yClip[1]),
-    );
-    if (terr.length >= 3) {
+    // Terrain = a kernel-smoothed surface over the REAL community points (see
+    // smoothGrid). The precomputed grid doesn't track the communities, and a raw
+    // Delaunay mesh through them is jagged; this follows the data trend smoothly.
+    if (smoothGrid) {
       t.push({
-        type: "mesh3d",
-        x: terr.map((p) => p.x),
-        y: terr.map((p) => p.y),
-        z: terr.map((p) => p.z),
-        intensity: terr.map((p) => p.z),
-        delaunayaxis: "z", // triangulate in the x–y (Distance × −log10p) plane
+        type: "surface",
+        x: smoothGrid.xg,
+        y: smoothGrid.yg,
+        z: smoothGrid.zg,
+        connectgaps: false,
         colorscale: COLORSCALE_3D_JET,
         cmin: rangeMin,
         cmax: rangeMax,
-        opacity: 0.85,
-        flatshading: false,
+        cauto: false,
+        opacity: 0.9,
+        contours: { x: { show: false }, y: { show: false }, z: { show: false } },
         colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 14 },
         hoverinfo: "none",
       });
