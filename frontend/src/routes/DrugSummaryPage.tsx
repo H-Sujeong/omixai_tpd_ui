@@ -102,7 +102,7 @@ export function DrugSummaryPage() {
   }, [data, rows]);
 
   return (
-    <div className="flex-1 px-8 py-7 mx-auto w-full max-w-[1500px]">
+    <div className="flex-1 pl-16 pr-4 lg:px-8 py-7 mx-auto w-full max-w-[1500px]">
       {/* Back affordance mirroring the Dashboard's "← Back to Plate {id}".
        *  The sidebar's "Plates" item is the structural workspace target,
        *  but it reads as a section switcher in the icon rail rather than

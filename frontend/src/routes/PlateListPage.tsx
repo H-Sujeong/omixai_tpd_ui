@@ -44,7 +44,7 @@ export function PlateListPage() {
   }, [data]);
 
   return (
-    <div className="flex-1 px-8 py-8 mx-auto w-full max-w-[1400px]">
+    <div className="flex-1 pl-16 pr-4 lg:px-8 py-8 mx-auto w-full max-w-[1400px]">
       {/* Hero — bounded Summary Surface. Wrapping the workspace summary in
        *  a softly tinted, bordered panel makes "Workspace" register as a
        *  distinct layer above the plate grid; the page now reads as
