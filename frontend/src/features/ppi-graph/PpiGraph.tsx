@@ -22,6 +22,8 @@ interface Props {
   selectedEdgeId?: string | null;
   onNodeClick?: (nodeId: string) => void;
   onEdgeClick?: (edge: { id: string; source: string; target: string; corr: number }) => void;
+  /** Clear the active protein selection (called by the Reset button). */
+  onClearSelection?: () => void;
   height?: number;
 }
 
@@ -72,6 +74,7 @@ export function PpiGraph({
   selectedEdgeId,
   onNodeClick,
   onEdgeClick,
+  onClearSelection,
   height,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -192,8 +195,8 @@ export function PpiGraph({
     cyRef.current = cy;
 
     cy.on("tap", "node", (evt) => {
-      cy.edges().removeClass("hl");
-      evt.target.connectedEdges().addClass("hl");
+      // Edge highlight is driven by the selectedNode effect (single source of
+      // truth), so it clears properly on deselect.
       onNodeClick?.(evt.target.id() as string);
     });
     cy.on("tap", "edge", (evt) => {
@@ -224,14 +227,19 @@ export function PpiGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elements]);
 
-  // External selectedNode highlight
+  // External selectedNode highlight — single source of truth for the node
+  // selection AND its connected-edge highlight, so deselect clears both.
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     cy.$("node:selected").unselect();
+    cy.edges().removeClass("hl");
     if (selectedNode) {
       const n = cy.getElementById(selectedNode);
-      if (n) n.select();
+      if (n && n.length) {
+        n.select();
+        n.connectedEdges().addClass("hl");
+      }
     }
   }, [selectedNode]);
 
@@ -304,7 +312,8 @@ export function PpiGraph({
     cyRef.current?.fit(undefined, 20);
   };
   const handleReset = () => {
-    cyRef.current?.reset();
+    cyRef.current?.reset(); // reset zoom/pan
+    onClearSelection?.(); // and clear the active protein selection
   };
 
   return (

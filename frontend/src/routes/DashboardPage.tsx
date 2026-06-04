@@ -102,34 +102,11 @@ export function DashboardPage() {
   const switchCommunity = useSwitchCommunity();
 
   const handleNodeClick = (nodeId: string) => {
+    // Inspect the protein only: open its info panel + highlight the node.
+    // Do NOT jump communities — that was a bug (clicking a bridging node
+    // re-scoped the PPI). Community navigation is done from the landscape.
     setSelectedNode(nodeId);
     setSelectedEdgeId(null);
-    if (!activePpi) return;
-    const home = activePpi.current_community_id;
-    const candidates = (activePpi.node_community_index[nodeId] ?? []).filter((c) => c !== home);
-    if (candidates.length === 0) {
-      setBridgeNotice({
-        text: `노드 ${nodeId} 클릭 — 다른 community와 직접 연결 없음 (E12 슬라이드만 열림)`,
-        direction: "node-jump",
-      });
-      return;
-    }
-    const next_cid = candidates[0];
-    setBridgeNotice({
-      text: `노드 ${nodeId} → community ${home} 에서 community ${next_cid} 로 이동`,
-      direction: "node-jump",
-    });
-    setSelectedCommunity(next_cid);
-    if (plateId && drugId && target) {
-      switchCommunity.mutate({
-        plateId,
-        drugId,
-        fromCommunityId: home,
-        toCommunityId: next_cid,
-        bridgingNode: nodeId,
-        target,
-      });
-    }
   };
 
   const handleEdgeClick = (edge: {
@@ -187,13 +164,12 @@ export function DashboardPage() {
     }
   };
 
-  // Clear the activation triggered by clicking a specific protein (node):
-  // close the protein info panel, drop node/edge highlights, and return the
-  // PPI to the target (home) community.
+  // Clear the active protein selection: close the info panel and drop the
+  // node/edge highlights. Does NOT change the community — node click no longer
+  // navigates, so closing the panel keeps you in the current community.
   const clearProteinSelection = () => {
     setSelectedNode(null);
     setSelectedEdgeId(null);
-    if (dash.data?.ppi) setSelectedCommunity(dash.data.ppi.target_community_id);
     setBridgeNotice(null);
   };
 
@@ -315,6 +291,7 @@ export function DashboardPage() {
                     selectedEdgeId={selectedEdgeId}
                     onNodeClick={handleNodeClick}
                     onEdgeClick={handleEdgeClick}
+                    onClearSelection={clearProteinSelection}
                     height={520}
                   />
                 )}
