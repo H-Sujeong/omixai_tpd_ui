@@ -141,6 +141,40 @@ export function Landscape({
   // from the PPI data). Flag it honestly instead of silently omitting the ✚.
   const dataHasTarget = landscape.scatter.some((p) => p.is_target);
 
+  // -log10(p) outlier clip. Degenerate p≈0 communities (p underflowed to 0 →
+  // -log10(p) capped at ~300) blow the y-axis out and squash every real point
+  // against the back plane. Clip the y-axis to a Tukey upper fence of the
+  // scatter's y so the real terrain is visible; outliers fall off-screen.
+  const yClip = useMemo<[number, number] | null>(() => {
+    const ys = landscape.scatter
+      .map((p) => p.y)
+      .filter((v) => Number.isFinite(v))
+      .sort((a, b) => a - b);
+    if (ys.length < 4) return null;
+    const q = (f: number) => ys[Math.max(0, Math.min(ys.length - 1, Math.round(f * (ys.length - 1))))];
+    const q1 = q(0.25);
+    const q3 = q(0.75);
+    // Far-outlier fence (3×IQR): drops only the degenerate p≈0 cap points, keeps
+    // genuinely significant communities. Clip just above the highest in-fence
+    // point so it isn't glued to the top edge.
+    const fence = Math.max(q3 + 3 * (q3 - q1), q3 * 1.2, 2);
+    const dataMax = ys[ys.length - 1];
+    const inMax = Math.max(...ys.filter((v) => v <= fence));
+    if (inMax >= dataMax) return null; // no real outliers → don't clip
+    const lo = Math.min(ys[0], 0);
+    const pad = (inMax - lo) * 0.05 || 0.5;
+    return [lo, inMax + pad];
+  }, [landscape.scatter]);
+
+  // Grid cells outside the data hull were filled with exactly 0 (a flat fake
+  // plane). Render them as gaps (null) so only the real interpolated terrain
+  // shows — not a sheet plastered across the whole axis box.
+  const maskedZ = useMemo<(number | null)[][] | null>(() => {
+    const g = landscape.grid;
+    if (!g) return null;
+    return g.z.map((row) => row.map((v) => (v === 0 ? null : v)));
+  }, [landscape.grid]);
+
   const traces: any[] = mode === "2d" ? build2D() : build3D();
 
   function build2D(): any[] {
@@ -153,7 +187,8 @@ export function Landscape({
         type: "contour",
         x: g.xi,
         y: g.yi,
-        z: g.z,
+        z: maskedZ ?? g.z,
+        connectgaps: false,
         colorscale: COLORSCALE_2D,
         zmin: -0.5,
         zmax: 0.5,
@@ -249,10 +284,15 @@ export function Landscape({
         type: "surface",
         x: g.xi,
         y: g.yi,
-        z: g.z,
+        z: maskedZ ?? g.z,
+        connectgaps: false,
         colorscale: COLORSCALE_3D_JET,
-        // No fixed cmin/cmax: let color span the actual height range so the
-        // terrain uses the full jet ramp (valleys blue → peaks red).
+        // Tie the jet ramp to the real community avg(PCC) range (scatter z) so a
+        // single off-screen outlier valley can't wash the visible terrain into
+        // one flat color.
+        cmin: rangeMin,
+        cmax: rangeMax,
+        cauto: false,
         opacity: 1,
         contours: { x: { show: false }, y: { show: false }, z: { show: false } },
         colorbar: {
@@ -352,6 +392,7 @@ export function Landscape({
             gridcolor: axisGridColor,
             tickfont: { color: axisTextColor },
             zeroline: false,
+            ...(yClip ? { range: yClip, autorange: false as const } : {}),
           },
         }
       : {
@@ -378,6 +419,7 @@ export function Landscape({
               tickfont: { color: axisTextColor },
               backgroundcolor: sceneBgColor,
               showbackground: true,
+              ...(yClip ? { range: yClip, autorange: false as const } : {}),
             },
             zaxis: {
               title: { text: landscape.axes.z ?? "z", font: { size: 10, color: axisTextColor } },
@@ -400,6 +442,9 @@ export function Landscape({
 
   const totalPoints = landscape.scatter.length;
   const visibleCount = visibleScatter.length;
+  // Communities pushed off the top of the clipped −log10(p) axis (degenerate
+  // p≈0). Reported honestly rather than silently dropped.
+  const yClippedCount = yClip ? visibleScatter.filter((p) => p.y > yClip[1]).length : 0;
 
   const clampThreshold = (v: number) => {
     if (Number.isNaN(v)) return effectiveThreshold;
@@ -510,6 +555,17 @@ export function Landscape({
         {visibleCount < totalPoints && (
           <span className="text-ink-muted whitespace-nowrap">
             ({visibleCount}/{totalPoints})
+          </span>
+        )}
+        {yClippedCount > 0 && (
+          <span
+            className="text-ink-muted whitespace-nowrap"
+            title={t(
+              "−log10(p)가 비정상적으로 큰(p≈0) community는 축 범위 밖으로 잘림",
+              "Communities with degenerate −log10(p) (p≈0) are clipped beyond the axis range",
+            )}
+          >
+            {t(`−log10(p) 축 밖 ${yClippedCount}개`, `${yClippedCount} beyond −log10(p) axis`)}
           </span>
         )}
       </div>
