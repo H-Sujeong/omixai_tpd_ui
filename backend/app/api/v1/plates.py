@@ -6,10 +6,14 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session as DbSession
 
+from ...auth import require_user
 from ...config import get_settings
 from ...data_loader import PlateRegistry, get_registry
+from ...db import get_db
+from ...models import Plate, User
 from ...schemas import DrugSummaryRow, DrugTargetEntry, PlateSummary
 
 router = APIRouter(prefix="/api/v1", tags=["plates"])
@@ -85,13 +89,23 @@ def _resolve_dates(store: dict[str, dict[str, str]], plate_id: str, data_dir: Pa
     return created, updated, dirty
 
 
+def owned_plate_ids(db: DbSession, user: User) -> set[str]:
+    return {pid for (pid,) in db.query(Plate.plate_id).filter(Plate.owner_id == user.id)}
+
+
 @router.get("/plates", response_model=list[PlateSummary])
-def list_plates() -> list[PlateSummary]:
+def list_plates(
+    user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> list[PlateSummary]:
+    owned = owned_plate_ids(db, user)
     reg = _registry()
     dates = _load_plate_dates()
     dirty = False
     out: list[PlateSummary] = []
     for plate in reg.list_plates():
+        if plate.plate_id not in owned:
+            continue
         n_drugs = len(plate.drugs)
         n_wells = sum(len(d.wells) for d in plate.drugs.values())
         any_assets = any(d.has_dashboard_assets for d in plate.drugs.values())
@@ -118,7 +132,13 @@ def list_plates() -> list[PlateSummary]:
 
 
 @router.get("/plates/{plate_id}/drugs", response_model=list[DrugSummaryRow])
-def list_drugs(plate_id: str) -> list[DrugSummaryRow]:
+def list_drugs(
+    plate_id: str,
+    user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> list[DrugSummaryRow]:
+    if plate_id not in owned_plate_ids(db, user):
+        raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
     plate = _registry().get_plate(plate_id)
     if not plate:
         raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
