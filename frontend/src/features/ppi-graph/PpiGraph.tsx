@@ -386,15 +386,15 @@ export function PpiGraph({
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#EF4444", border: "1.5px solid #DC2626" }} />
           is_target
         </span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5" title={t("타깃과 양의 상관 → 상향 조절(activated)", "Positively correlated with target → up-regulated (activated)")}>
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#185FA5" }} />
-          {t("양성", "Positive")} corr &gt; 0.2
+          {t("양성 ↑ (상향)", "Positive ↑ (up)")} corr &gt; 0.2
         </span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5" title={t("타깃과 음의 상관 → 하향 조절(suppressed)", "Negatively correlated with target → down-regulated (suppressed)")}>
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#7C3AED" }} />
-          {t("음성", "Negative")} corr &lt; −0.2
+          {t("음성 ↓ (하향)", "Negative ↓ (down)")} corr &lt; −0.2
         </span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5" title={t("뚜렷한 변화 없음", "No clear change")}>
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#9CA3AF" }} />
           {t("중립", "Neutral")}
         </span>

@@ -285,8 +285,8 @@ export function DashboardPage() {
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
               tooltip={t(
-                "노드=단백질(크기=연결 수, 색=타깃과의 상관 양/음), 엣지=STRING 상호작용(두께=신뢰도, 가까울수록 강한 상호작용). 노드 클릭=단백질 정보, 엣지 클릭=관련 community 안내(전환 X). community 전환은 landscape에서.",
-                "Nodes = proteins (size = degree, color = correlation sign with the target); edges = STRING interactions (thickness = confidence; closer = stronger). Node click = protein info; edge click = related community (no switch). Switch communities from the landscape.",
+                "노드=단백질(크기=연결 수). 색 = 타깃과의 상관(PCC) — 양성(파랑)=타깃과 함께 ↑(activated/상향 조절), 음성(보라)=타깃과 반대로 ↓(suppressed/하향 조절), 중립(회색)=뚜렷한 변화 없음. 엣지=STRING 상호작용(두께=신뢰도, 가까울수록 강함). 노드 클릭=단백질 정보, 엣지 클릭=관련 community 안내. community 전환은 landscape에서.",
+                "Nodes = proteins (size = degree). Color = correlation (PCC) with the target — positive (blue) = moves up with the target (activated / up-regulated), negative (purple) = moves opposite (suppressed / down-regulated), neutral (grey) = no clear change. Edges = STRING interactions (thickness = confidence; closer = stronger). Node click = protein info; edge click = related community. Switch communities from the landscape.",
               )}
               accent
               status={d.status_flags.ppi}
