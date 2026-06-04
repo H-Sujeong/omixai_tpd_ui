@@ -8,6 +8,8 @@ export interface PlateSummary {
   cell_line: string | null;
   n_wells: number;
   n_drugs: number;
+  created_at: string | null;
+  updated_at: string | null;
   generated_at: string | null;
   pipeline_version: string | null;
   has_dashboard_assets: boolean;

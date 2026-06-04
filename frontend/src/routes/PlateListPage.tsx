@@ -67,9 +67,11 @@ export function PlateListPage() {
         return a.plate_id.localeCompare(b.plate_id, undefined, { numeric: true }) * dir;
       }
       if (sortKey === "n_drugs") return (a.n_drugs - b.n_drugs) * dir;
-      // generated_at — parse to time; missing dates always sort last.
-      const av = a.generated_at ? Date.parse(a.generated_at) : NaN;
-      const bv = b.generated_at ? Date.parse(b.generated_at) : NaN;
+      // created_at / updated_at — parse to time; missing dates always sort last.
+      const af = sortKey === "created_at" ? a.created_at : a.updated_at;
+      const bf = sortKey === "created_at" ? b.created_at : b.updated_at;
+      const av = af ? Date.parse(af) : NaN;
+      const bv = bf ? Date.parse(bf) : NaN;
       const aNan = Number.isNaN(av);
       const bNan = Number.isNaN(bv);
       if (aNan && bNan) return 0;
@@ -146,7 +148,8 @@ export function PlateListPage() {
             onChange={(k) => set({ sortKey: k as PlateSortKey })}
             options={[
               { k: "title", label: t("제목", "Title") },
-              { k: "generated_at", label: t("업데이트", "Updated") },
+              { k: "created_at", label: t("생성일", "Created") },
+              { k: "updated_at", label: t("업데이트", "Updated") },
               { k: "n_drugs", label: t("약물수", "Compounds") },
             ]}
           />
@@ -277,6 +280,7 @@ function PlateCard({
   drugs: DrugSummaryRow[] | undefined;
   drugsLoading: boolean;
 }) {
+  const t = useT();
   const buckets = useMemo(() => (drugs ? bucketDrugs(drugs) : null), [drugs]);
 
   const segments = useMemo(() => {
@@ -349,6 +353,16 @@ function PlateCard({
                 : null,
             ]}
           />
+          {(plate.created_at || plate.updated_at) && (
+            <div className="flex flex-wrap gap-x-3 text-caption text-ink-muted tabular pt-0.5">
+              {plate.created_at && (
+                <span>{t("생성", "Created")} {String(plate.created_at).slice(0, 10)}</span>
+              )}
+              {plate.updated_at && (
+                <span>{t("업데이트", "Updated")} {String(plate.updated_at).slice(0, 10)}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Outcome — stacked bar + counts + phenotype-active percentage.
@@ -456,6 +470,7 @@ function PlateTable({
     t("약물", "Compounds"),
     t("웰", "Wells"),
     t("자산", "Coverage"),
+    t("생성일", "Created"),
     t("업데이트", "Updated"),
   ];
   return (
@@ -496,7 +511,10 @@ function PlateTable({
                   {b ? `${b.assetCovered}/${b.total}` : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-right text-ink-muted tabular">
-                  {p.generated_at ? String(p.generated_at).slice(0, 10) : "—"}
+                  {p.created_at ? String(p.created_at).slice(0, 10) : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right text-ink-muted tabular">
+                  {p.updated_at ? String(p.updated_at).slice(0, 10) : "—"}
                 </td>
               </tr>
             );

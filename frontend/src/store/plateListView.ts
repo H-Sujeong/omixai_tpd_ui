@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type PlateSortKey = "title" | "generated_at" | "n_drugs";
+export type PlateSortKey = "title" | "created_at" | "updated_at" | "n_drugs";
 export type PlateView = "card" | "table";
 
 interface PlateListViewState {
@@ -23,6 +23,6 @@ export const usePlateListView = create<PlateListViewState>()(
       view: "card",
       set: (patch) => set(patch),
     }),
-    { name: "omixai-plate-list-view" },
+    { name: "omixai-plate-list-view-v2" },
   ),
 );

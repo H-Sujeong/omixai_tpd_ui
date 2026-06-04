@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from ...config import get_settings
 from ...data_loader import PlateRegistry, get_registry
 from ...schemas import DrugSummaryRow, DrugTargetEntry, PlateSummary
 
@@ -17,33 +19,84 @@ def _registry() -> PlateRegistry:
     return get_registry()
 
 
-def _last_update_iso(data_dir: Path) -> str | None:
-    """Most recent mtime among the plate's metadata + asset files = "last data
-    update" (the dataset carries no generated_at). Timelapse images are skipped
-    (too many) — metadata CSV/py + per-drug JSON assets are enough and cheap."""
+def _today_iso() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _file_date_range(data_dir: Path) -> tuple[str | None, str | None]:
+    """(earliest, latest) mtime among the plate's metadata + asset files, as
+    YYYY-MM-DD. Timelapse images are skipped (too many); metadata CSV/py +
+    per-drug JSON assets are enough and cheap."""
     try:
+        earliest = float("inf")
         latest = 0.0
         for pat in ("*.csv", "*.py", "*/*/*.json"):
             for f in data_dir.glob(pat):
                 try:
-                    latest = max(latest, f.stat().st_mtime)
+                    m = f.stat().st_mtime
                 except OSError:
-                    pass
+                    continue
+                earliest = min(earliest, m)
+                latest = max(latest, m)
         if latest <= 0:
-            return None
-        return datetime.fromtimestamp(latest, tz=timezone.utc).date().isoformat()
+            return None, None
+        iso = lambda ts: datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
+        return iso(earliest), iso(latest)
     except Exception:  # noqa: BLE001
-        return None
+        return None, None
+
+
+def _plate_dates_path() -> Path:
+    return get_settings().protein_info_cache.parent / "plate_dates.json"
+
+
+def _load_plate_dates() -> dict[str, dict[str, str]]:
+    p = _plate_dates_path()
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return {}
+    return {}
+
+
+def _save_plate_dates(store: dict[str, dict[str, str]]) -> None:
+    try:
+        _plate_dates_path().write_text(json.dumps(store, indent=0), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _resolve_dates(store: dict[str, dict[str, str]], plate_id: str, data_dir: Path) -> tuple[str, str, bool]:
+    """created_at (recorded once = when the card was first registered) + updated_at
+    (tracks the latest data mtime). Returns (created, updated, dirty)."""
+    file_created, file_updated = _file_date_range(data_dir)
+    entry = store.get(plate_id)
+    if entry is None:
+        created = file_created or _today_iso()
+        updated = file_updated or created
+        store[plate_id] = {"created_at": created, "updated_at": updated}
+        return created, updated, True
+    created = entry.get("created_at") or file_created or _today_iso()
+    updated = file_updated or entry.get("updated_at") or created
+    dirty = entry.get("created_at") != created or entry.get("updated_at") != updated
+    if dirty:
+        store[plate_id] = {"created_at": created, "updated_at": updated}
+    return created, updated, dirty
 
 
 @router.get("/plates", response_model=list[PlateSummary])
 def list_plates() -> list[PlateSummary]:
     reg = _registry()
+    dates = _load_plate_dates()
+    dirty = False
     out: list[PlateSummary] = []
     for plate in reg.list_plates():
         n_drugs = len(plate.drugs)
         n_wells = sum(len(d.wells) for d in plate.drugs.values())
         any_assets = any(d.has_dashboard_assets for d in plate.drugs.values())
+        created, updated, d = _resolve_dates(dates, plate.plate_id, plate.data_dir)
+        dirty = dirty or d
         out.append(PlateSummary(
             plate_id=plate.plate_id,
             plate_code=plate.plate_code,
@@ -52,10 +105,14 @@ def list_plates() -> list[PlateSummary]:
             cell_line="U2OS",
             n_wells=n_wells,
             n_drugs=n_drugs,
-            generated_at=_last_update_iso(plate.data_dir),
+            created_at=created,
+            updated_at=updated,
+            generated_at=created,
             pipeline_version="demo-0.1",
             has_dashboard_assets=any_assets,
         ))
+    if dirty:
+        _save_plate_dates(dates)
     out.sort(key=lambda p: p.plate_id)
     return out
 

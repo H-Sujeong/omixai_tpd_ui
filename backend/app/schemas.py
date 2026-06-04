@@ -24,6 +24,8 @@ class PlateSummary(BaseModel):
     cell_line: str | None = None
     n_wells: int = 0
     n_drugs: int = 0
+    created_at: str | None = Field(None, description="Date the plate card was first registered (YYYY-MM-DD)")
+    updated_at: str | None = Field(None, description="Date the plate data last changed (YYYY-MM-DD)")
     generated_at: str | None = None
     pipeline_version: str | None = None
     has_dashboard_assets: bool = False
