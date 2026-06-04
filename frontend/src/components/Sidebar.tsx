@@ -1,5 +1,6 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LangToggle } from "@/components/LangToggle";
 
 /**
  * Global icon-rail sidebar (~64px). Carries only the brand, the
@@ -77,7 +78,8 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         </Link>
       </nav>
 
-      <div className="sidebar-footer mt-auto">
+      <div className="sidebar-footer mt-auto flex flex-col items-center gap-1">
+        <LangToggle />
         <ThemeToggle />
       </div>
     </aside>

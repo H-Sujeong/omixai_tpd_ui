@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useProtein } from "@/api/queries";
+import { useT, useUiLang } from "@/store/uiLang";
 import type { ProteinInfo } from "@/types/api";
 
 interface Props {
@@ -15,7 +16,9 @@ interface Props {
  * / PDB links. Data is fetched on demand from UniProt (cached server-side).
  */
 export function ProteinInfoPanel({ gene, onClose }: Props) {
-  const { data, isLoading } = useProtein(gene);
+  const lang = useUiLang((s) => s.lang);
+  const t = useT();
+  const { data, isLoading } = useProtein(gene, lang);
   const open = !!gene;
 
   return (
@@ -49,7 +52,7 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
                     {data.protein_name}
                   </div>
                 )}
-                <Field label="기능">
+                <Field label={t("기능", "Function")}>
                   {data.summary.length ? (
                     <ul className="list-disc pl-4 space-y-0.5">
                       {data.summary.map((b, i) => (
@@ -60,29 +63,32 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
                     data.function ?? "—"
                   )}
                 </Field>
-                <Field label="패밀리 / 도메인">
+                <Field label={t("패밀리 / 도메인", "Family / domain")}>
                   {data.families.length ? data.families.join(" · ") : "—"}
                 </Field>
-                <Field label="크기">
+                <Field label={t("크기", "Size")}>
                   {data.length ?? "—"} aa · {data.mass_kda ?? "—"} kDa
                 </Field>
-                <Field label="세포내 위치">
+                <Field label={t("세포내 위치", "Localization")}>
                   {data.subcellular.length ? data.subcellular.join(", ") : "—"}
                 </Field>
-                <Field label="구조 (PDB)">
+                <Field label={t("구조 (PDB)", "Structures (PDB)")}>
                   {data.pdb_count > 0
-                    ? `${data.pdb_count}개` +
+                    ? `${data.pdb_count}${t("개", "")}` +
                       (data.pdb_ids.length
                         ? ` · ${data.pdb_ids.slice(0, 3).join(", ")}${
                             data.pdb_count > 3 ? " …" : ""
                           }`
                         : "")
-                    : "구조 없음"}
+                    : t("구조 없음", "no structures")}
                 </Field>
               </>
             ) : (
               <p className="text-meta text-ink-muted">
-                UniProt에서 이 단백질 정보를 찾지 못했습니다. 아래 검색 링크로 확인하세요.
+                {t(
+                  "UniProt에서 이 단백질 정보를 찾지 못했습니다. 아래 검색 링크로 확인하세요.",
+                  "No UniProt entry found for this protein. Use the search links below.",
+                )}
               </p>
             )}
 
@@ -96,17 +102,25 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
 
 /** Pulsing skeleton shown while the protein info (incl. LLM summary) loads. */
 function ProteinSkeleton() {
+  const t = useT();
   const bar = "rounded bg-surface-overlay";
+  const labels = [
+    t("기능", "Function"),
+    t("패밀리 / 도메인", "Family / domain"),
+    t("크기", "Size"),
+    t("세포내 위치", "Localization"),
+    t("구조 (PDB)", "Structures (PDB)"),
+  ];
   return (
     <div className="animate-pulse space-y-3">
       <div className={`${bar} h-4 w-2/3`} />
       <div className="space-y-1.5">
-        <div className="text-meta text-ink-muted">기능</div>
+        <div className="text-meta text-ink-muted">{labels[0]}</div>
         <div className={`${bar} h-3 w-full`} />
         <div className={`${bar} h-3 w-11/12`} />
         <div className={`${bar} h-3 w-4/5`} />
       </div>
-      {["패밀리 / 도메인", "크기", "세포내 위치", "구조 (PDB)"].map((l) => (
+      {labels.slice(1).map((l) => (
         <div key={l} className="space-y-1">
           <div className="text-meta text-ink-muted">{l}</div>
           <div className={`${bar} h-3 w-1/2`} />
@@ -117,7 +131,7 @@ function ProteinSkeleton() {
         <div className={`${bar} h-5 w-16`} />
         <div className={`${bar} h-5 w-16`} />
       </div>
-      <div className="text-meta text-ink-muted pt-1">불러오는 중…</div>
+      <div className="text-meta text-ink-muted pt-1">{t("불러오는 중…", "Loading…")}</div>
     </div>
   );
 }

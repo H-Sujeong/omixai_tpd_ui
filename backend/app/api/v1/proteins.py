@@ -11,11 +11,11 @@ router = APIRouter(prefix="/api/v1", tags=["proteins"])
 
 
 @router.get("/proteins/{gene}", response_model=ProteinInfo)
-def get_protein(gene: str) -> ProteinInfo:
-    """Protein info (UniProt + Korean summary) for a human gene symbol.
+def get_protein(gene: str, lang: str = "ko") -> ProteinInfo:
+    """Protein info (UniProt + optional Korean summary) for a human gene symbol.
 
-    Cached; always 200s — unknown/failed lookups return found=false with search
-    links. The Korean summary uses the local LLM, so this can be slow on the
-    first fetch of a protein (the UI shows a loading shimmer).
+    lang="ko" (default) includes the local-LLM Korean summary (slower; UI shows
+    a shimmer). lang="en" skips the LLM and the UI shows the English UniProt
+    function instead. Cached; always 200s (found=false → search links).
     """
-    return ProteinInfo.model_validate(get_protein_info(gene))
+    return ProteinInfo.model_validate(get_protein_info(gene, want_summary=lang != "en"))

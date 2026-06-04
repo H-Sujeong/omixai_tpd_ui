@@ -219,12 +219,12 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
         return []
 
 
-def get_protein_info(gene: str) -> dict[str, Any]:
+def get_protein_info(gene: str, want_summary: bool = True) -> dict[str, Any]:
     """Return protein info dict for a human gene symbol (cached, never raises).
 
-    Includes the Korean summary (local LLM) — the panel waits for it behind a
-    loading shimmer. Summary is generated once and cached; if the model was
-    down it is retried on the next fetch.
+    With want_summary (Korean UI), the Korean LLM summary is generated/cached
+    (slower; the panel shows a shimmer). With want_summary=False (English UI),
+    the LLM is skipped — the panel shows the English UniProt function instead.
     """
     gene = (gene or "").strip()
     if not gene:
@@ -234,7 +234,7 @@ def get_protein_info(gene: str) -> dict[str, Any]:
     info = cache.get(key)
     if info is not None:
         info.setdefault("summary", [])
-        if info.get("found") and info.get("function") and not info["summary"]:
+        if want_summary and info.get("found") and info.get("function") and not info["summary"]:
             bullets = _summarize_ko(gene, info.get("protein_name"), info["function"])
             if bullets:
                 info["summary"] = bullets
@@ -285,7 +285,7 @@ def get_protein_info(gene: str) -> dict[str, Any]:
                 "accession": acc,
                 "protein_name": pname,
                 "function": fn,
-                "summary": _summarize_ko(gene, pname, fn) if fn else [],
+                "summary": _summarize_ko(gene, pname, fn) if (want_summary and fn) else [],
                 "families": _families(e),
                 "length": length,
                 "mass_kda": round(mol / 1000.0, 1) if mol else None,

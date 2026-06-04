@@ -10,15 +10,16 @@ import type {
   ProteinInfo,
 } from "@/types/api";
 
-// Protein info incl. Korean summary (local LLM). Can be slow on first fetch of
-// a protein; the panel shows a loading shimmer. Cached for the session.
-export function useProtein(gene: string | null) {
+// Protein info. lang="ko" includes the local-LLM Korean summary (slow first
+// fetch → shimmer); lang="en" skips it (English UniProt function, fast).
+export function useProtein(gene: string | null, lang: "ko" | "en" = "ko") {
   return useQuery<ProteinInfo>({
-    queryKey: ["protein", gene],
+    queryKey: ["protein", gene, lang],
     enabled: !!gene,
     staleTime: 1000 * 60 * 60,
     retry: false,
-    queryFn: () => apiGet<ProteinInfo>(`/api/v1/proteins/${encodeURIComponent(gene as string)}`),
+    queryFn: () =>
+      apiGet<ProteinInfo>(`/api/v1/proteins/${encodeURIComponent(gene as string)}`, { lang }),
   });
 }
 
