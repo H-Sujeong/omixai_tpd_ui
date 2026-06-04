@@ -5,12 +5,15 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.v1 import auth as auth_router
 from .api.v1 import drugs as drugs_router
 from .api.v1 import files as files_router
 from .api.v1 import plates as plates_router
 from .api.v1 import proteins as proteins_router
+from .auth import ensure_demo_user
 from .config import get_settings
 from .data_loader import get_registry
+from .db import init_db
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s — %(message)s")
 
@@ -31,6 +34,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+    app.include_router(auth_router.router)
     app.include_router(plates_router.router)
     app.include_router(drugs_router.router)
     app.include_router(files_router.router)
@@ -38,6 +42,9 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def _warm() -> None:
+        init_db()
+        demo = ensure_demo_user()
+        logging.info("db ready; demo account %s", demo.email)
         n = len(get_registry().list_plates())
         logging.info("plate registry warmed (%d plates from %s)", n, settings.data_root)
 

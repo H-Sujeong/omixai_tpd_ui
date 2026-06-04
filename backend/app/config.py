@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # is derived from the row count. A hyperparameter.
     gr_window_start_h: float = 10.0
     gr_step_h: float = 0.5
+    # Seed demo account (created on first startup if no users exist). The demo
+    # account owns the bundled TPD_UI_DB plates so reviewers can log straight in.
+    demo_email: str = "demo@omixai.local"
+    demo_password: str = "demo1234"
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
