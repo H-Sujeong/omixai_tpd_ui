@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 
 from ...data_loader import PlateRegistry, get_registry
@@ -12,6 +15,25 @@ router = APIRouter(prefix="/api/v1", tags=["plates"])
 
 def _registry() -> PlateRegistry:
     return get_registry()
+
+
+def _last_update_iso(data_dir: Path) -> str | None:
+    """Most recent mtime among the plate's metadata + asset files = "last data
+    update" (the dataset carries no generated_at). Timelapse images are skipped
+    (too many) — metadata CSV/py + per-drug JSON assets are enough and cheap."""
+    try:
+        latest = 0.0
+        for pat in ("*.csv", "*.py", "*/*/*.json"):
+            for f in data_dir.glob(pat):
+                try:
+                    latest = max(latest, f.stat().st_mtime)
+                except OSError:
+                    pass
+        if latest <= 0:
+            return None
+        return datetime.fromtimestamp(latest, tz=timezone.utc).date().isoformat()
+    except Exception:  # noqa: BLE001
+        return None
 
 
 @router.get("/plates", response_model=list[PlateSummary])
@@ -30,7 +52,7 @@ def list_plates() -> list[PlateSummary]:
             cell_line="U2OS",
             n_wells=n_wells,
             n_drugs=n_drugs,
-            generated_at=None,
+            generated_at=_last_update_iso(plate.data_dir),
             pipeline_version="demo-0.1",
             has_dashboard_assets=any_assets,
         ))

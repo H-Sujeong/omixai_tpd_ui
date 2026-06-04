@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { usePlates } from "@/api/queries";
@@ -6,6 +6,7 @@ import { apiGet } from "@/api/client";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import type { DrugSummaryRow, PlateSummary } from "@/types/api";
 import { useT } from "@/store/uiLang";
+import { usePlateListView, type PlateSortKey } from "@/store/plateListView";
 
 /**
  * Workspace home — list of plates. Rewrite 2026-06-02:
@@ -42,6 +43,41 @@ export function PlateListPage() {
       wells: data.reduce((s, p) => s + p.n_wells, 0),
     };
   }, [data]);
+
+  const { sortKey, sortDir, view, set } = usePlateListView();
+
+  // Map per-plate drug query by plate_id (not array index) so sorting the list
+  // doesn't desync the asset-coverage lookup.
+  const drugsByPlate = useMemo(() => {
+    const m = new Map<string, { data?: DrugSummaryRow[]; loading: boolean }>();
+    (data ?? []).forEach((p, i) => {
+      m.set(p.plate_id, {
+        data: drugQueries[i]?.data,
+        loading: drugQueries[i]?.isLoading ?? true,
+      });
+    });
+    return m;
+  }, [data, drugQueries]);
+
+  const sorted = useMemo(() => {
+    if (!data) return [];
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...data].sort((a, b) => {
+      if (sortKey === "title") {
+        return a.plate_id.localeCompare(b.plate_id, undefined, { numeric: true }) * dir;
+      }
+      if (sortKey === "n_drugs") return (a.n_drugs - b.n_drugs) * dir;
+      // generated_at — parse to time; missing dates always sort last.
+      const av = a.generated_at ? Date.parse(a.generated_at) : NaN;
+      const bv = b.generated_at ? Date.parse(b.generated_at) : NaN;
+      const aNan = Number.isNaN(av);
+      const bNan = Number.isNaN(bv);
+      if (aNan && bNan) return 0;
+      if (aNan) return 1;
+      if (bNan) return -1;
+      return (av - bv) * dir;
+    });
+  }, [data, sortKey, sortDir]);
 
   return (
     <div className="flex-1 pl-16 pr-4 lg:px-8 py-8 mx-auto w-full max-w-[1400px]">
@@ -87,7 +123,7 @@ export function PlateListPage() {
 
       {/* Section break — uppercase T7 label paired with a thin divider line
        *  reads as a clear "now entering Plate Selection" handoff. */}
-      <div className="mb-5 flex items-center gap-4">
+      <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <span
           className="text-ink-muted whitespace-nowrap"
           style={{
@@ -100,25 +136,93 @@ export function PlateListPage() {
         >
           Experiment Plates
         </span>
-        <span className="flex-1 border-t border-line" aria-hidden />
+        <span className="flex-1 border-t border-line min-w-[1rem]" aria-hidden />
+
+        {/* Sort controls + card/table view toggle */}
+        <div className="flex items-center gap-1.5 text-meta text-ink-secondary">
+          <span className="whitespace-nowrap">{t("정렬", "Sort")}</span>
+          <Segmented
+            value={sortKey}
+            onChange={(k) => set({ sortKey: k as PlateSortKey })}
+            options={[
+              { k: "title", label: t("제목", "Title") },
+              { k: "generated_at", label: t("업데이트", "Updated") },
+              { k: "n_drugs", label: t("약물수", "Compounds") },
+            ]}
+          />
+          <button
+            type="button"
+            className="px-1.5 py-1 rounded-md border border-line bg-surface-elevated text-ink-primary hover:border-brand-primary/45 transition-colors"
+            title={sortDir === "asc" ? t("오름차순", "Ascending") : t("내림차순", "Descending")}
+            onClick={() => set({ sortDir: sortDir === "asc" ? "desc" : "asc" })}
+            aria-label="Toggle sort direction"
+          >
+            {sortDir === "asc" ? "↑" : "↓"}
+          </button>
+        </div>
+        <Segmented
+          value={view}
+          onChange={(v) => set({ view: v as "card" | "table" })}
+          options={[
+            { k: "card", label: t("카드", "Card") },
+            { k: "table", label: t("테이블", "Table") },
+          ]}
+        />
       </div>
 
       {isLoading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
       {data && data.length === 0 && <EmptyBlock label={t("등록된 plate가 없습니다.", "No registered plates.")} />}
 
-      {data && data.length > 0 && (
+      {data && data.length > 0 && view === "card" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {data.map((plate, i) => (
-            <PlateCard
-              key={plate.plate_id}
-              plate={plate}
-              drugs={drugQueries[i]?.data}
-              drugsLoading={drugQueries[i]?.isLoading ?? true}
-            />
-          ))}
+          {sorted.map((plate) => {
+            const dq = drugsByPlate.get(plate.plate_id);
+            return (
+              <PlateCard
+                key={plate.plate_id}
+                plate={plate}
+                drugs={dq?.data}
+                drugsLoading={dq?.loading ?? true}
+              />
+            );
+          })}
         </div>
       )}
+
+      {data && data.length > 0 && view === "table" && (
+        <PlateTable plates={sorted} drugsByPlate={drugsByPlate} />
+      )}
+    </div>
+  );
+}
+
+/** Small segmented button group (shared look with the Landscape 2D/3D toggle). */
+function Segmented({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (k: string) => void;
+  options: Array<{ k: string; label: string }>;
+}) {
+  return (
+    <div className="flex gap-0.5 rounded-md overflow-hidden border border-line bg-surface-elevated">
+      {options.map((o) => (
+        <button
+          key={o.k}
+          type="button"
+          onClick={() => onChange(o.k)}
+          className={`px-2 py-1 transition-colors ${
+            value === o.k
+              ? "bg-brand-primary/15 text-brand-primary font-medium"
+              : "text-ink-secondary hover:text-ink-primary"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -330,6 +434,76 @@ function PlateCard({
         </span>
       </div>
     </Link>
+  );
+}
+
+/** Compact table view of plates — same data as the cards, denser. */
+function PlateTable({
+  plates,
+  drugsByPlate,
+}: {
+  plates: PlateSummary[];
+  drugsByPlate: Map<string, { data?: DrugSummaryRow[]; loading: boolean }>;
+}) {
+  const t = useT();
+  const navigate = useNavigate();
+  const cols = [
+    t("플레이트", "Plate"),
+    "Set",
+    "Cell",
+    t("용량", "Dose"),
+    t("관찰", "Obs"),
+    t("약물", "Compounds"),
+    t("웰", "Wells"),
+    t("자산", "Coverage"),
+    t("업데이트", "Updated"),
+  ];
+  return (
+    <div className="overflow-x-auto rounded-lg border border-line">
+      <table className="w-full text-body border-collapse">
+        <thead>
+          <tr className="text-meta text-ink-muted bg-surface-soft border-b border-line">
+            {cols.map((c, i) => (
+              <th key={c} className={`px-4 py-2.5 font-medium ${i === 0 ? "text-left" : "text-right"}`}>
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {plates.map((p) => {
+            const b = drugsByPlate.get(p.plate_id)?.data
+              ? bucketDrugs(drugsByPlate.get(p.plate_id)!.data!)
+              : null;
+            return (
+              <tr
+                key={p.plate_id}
+                onClick={() => navigate(`/plates/${p.plate_id}`)}
+                className="border-b border-line/60 last:border-0 hover:bg-surface-soft cursor-pointer transition-colors"
+              >
+                <td className="px-4 py-2.5 font-semibold text-ink-primary tabular">{p.plate_id}</td>
+                <td className="px-4 py-2.5 text-right text-ink-secondary">{p.plate_code || "—"}</td>
+                <td className="px-4 py-2.5 text-right text-ink-secondary">{p.cell_line || "—"}</td>
+                <td className="px-4 py-2.5 text-right text-ink-secondary tabular">
+                  {p.dose_um != null ? `${p.dose_um} µM` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right text-ink-secondary tabular">
+                  {p.treatment_hours != null ? `${p.treatment_hours} h` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right text-ink-primary tabular">{p.n_drugs}</td>
+                <td className="px-4 py-2.5 text-right text-ink-secondary tabular">{p.n_wells}</td>
+                <td className="px-4 py-2.5 text-right text-ink-secondary tabular">
+                  {b ? `${b.assetCovered}/${b.total}` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right text-ink-muted tabular">
+                  {p.generated_at ? String(p.generated_at).slice(0, 10) : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

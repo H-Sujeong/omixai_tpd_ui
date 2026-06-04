@@ -20,6 +20,8 @@ interface Props {
   onCloseMobile?: () => void;
 }
 
+// Microplate outline with the A1-orientation chamfer (top-left corner cut on
+// the diagonal) + a 3×2 grid of wells, so the rail reads as "assay plates".
 const PlatesIcon = () => (
   <svg
     width="18"
@@ -30,10 +32,16 @@ const PlatesIcon = () => (
     strokeWidth="1.8"
     aria-hidden="true"
   >
-    <rect x="3" y="3" width="7" height="7" rx="1.5" />
-    <rect x="14" y="3" width="7" height="7" rx="1.5" />
-    <rect x="3" y="14" width="7" height="7" rx="1.5" />
-    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    <path
+      d="M8 4 H18.5 A1.5 1.5 0 0 1 20 5.5 V18.5 A1.5 1.5 0 0 1 18.5 20 H5.5 A1.5 1.5 0 0 1 4 18.5 V8 Z"
+      strokeLinejoin="round"
+    />
+    <circle cx="8.5" cy="11" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="11" r="1" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="11" r="1" fill="currentColor" stroke="none" />
+    <circle cx="8.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="14.5" r="1" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
   </svg>
 );
 
