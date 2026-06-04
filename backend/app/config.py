@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # Seed demo account (created on first startup if no users exist). The demo
     # account owns the bundled TPD_UI_DB plates so reviewers can log straight in.
     demo_email: str = "demo@omixai.local"
-    demo_password: str = "demo1234"
+    demo_password: str = "omixai@demo123"
     # Seed admin account (web Admin console access). Created on first startup.
     admin_email: str = "admin@omixai.local"
     admin_password: str = "admin1234"

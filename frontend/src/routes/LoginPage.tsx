@@ -87,9 +87,9 @@ export function LoginPage() {
           <button
             type="button"
             className="text-brand-primary hover:underline"
-            onClick={() => { setEmail("demo@omixai.local"); setPassword("demo1234"); }}
+            onClick={() => { setEmail("demo@omixai.local"); setPassword("omixai@demo123"); }}
           >
-            demo@omixai.local / demo1234
+            demo@omixai.local / omixai@demo123
           </button>
         </div>
       </div>

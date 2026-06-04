@@ -135,6 +135,10 @@ def ensure_demo_user() -> User:
             db.add(user)
             db.commit()
             db.refresh(user)
+        elif not verify_password(s.demo_password, user.password_hash):
+            # keep the demo password in sync with config (reset on change).
+            user.password_hash = hash_password(s.demo_password)
+            db.commit()
         return user
     finally:
         db.close()
