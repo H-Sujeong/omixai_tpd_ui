@@ -296,30 +296,41 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
     df_target = _read_target_csv(fs.target_csv)
     target_lookup = _build_target_lookup(df_target)
 
-    # GR curve CSV: first row = well_ids header (with "DMSO" as the first col label),
-    # column 0 = time index (0..). We re-key to t_hours by spacing 4h.
+    # GR curve CSV (brightfield_gr `gr_curve_table.csv`). Two formats supported:
+    #   • New pipeline: first column = "frame_time_hr" (real frame times, the
+    #     index of build_gr_curve_table — window [early_hr_ignore, late_hr_ignore)),
+    #     then "DMSO", then well-id columns.
+    #   • Legacy export (current TPD_UI_DB): the time index was dropped, so the
+    #     first column is "DMSO" and there is no time column → synthesize the axis
+    #     from gr_window_start_h / gr_step_h.
     df_gr = _read_csv_lenient(fs.gr_csv)
-    if df_gr.columns[0].upper() == "DMSO":
-        # First column is GR for DMSO reference at each timepoint
+    real_times: list[float] | None = None
+    col0 = str(df_gr.columns[0]).strip().lower()
+    if col0 in ("frame_time_hr", "time_hr", "t_hr", "frame_time", "time", "hour", "hr"):
+        try:
+            real_times = [float(v) for v in df_gr.iloc[:, 0].tolist()]
+        except (TypeError, ValueError):
+            real_times = None
+        df_gr = df_gr.iloc[:, 1:]  # drop the time column; rest = DMSO + wells
+
+    if str(df_gr.columns[0]).upper() == "DMSO":
         gr_dmso = df_gr.iloc[:, 0].tolist()
         well_cols = df_gr.columns[1:].astype(str).tolist()
-        # Re-create well-curves
-        gr_curves: dict[str, list[float]] = {}
-        for c in well_cols:
-            gr_curves[str(c)] = df_gr[c].tolist()
+        gr_curves: dict[str, list[float]] = {str(c): df_gr[c].tolist() for c in well_cols}
     else:
-        # Fallback: assume header has well_ids
         gr_dmso = []
         gr_curves = {c: df_gr[c].tolist() for c in df_gr.columns}
         well_cols = list(df_gr.columns)
 
     n_points = len(next(iter(gr_curves.values()))) if gr_curves else 0
-    # The GR CSV rows ARE the drug-effect observation window (already restricted
-    # upstream), spaced gr_step_h hours from gr_window_start_h. So row i = real
-    # clock time start + i*step (e.g. 10h, 10.5h, …) — NOT a 0-based index.
     s = get_settings()
-    gr_start_h, gr_step_h = s.gr_window_start_h, s.gr_step_h
-    gr_t_hours = [gr_start_h + i * gr_step_h for i in range(n_points)]
+    if real_times is not None and len(real_times) == n_points:
+        # Real frame times from the pipeline — the honest axis (no guessing).
+        gr_t_hours = real_times
+    else:
+        # Legacy file w/o a time column: synthesize start + i*step.
+        gr_start_h, gr_step_h = s.gr_window_start_h, s.gr_step_h
+        gr_t_hours = [gr_start_h + i * gr_step_h for i in range(n_points)]
 
     df_slope = _read_csv_lenient(fs.slope_csv)
     slope_by_well: dict[str, dict[str, Any]] = {}
@@ -354,7 +365,8 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
         slope = slope_by_well.get(str(well_id_str), {})
         gr_curve = []
         for i, val in enumerate(gr_curves.get(str(well_id_str), [])):
-            gr_curve.append((gr_start_h + i * gr_step_h, float(val) if pd.notna(val) else 0.0))
+            th = gr_t_hours[i] if i < len(gr_t_hours) else float(i)
+            gr_curve.append((th, float(val) if pd.notna(val) else 0.0))
         wells[str(well_id_str)] = WellRecord(
             well_id=str(well_id_str),
             well_label=well_label,

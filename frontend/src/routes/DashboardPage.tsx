@@ -380,8 +380,8 @@ export function DashboardPage() {
             <PanelCard
               title="Phenotypic Profiling"
               tooltip={t(
-                "Growth Rate: 약물군 GR(t)을 DMSO 대비 성장 속도로(1=정상, <1=성장 둔화/세포독성), 곡선은 약효 관찰창 10–23.5h. Phenome Tracking: vehicle 궤적축에서 벗어난 정도(표현형 이탈).",
-                "Growth Rate: GR(t) of the drug vs DMSO (1 = normal, <1 = slowed / cytotoxic); the curve spans the 10–23.5 h drug-effect window. Phenome Tracking: deviation from the vehicle trajectory axis (phenotypic divergence).",
+                "Growth Rate: GR(t)=DMSO 기준 상대 성장(1=DMSO 수준, 0=정지, <0=사멸; clip −1~1.5). 곡선은 초기·후기 구간을 제외한 약효 관찰창(실제 촬영 시각). Phenome Tracking: vehicle 궤적축에서 벗어난 정도(표현형 이탈).",
+                "Growth Rate: GR(t) = growth relative to DMSO (1 = DMSO rate, 0 = stasis, <0 = death; clipped −1…1.5). The curve spans the drug-effect window (early/late frames excluded, real capture times). Phenome Tracking: deviation from the vehicle trajectory axis.",
               )}
               status={d.status_flags.phenotypic}
               meta={
