@@ -121,6 +121,25 @@ def delete_user(user_id: int, db: DbSession = Depends(get_db),
     return {"ok": True}
 
 
+class ResetPwOut(BaseModel):
+    password: str
+
+
+@router.post("/users/{user_id}/reset-password", response_model=ResetPwOut)
+def reset_user_password(user_id: int, db: DbSession = Depends(get_db)) -> ResetPwOut:
+    """Admin-mediated reset (no link/token): set the user's password back to the
+    convention <local-part>123!@ and require a change at next login. The admin
+    relays the temporary password through a trusted channel."""
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="user not found")
+    pw = initial_password_for(u.email)
+    u.password_hash = hash_password(pw)
+    u.must_change_password = True
+    db.commit()
+    return ResetPwOut(password=pw)
+
+
 @router.get("/plates", response_model=list[PlateOption])
 def list_all_plates() -> list[PlateOption]:
     """All folder plates available for assignment (from the data registry)."""

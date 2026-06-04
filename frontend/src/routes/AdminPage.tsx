@@ -9,6 +9,7 @@ import {
   useDeleteUser,
   useAssignPlate,
   useRevokePlate,
+  useResetUserPassword,
   type AdminUser,
 } from "@/api/admin";
 import { LoadingBlock, ErrorBlock } from "@/components/LoadingBlock";
@@ -138,6 +139,8 @@ function UserRow({ u, meId, plateOptions }: { u: AdminUser; meId: number; plateO
   const del = useDeleteUser();
   const assign = useAssignPlate();
   const revoke = useRevokePlate();
+  const resetPw = useResetUserPassword();
+  const [tempPw, setTempPw] = useState<string | null>(null);
   const self = u.id === meId;
   const owned = new Set(u.plate_ids);
 
@@ -146,6 +149,14 @@ function UserRow({ u, meId, plateOptions }: { u: AdminUser; meId: number; plateO
       <td className="px-4 py-2.5">
         <div className="text-ink-primary font-medium">{u.email}</div>
         {u.display_name && <div className="text-meta text-ink-muted">{u.display_name}</div>}
+        {u.must_change_password && (
+          <div className="text-caption text-status-warning mt-0.5">{t("비번 변경 대기", "must change pw")}</div>
+        )}
+        {tempPw && (
+          <div className="text-meta text-status-success mt-1">
+            {t("임시비번", "Temp password")}: <span className="font-mono text-ink-primary">{tempPw}</span>
+          </div>
+        )}
       </td>
       <td className="px-4 py-2.5">
         <div className="flex flex-wrap gap-1">
@@ -177,6 +188,15 @@ function UserRow({ u, meId, plateOptions }: { u: AdminUser; meId: number; plateO
       </td>
       <td className="px-4 py-2.5">
         <div className="flex items-center justify-end gap-2 text-meta">
+          <button
+            className="text-ink-secondary hover:text-brand-primary disabled:opacity-40"
+            disabled={resetPw.isPending}
+            title={t("비번을 ‘아이디+123!@’로 초기화하고 첫 로그인 시 변경 요구", "Reset to ‘<id>123!@’ and force change at next login")}
+            onClick={() => resetPw.mutate(u.id, { onSuccess: (r) => setTempPw(r.password) })}
+          >
+            {t("비번 초기화", "Reset password")}
+          </button>
+          <span className="text-ink-muted opacity-40">·</span>
           <button
             className="text-ink-secondary hover:text-ink-primary disabled:opacity-40"
             disabled={self}

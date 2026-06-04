@@ -8,6 +8,7 @@ export interface AdminUser {
   is_demo: boolean;
   is_admin: boolean;
   is_active: boolean;
+  must_change_password: boolean;
   plate_ids: string[];
   last_login_at: string | null;
 }
@@ -84,6 +85,14 @@ export function useAssignPlate() {
   const inv = useInvalidate();
   return useMutation<AdminUser, ApiError, { userId: number; plateId: string }>({
     mutationFn: ({ userId, plateId }) => apiPostJson<AdminUser>(`/api/v1/admin/users/${userId}/plates`, { plate_id: plateId }),
+    onSuccess: inv,
+  });
+}
+
+export function useResetUserPassword() {
+  const inv = useInvalidate();
+  return useMutation<{ password: string }, ApiError, number>({
+    mutationFn: (id) => apiPostJson<{ password: string }>(`/api/v1/admin/users/${id}/reset-password`),
     onSuccess: inv,
   });
 }

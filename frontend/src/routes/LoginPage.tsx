@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useLogin, useRequestReset } from "@/api/auth";
+import { useLogin } from "@/api/auth";
 import { useT } from "@/store/uiLang";
 import { useTheme } from "@/hooks/useTheme";
 import { LangToggle } from "@/components/LangToggle";
@@ -26,7 +26,6 @@ export function LoginPage() {
   const isDark = theme === "dark";
   const location = useLocation() as { state?: { from?: string } };
   const login = useLogin();
-  const reset = useRequestReset();
   const [mode, setMode] = useState<"login" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,10 +41,6 @@ export function LoginPage() {
     );
   }
 
-  function submitForgot(e: React.FormEvent) {
-    e.preventDefault();
-    reset.mutate(email.trim());
-  }
 
   // Glass tones differ by mode so the frosted card reads on both backgrounds.
   const glass = isDark
@@ -117,7 +112,7 @@ export function LoginPage() {
                   <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-brand-primary" />
                   {t("로그인 유지", "Remember Me")}
                 </label>
-                <button type="button" className="text-ink-secondary hover:text-brand-primary transition-colors" onClick={() => { reset.reset(); setMode("forgot"); }}>
+                <button type="button" className="text-ink-secondary hover:text-brand-primary transition-colors" onClick={() => setMode("forgot")}>
                   {t("비밀번호를 잊으셨나요?", "Forgot Password?")}
                 </button>
               </div>
@@ -148,44 +143,16 @@ export function LoginPage() {
           </>
         ) : (
           <>
-            {reset.isSuccess ? (
-              <div className="text-center text-body text-ink-secondary py-2" style={{ lineHeight: 1.6 }}>
-                {t(
-                  "해당 이메일로 계정이 있다면 재설정 링크를 보냈습니다. 메일함을 확인하세요 (1시간 유효).",
-                  "If an account exists for that email, a reset link has been sent. Check your inbox (valid 1 hour).",
-                )}
-              </div>
-            ) : (
-              <form onSubmit={submitForgot} className="flex flex-col gap-3.5">
-                <p className="text-meta text-ink-muted text-center -mt-2">
-                  {t("가입한 이메일을 입력하면 재설정 링크를 보내드립니다.", "Enter your email and we'll send a reset link.")}
-                </p>
-                <Field icon={<UserIcon />}>
-                  <input
-                    type="email"
-                    autoComplete="username"
-                    placeholder={t("이메일", "Email")}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full border pl-11 pr-4 py-3 rounded-full text-body text-ink-primary placeholder:text-ink-muted outline-none focus:border-brand-primary"
-                    style={fieldStyle}
-                  />
-                </Field>
-                <button
-                  type="submit"
-                  disabled={reset.isPending}
-                  className="mt-1 py-3 rounded-full font-semibold text-white shadow-lg disabled:opacity-50 transition-transform hover:-translate-y-0.5"
-                  style={{ background: "linear-gradient(135deg, rgb(var(--color-brand-primary-rgb)), rgb(139 92 246))" }}
-                >
-                  {reset.isPending ? t("보내는 중…", "Sending…") : t("재설정 링크 보내기", "Send reset link")}
-                </button>
-              </form>
-            )}
+            <div className="text-center text-body text-ink-secondary py-2" style={{ lineHeight: 1.7 }}>
+              {t(
+                "비밀번호 분실 시 관리자가 초기화합니다. 관리자에게 문의하면 임시 비밀번호(아이디+123!@)로 재설정해 드리며, 다음 로그인에서 새 비밀번호를 정하게 됩니다.",
+                "If you forgot your password, an admin resets it. Ask your admin — they'll set a temporary password (<id>123!@) and you'll choose a new one at next sign-in.",
+              )}
+            </div>
             <button
               type="button"
               className="mt-5 w-full text-center text-meta text-ink-muted hover:text-brand-primary transition-colors"
-              onClick={() => { reset.reset(); setMode("login"); }}
+              onClick={() => setMode("login")}
             >
               ← {t("로그인으로 돌아가기", "Back to sign in")}
             </button>
