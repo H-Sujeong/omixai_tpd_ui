@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TimeLapseFrame, TimeLapseViewer } from "@/types/api";
 import { EmptyBlock } from "@/components/LoadingBlock";
+import { buildTimeLapseGif, downloadBytes } from "./exportGif";
 
 interface Props {
   data: TimeLapseViewer | null;
+  drugName?: string;
 }
 
 // Display-interval options (hours). The backend returns the full frame set
@@ -42,7 +44,7 @@ function subsample(frames: TimeLapseFrame[], intervalH: number): TimeLapseFrame[
  * E4 Time-lapse viewer. Slider over frames, play/pause toggle, scale bar
  * overlay, and a display-interval selector (subsamples the full frame set).
  */
-export function TimeLapseViewerPanel({ data }: Props) {
+export function TimeLapseViewerPanel({ data, drugName }: Props) {
   const allFrames = useMemo(() => data?.frames ?? [], [data]);
 
   // Default interval: finest available spacing rounded into the option set.
@@ -51,6 +53,7 @@ export function TimeLapseViewerPanel({ data }: Props) {
 
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [gifBusy, setGifBusy] = useState(false);
 
   useEffect(() => {
     if (!playing || frames.length === 0) return;
@@ -70,6 +73,27 @@ export function TimeLapseViewerPanel({ data }: Props) {
   const frame = frames[Math.min(idx, frames.length - 1)];
   const cells = frame.n_cells ?? data.n_cells_t0 ?? null;
 
+  async function exportGif() {
+    if (gifBusy || frames.length === 0 || !data) return;
+    setGifBusy(true);
+    try {
+      const bytes = await buildTimeLapseGif(frames, {
+        drugName: drugName ?? "",
+        wellId: data.well_id,
+        fallbackCells: data.n_cells_t0,
+      });
+      const base = `${drugName || "timelapse"}_${data.well_id ?? ""}`.replace(
+        /[^A-Za-z0-9._-]+/g,
+        "_",
+      );
+      downloadBytes(`${base}.gif`, bytes, "image/gif");
+    } catch (e) {
+      console.error("GIF export failed", e);
+    } finally {
+      setGifBusy(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="relative bg-black rounded-md overflow-hidden h-[431px]">
@@ -80,6 +104,7 @@ export function TimeLapseViewerPanel({ data }: Props) {
           loading="lazy"
         />
         <div className="absolute top-2 left-2 text-white text-caption font-mono bg-black/60 px-2 py-1 rounded leading-snug">
+          {drugName && <div className="font-semibold">{drugName}</div>}
           <div>{fmtHours(frame.t_hours)} h</div>
           <div>{cells ?? "—"} cells</div>
         </div>
@@ -122,6 +147,14 @@ export function TimeLapseViewerPanel({ data }: Props) {
             ))}
           </select>
         </label>
+        <button
+          className="btn btn--ghost text-caption px-2 py-1 whitespace-nowrap"
+          onClick={exportGif}
+          disabled={gifBusy}
+          title="현재 간격의 프레임을 이름/시간/세포수 오버레이가 있는 GIF로 내보내기"
+        >
+          {gifBusy ? "GIF…" : "GIF ⬇"}
+        </button>
       </div>
     </div>
   );

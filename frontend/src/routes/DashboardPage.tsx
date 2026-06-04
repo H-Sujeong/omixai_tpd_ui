@@ -345,7 +345,7 @@ export function DashboardPage() {
               meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
               actions={<CellLineInline cell={d.cell_line} />}
             >
-              <TimeLapseViewerPanel data={d.time_lapse} />
+              <TimeLapseViewerPanel data={d.time_lapse} drugName={d.drug_name} />
             </PanelCard>
 
             <PanelCard
