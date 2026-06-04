@@ -4,10 +4,10 @@ FastAPI 서비스 — `TPD_UI_DB` 폴더를 in-memory로 로드해 Plate / Drug 
 
 ## 데이터 위치
 
-기본값: `OMIXAI_DATA_ROOT` 환경변수, 미설정 시 `/mnt/c/Users/beloz/Documents/TPD_UI_DB`.
+기본값: `OMIXAI_DATA_ROOT` 환경변수, 미설정 시 `/mnt/c/Users/beloz/Documents/ui_workspace/TPD_UI_DB`.
 
 ```bash
-export OMIXAI_DATA_ROOT="/mnt/c/Users/beloz/Documents/TPD_UI_DB"
+export OMIXAI_DATA_ROOT="/mnt/c/Users/beloz/Documents/ui_workspace/TPD_UI_DB"
 ```
 
 ## 실행
@@ -18,7 +18,7 @@ bash /mnt/c/Users/beloz/Documents/start-omixai-backend.sh           # uvicorn :8
 bash /mnt/c/Users/beloz/Documents/start-omixai-ui.sh --with-backend # 프론트와 함께
 
 # 수동
-cd /mnt/c/Users/beloz/Documents/omixai_tpd_ui/backend
+cd /mnt/c/Users/beloz/Documents/ui_workspace/omixai_tpd_ui/backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000

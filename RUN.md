@@ -59,7 +59,7 @@ bash /mnt/c/Users/beloz/Documents/start-omixai-backend.sh
 | `--port 8001` | 포트 변경 |
 | `--host 0.0.0.0` | WSL 외부에서도 접근 가능 (reload 자동 비활성) |
 | `--no-reload` | watch 비활성 (단일 프로세스) |
-| `--data-root /path` | `OMIXAI_DATA_ROOT` 덮어쓰기 (기본 `/mnt/c/Users/beloz/Documents/TPD_UI_DB`) |
+| `--data-root /path` | `OMIXAI_DATA_ROOT` 덮어쓰기 (기본 `/mnt/c/Users/beloz/Documents/ui_workspace/TPD_UI_DB`) |
 
 OpenAPI 문서: <http://127.0.0.1:8000/docs>
 
@@ -111,7 +111,7 @@ networkingMode=mirrored
 
 ## 백엔드 동작 메모
 
-- 데이터 루트 기본값: `/mnt/c/Users/beloz/Documents/TPD_UI_DB`
+- 데이터 루트 기본값: `/mnt/c/Users/beloz/Documents/ui_workspace/TPD_UI_DB`
 - `OMIXAI_DATA_ROOT` 환경변수 또는 `--data-root` 로 덮어쓰기
 - 백엔드 미실행 시 UI는 보이지만 `/api/v1/...` 호출이 502/504 (vite proxy 가 거절). DevTools Network 탭에서 확인.
 - `--with-backend` 통합 모드는 backend 의 reload 를 끕니다. 파일 변경마다 자동 재시작이 필요하면 백엔드를 별도 터미널에서 `start-omixai-backend.sh` 로 따로 실행하세요.
