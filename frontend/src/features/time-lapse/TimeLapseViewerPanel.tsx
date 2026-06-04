@@ -3,6 +3,7 @@ import type { TimeLapseFrame, TimeLapseViewer } from "@/types/api";
 import { EmptyBlock } from "@/components/LoadingBlock";
 import { buildTimeLapseGif, downloadBytes, pickBarUm, barLabel } from "./exportGif";
 import { useT } from "@/store/uiLang";
+import { useTheme } from "@/hooks/useTheme";
 
 interface Props {
   data: TimeLapseViewer | null;
@@ -47,6 +48,8 @@ function subsample(frames: TimeLapseFrame[], intervalH: number): TimeLapseFrame[
  */
 export function TimeLapseViewerPanel({ data, drugName }: Props) {
   const t = useT();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const allFrames = useMemo(() => data?.frames ?? [], [data]);
 
   // Default interval: finest available spacing rounded into the option set.
@@ -189,9 +192,16 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
             className="bg-surface-2 border border-line rounded px-1 py-0.5 text-ink-primary"
           >
             {INTERVAL_OPTIONS.map((h) => (
-              // The native dropdown popup has a light background even in dark
-              // mode, so force dark option text or the numbers vanish.
-              <option key={h} value={h} style={{ color: "#1a1a1a", backgroundColor: "#fff" }}>
+              // Theme-aware option colors so the native popup is readable in both
+              // modes (and the closed value doesn't get forced to black).
+              <option
+                key={h}
+                value={h}
+                style={{
+                  color: isDark ? "#E5E7EB" : "#1a1a1a",
+                  backgroundColor: isDark ? "#1f2937" : "#ffffff",
+                }}
+              >
                 {fmtHours(h)}h
               </option>
             ))}

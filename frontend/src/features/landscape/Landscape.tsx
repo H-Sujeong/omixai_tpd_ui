@@ -58,6 +58,10 @@ const COLORSCALE_3D_JET: Array<[number, string]> = [
 
 const COLOR_TARGET_FILL = "#F59E0B";
 const COLOR_TARGET_EDGE = "#92400E";
+// Target community absent from the PPI data: same cross, yellow → dark grey,
+// drawn at the would-be target position (landscape.target_point).
+const COLOR_TARGET_ABSENT_FILL = "#4B5563";
+const COLOR_TARGET_ABSENT_EDGE = "#1F2937";
 const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
 const COLOR_OTHER_EDGE  = "#FFFFFF";
 const REF_LINE_COLOR    = "#1F2937";
@@ -140,6 +144,9 @@ export function Landscape({
   // Some assets carry no target community at all (the target protein is absent
   // from the PPI data). Flag it honestly instead of silently omitting the ✚.
   const dataHasTarget = landscape.scatter.some((p) => p.is_target);
+  // Precomputed here because inside build2D/build3D the local `t` is the traces
+  // array (shadows the useT() translator).
+  const absentTargetLabel = t("target community (PPI 데이터 없음)", "target community (no PPI data)");
 
   // -log10(p) outlier clip. Degenerate p≈0 communities (p underflowed to 0 →
   // -log10(p) capped at ~300) blow the y-axis out and squash every real point
@@ -188,10 +195,11 @@ export function Landscape({
     const xMin = Math.min(...xs), xMax = Math.max(...xs);
     const yMin = Math.min(...ys), yMax = Math.max(...ys);
     const xSpan = xMax - xMin || 1, ySpan = yMax - yMin || 1;
-    const N = 46;
-    const h = 0.16;          // smoothing bandwidth (normalized axis units)
+    const N = 56;
+    const h = 0.09;          // smoothing bandwidth (normalized axis units);
+                             // ≈ point spacing → keeps peaks, not a bald dome
     const h2 = h * h;
-    const maxD = 0.2;        // mask cells whose nearest community is farther
+    const maxD = 0.16;       // mask cells whose nearest community is farther
     const xg: number[] = [];
     const yg: number[] = [];
     for (let i = 0; i < N; i++) {
@@ -318,6 +326,23 @@ export function Landscape({
         trace.textfont = { size: 16, color: COLOR_TARGET_FILL };
       }
       t.push(trace);
+    } else if (landscape.target_point) {
+      // No target community in the PPI data — mark its would-be position with a
+      // dark-grey cross (same glyph as the real target).
+      t.push({
+        type: "scatter",
+        mode: "markers",
+        x: [landscape.target_point.x],
+        y: [landscape.target_point.y],
+        marker: {
+          size: 16,
+          symbol: "cross",
+          color: COLOR_TARGET_ABSENT_FILL,
+          line: { width: 2.5, color: COLOR_TARGET_ABSENT_EDGE },
+        },
+        hovertemplate: `<b>${absentTargetLabel}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
+        showlegend: false,
+      });
     }
 
     return t;
@@ -405,6 +430,23 @@ export function Landscape({
         trace.textfont = { color: COLOR_TARGET_FILL, size: 20, family: "Arial Black" };
       }
       t.push(trace);
+    } else if (landscape.target_point) {
+      // No target community in the PPI data — dark-grey cross at its would-be spot.
+      t.push({
+        type: "scatter3d",
+        mode: "markers",
+        x: [landscape.target_point.x],
+        y: [landscape.target_point.y],
+        z: [landscape.target_point.z],
+        marker: {
+          size: 11,
+          color: COLOR_TARGET_ABSENT_FILL,
+          symbol: "cross",
+          line: { width: 2, color: COLOR_TARGET_ABSENT_EDGE },
+        },
+        hovertemplate: `${absentTargetLabel}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
+        showlegend: false,
+      });
     }
     return t;
   }
@@ -452,7 +494,9 @@ export function Landscape({
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
-              autorange: "reversed" as const,
+              // Normal (not reversed) so low Distance-from-anchor — where the
+              // target community sits — lands at the front-left/origin corner.
+              autorange: true,
               gridcolor: sceneGridColor,
               tickfont: { color: axisTextColor },
               backgroundcolor: sceneBgColor,
