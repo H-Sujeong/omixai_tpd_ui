@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TimeLapseFrame, TimeLapseViewer } from "@/types/api";
 import { EmptyBlock } from "@/components/LoadingBlock";
 import { buildTimeLapseGif, downloadBytes, pickBarUm, barLabel } from "./exportGif";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   data: TimeLapseViewer | null;
@@ -45,6 +46,7 @@ function subsample(frames: TimeLapseFrame[], intervalH: number): TimeLapseFrame[
  * overlay, and a display-interval selector (subsamples the full frame set).
  */
 export function TimeLapseViewerPanel({ data, drugName }: Props) {
+  const t = useT();
   const allFrames = useMemo(() => data?.frames ?? [], [data]);
 
   // Default interval: finest available spacing rounded into the option set.
@@ -108,7 +110,8 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
     setIdx(0);
   }, [frames.length]);
 
-  if (!data || allFrames.length === 0) return <EmptyBlock label="Time-lapse 이미지가 없습니다." />;
+  if (!data || allFrames.length === 0)
+    return <EmptyBlock label={t("Time-lapse 이미지가 없습니다.", "No time-lapse images.")} />;
 
   const frame = frames[Math.min(idx, frames.length - 1)];
   const cells = frame.n_cells ?? data.n_cells_t0 ?? null;
@@ -179,7 +182,7 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
           {fmtHours(frame.t_hours)} / {fmtHours(frames[frames.length - 1].t_hours)} h
         </span>
         <label className="flex items-center gap-1 text-caption text-ink-secondary">
-          <span>간격</span>
+          <span>{t("간격", "Interval")}</span>
           <select
             value={intervalH}
             onChange={(e) => setIntervalH(Number(e.target.value))}
@@ -196,7 +199,10 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
           className="btn btn--ghost text-caption px-2 py-1 whitespace-nowrap"
           onClick={exportGif}
           disabled={gifBusy}
-          title="현재 간격의 프레임을 이름/시간/세포수 오버레이가 있는 GIF로 내보내기"
+          title={t(
+            "현재 간격의 프레임을 이름/시간/세포수 오버레이가 있는 GIF로 내보내기",
+            "Export frames at the current interval as a GIF with name/time/cell-count overlay",
+          )}
         >
           {gifBusy ? "GIF…" : "GIF ⬇"}
         </button>

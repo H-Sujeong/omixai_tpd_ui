@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import { apiGet } from "@/api/client";
 import type { DashboardResponse, DrugSummaryRow } from "@/types/api";
 import { ctxFromDashboard, downloadBlob, exportGroups } from "./bulkExport";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   plateId: string;
@@ -19,7 +20,7 @@ const FORMATS: Array<{ id: string; label: string }> = [
   { id: "landscape.csv", label: "Landscape CSV" },
   { id: "enrichment.csv", label: "Enrichment CSV" },
   { id: "profiling.csv", label: "Profiling CSV" },
-  { id: "timelapse.gif", label: "Time-lapse GIF (느림)" },
+  { id: "timelapse.gif", label: "Time-lapse GIF" },
 ];
 const DEFAULT_FORMATS = ["ppi.graphml", "landscape.csv", "enrichment.csv", "profiling.csv"];
 
@@ -32,6 +33,7 @@ const tkey = (drugId: string, target: string) => `${drugId}::${target}`;
  * {plate}/{drug}/{target}/{file} folder hierarchy.
  */
 export function PlateExportMenu({ plateId, drugs }: Props) {
+  const tr = useT();
   const [open, setOpen] = useState(false);
   const [formats, setFormats] = useState<Set<string>>(new Set(DEFAULT_FORMATS));
   const [busy, setBusy] = useState(false);
@@ -117,7 +119,7 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
             <div className="px-4 py-3 overflow-y-auto text-meta space-y-3">
               {/* Formats */}
               <div>
-                <div className="text-ink-secondary font-medium mb-1">포맷</div>
+                <div className="text-ink-secondary font-medium mb-1">{tr("포맷", "Formats")}</div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                   {FORMATS.map((f) => (
                     <label key={f.id} className="flex items-center gap-1.5 text-ink-secondary">
@@ -127,15 +129,27 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
                         checked={formats.has(f.id)}
                         onChange={() => setFormats((s) => toggle(s, f.id))}
                       />
-                      <span>{f.label}</span>
+                      <span>
+                        {f.id === "timelapse.gif"
+                          ? tr("Time-lapse GIF (느림)", "Time-lapse GIF (slow)")
+                          : f.label}
+                      </span>
                     </label>
                   ))}
                 </div>
                 <div className="text-ink-muted mt-1">
-                  * 선택 항목에 따라 시간이 오래 소요될 수 있습니다.
+                  {tr(
+                    "* 선택 항목에 따라 시간이 오래 소요될 수 있습니다.",
+                    "* Depending on the selected items, this may take a while.",
+                  )}
                 </div>
                 {formats.has("timelapse.gif") && (
-                  <div className="text-status-warning mt-0.5">⚠ GIF는 약물마다 인코딩이라 느리고 용량이 큽니다.</div>
+                  <div className="text-status-warning mt-0.5">
+                    {tr(
+                      "⚠ GIF는 약물마다 인코딩이라 느리고 용량이 큽니다.",
+                      "⚠ GIFs are encoded per drug — slow and large in size.",
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -143,13 +157,16 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-ink-secondary font-medium">
-                    약물 / 타겟 (asset {drugs.length}개, 선택 {selCount})
+                    {tr(
+                      `약물 / 타겟 (asset ${drugs.length}개, 선택 ${selCount})`,
+                      `Drugs / targets (${drugs.length} assets, ${selCount} selected)`,
+                    )}
                   </span>
                   <button
                     className="text-ink-muted hover:text-ink-primary"
                     onClick={() => setSel(selCount === allKeys.length ? new Set() : new Set(allKeys))}
                   >
-                    {selCount === allKeys.length ? "전체 해제" : "전체 선택"}
+                    {selCount === allKeys.length ? tr("전체 해제", "Deselect all") : tr("전체 선택", "Select all")}
                   </button>
                 </div>
                 <div className="max-h-[260px] overflow-y-auto border border-line rounded">
@@ -184,10 +201,12 @@ export function PlateExportMenu({ plateId, drugs }: Props) {
 
             <div className="px-4 py-3 border-t border-line flex items-center justify-between gap-3">
               <span className="text-meta text-ink-muted">
-                {busy && progress ? `생성 중 ${progress.done}/${progress.total}…` : `${selCount} target × ${formats.size} 포맷`}
+                {busy && progress
+                  ? tr(`생성 중 ${progress.done}/${progress.total}…`, `Generating ${progress.done}/${progress.total}…`)
+                  : tr(`${selCount} target × ${formats.size} 포맷`, `${selCount} target × ${formats.size} formats`)}
               </span>
               <button type="button" className="btn btn--primary text-caption px-3 py-1 disabled:opacity-50" disabled={!canRun} onClick={run}>
-                {busy ? "ZIP 생성 중…" : "Download ZIP"}
+                {busy ? tr("ZIP 생성 중…", "Generating ZIP…") : "Download ZIP"}
               </button>
             </div>
           </div>

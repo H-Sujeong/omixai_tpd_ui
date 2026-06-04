@@ -1,5 +1,6 @@
 import type { GoTerm } from "@/types/api";
 import { EmptyBlock } from "@/components/LoadingBlock";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   terms: GoTerm[];
@@ -31,7 +32,9 @@ const ALPHA_STEP = 0.05;   // 5% drop per rank
 const ALPHA_FLOOR = 0.35;  // never below 35% — guarantees readability
 
 export function EnrichmentBar({ terms, height }: Props) {
-  if (!terms.length) return <EmptyBlock label="Enrichment 결과가 없습니다." />;
+  const t = useT();
+  if (!terms.length)
+    return <EmptyBlock label={t("Enrichment 결과가 없습니다.", "No enrichment results.")} />;
 
   // Global sort by score (highest first); also pre-compute rank within
   // each category so alpha can step down per-category from #1 = 100%.

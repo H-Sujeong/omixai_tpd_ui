@@ -6,12 +6,14 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useDrugListFilters, type DrugSortKey as SortKey } from "@/store/drugListFilters";
 import { PlateExportMenu } from "@/features/export/PlateExportMenu";
 import type { DrugSummaryRow } from "@/types/api";
+import { useT } from "@/store/uiLang";
 
 /**
  * Drug summary table — design_02 / style_guide compact "Bloomberg terminal" feel.
  * Sticky header · zebra rows · purple hover · target chip → direct deep link.
  */
 export function DrugSummaryPage() {
+  const t = useT();
   const { plateId } = useParams<{ plateId: string }>();
   const navigate = useNavigate();
   const { data, isLoading, error } = useDrugSummary(plateId);
@@ -151,7 +153,7 @@ export function DrugSummaryPage() {
           type="search"
           value={search}
           onChange={(e) => set({ search: e.target.value })}
-          placeholder="약물 이름 · code · target 검색"
+          placeholder={t("약물 이름 · code · target 검색", "Search drug name · code · target")}
           className="flex-1 min-w-[260px] border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary placeholder:text-ink-muted focus:border-brand-primary outline-none transition-colors duration-fast"
         />
         <select
@@ -183,7 +185,7 @@ export function DrugSummaryPage() {
           role="switch"
           aria-checked={assetsOnly}
           onClick={() => set({ assetsOnly: !assetsOnly })}
-          title="실측 PPI / landscape 자산이 있는 약물만 표시"
+          title={t("실측 PPI / landscape 자산이 있는 약물만 표시", "Show only drugs with measured PPI / landscape assets")}
           className={`border rounded-md px-3 py-2 text-body transition-colors duration-fast inline-flex items-center gap-1.5 ${
             assetsOnly
               ? "border-brand-primary text-brand-primary font-medium"
@@ -211,7 +213,12 @@ export function DrugSummaryPage() {
       {isLoading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
       {!isLoading && rows.length === 0 && (
-        <EmptyBlock label="조건에 해당하는 약물이 없습니다 — 필터를 변경하거나 Reset을 누르세요." />
+        <EmptyBlock
+          label={t(
+            "조건에 해당하는 약물이 없습니다 — 필터를 변경하거나 Reset을 누르세요.",
+            "No drugs match the filters — change the filters or press Reset.",
+          )}
+        />
       )}
 
       {rows.length > 0 && (
@@ -296,7 +303,7 @@ export function DrugSummaryPage() {
                     {d.has_dashboard_assets ? (
                       <span
                         className="text-status-success font-semibold"
-                        title="on-target / landscape JSON 자산 있음"
+                        title={t("on-target / landscape JSON 자산 있음", "on-target / landscape JSON assets available")}
                         aria-label="asset available"
                       >
                         ✓
@@ -304,7 +311,7 @@ export function DrugSummaryPage() {
                     ) : (
                       <span
                         className="text-ink-muted"
-                        title="PPI / landscape 자산 없음"
+                        title={t("PPI / landscape 자산 없음", "No PPI / landscape assets")}
                         aria-label="no asset"
                       >
                         ○

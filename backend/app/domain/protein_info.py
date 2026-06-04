@@ -178,11 +178,34 @@ def _anglicize_terms(text: str) -> str:
     return text
 
 
+def _run_ollama(prompt: str) -> str:
+    """Run the local Ollama model and return the raw response text ("" on error)."""
+    s = get_settings()
+    r = httpx.post(
+        f"{s.ollama_url}/api/generate",
+        json={"model": s.ollama_model, "prompt": prompt, "stream": False,
+              "keep_alive": "30m", "options": {"temperature": 0.2}},
+        timeout=120.0,
+    )
+    r.raise_for_status()
+    return (r.json().get("response") or "").strip()
+
+
+def _to_bullets(text: str, anglicize: bool) -> list[str]:
+    bullets: list[str] = []
+    for ln in text.splitlines():
+        ln = ln.strip()
+        if ln[:1] in ("-", "•", "*"):
+            ln = ln[1:].strip()
+        if ln:
+            bullets.append(_anglicize_terms(ln) if anglicize else ln)
+    return bullets[:6]
+
+
 def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> list[str]:
     """Summarize the English UniProt function into Korean 개조식 bullets via the
     local Ollama model. Gene/protein/domain names and technical terms stay in
     English. Returns [] on any failure (panel then shows the English text)."""
-    s = get_settings()
     prompt = (
         f"다음은 인간 단백질 {gene}"
         + (f" ({protein_name})" if protein_name else "")
@@ -198,33 +221,80 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
         f"영문 설명:\n{function_text}"
     )
     try:
-        r = httpx.post(
-            f"{s.ollama_url}/api/generate",
-            json={"model": s.ollama_model, "prompt": prompt, "stream": False,
-                  "keep_alive": "30m", "options": {"temperature": 0.2}},
-            timeout=120.0,
-        )
-        r.raise_for_status()
-        text = (r.json().get("response") or "").strip()
-        bullets: list[str] = []
-        for ln in text.splitlines():
-            ln = ln.strip()
-            if ln[:1] in ("-", "•", "*"):
-                ln = ln[1:].strip()
-            if ln:
-                bullets.append(_anglicize_terms(ln))
-        return bullets[:6]
+        return _to_bullets(_run_ollama(prompt), anglicize=True)
     except Exception as exc:                                      # noqa: BLE001
-        log.info("Ollama summary unavailable for %s: %s", gene, exc)
+        log.info("Ollama summary (ko) unavailable for %s: %s", gene, exc)
         return []
 
 
-def get_protein_info(gene: str, want_summary: bool = True) -> dict[str, Any]:
+def _summarize_en(gene: str, protein_name: str | None, function_text: str) -> list[str]:
+    """Summarize the English UniProt function into concise English bullets via the
+    local model (NOT a translation of the Korean summary). Returns [] on failure
+    (panel then falls back to the raw English UniProt function paragraph)."""
+    prompt = (
+        f"The following is the function description of the human protein {gene}"
+        + (f" ({protein_name})" if protein_name else "")
+        + ". Summarize it into 3-5 concise English bullet points for a researcher.\n"
+        "Rules:\n"
+        "- Each line starts with '- '.\n"
+        "- Keep gene, protein, domain, and complex names as written.\n"
+        "- Keep biochemistry/molecular-biology terms (e.g. ubiquitination, "
+        "degradation, transcription, phosphorylation, chromatin) as-is.\n"
+        "- Output only the bullet lines (no preamble or closing remarks).\n\n"
+        f"Description:\n{function_text}"
+    )
+    try:
+        return _to_bullets(_run_ollama(prompt), anglicize=False)
+    except Exception as exc:                                      # noqa: BLE001
+        log.info("Ollama summary (en) unavailable for %s: %s", gene, exc)
+        return []
+
+
+def _summarize(gene: str, protein_name: str | None, function_text: str, lang: str) -> list[str]:
+    if lang == "en":
+        return _summarize_en(gene, protein_name, function_text)
+    return _summarize_ko(gene, protein_name, function_text)
+
+
+def _summary_field(lang: str) -> str:
+    return "summary_en" if lang == "en" else "summary"
+
+
+def _ensure_summary(info: dict[str, Any], key: str, cache: dict[str, Any], lang: str) -> None:
+    """Lazily generate (and persist) the bullet summary for the requested language.
+    Korean → ``summary``; English → ``summary_en``. Both are cached separately so
+    switching language never re-translates — each is summarized from the English
+    UniProt function directly."""
+    if not (info.get("found") and info.get("function")):
+        return
+    info.setdefault("summary", [])
+    info.setdefault("summary_en", [])
+    field = _summary_field(lang)
+    if not info[field]:
+        bullets = _summarize(info.get("gene", key), info.get("protein_name"), info["function"], lang)
+        if bullets:
+            info[field] = bullets
+            cache[key] = info
+            _persist()
+
+
+def _shaped(info: dict[str, Any], lang: str) -> dict[str, Any]:
+    """Return a copy whose ``summary`` carries the requested language's bullets,
+    with the internal ``summary_en`` field dropped (not part of the API schema)."""
+    out = dict(info)
+    out["summary"] = out.get(_summary_field(lang)) or []
+    out.pop("summary_en", None)
+    return out
+
+
+def get_protein_info(gene: str, lang: str = "ko") -> dict[str, Any]:
     """Return protein info dict for a human gene symbol (cached, never raises).
 
-    With want_summary (Korean UI), the Korean LLM summary is generated/cached
-    (slower; the panel shows a shimmer). With want_summary=False (English UI),
-    the LLM is skipped — the panel shows the English UniProt function instead.
+    The bullet summary is produced by the local LLM in the requested language
+    (``ko`` → Korean 개조식, ``en`` → English bullets), summarized directly from
+    the English UniProt function (English is NOT a re-translation of Korean).
+    The first lookup per language is slow (the panel shows a shimmer); both
+    languages are cached separately so later clicks are instant.
     """
     gene = (gene or "").strip()
     if not gene:
@@ -233,14 +303,8 @@ def get_protein_info(gene: str, want_summary: bool = True) -> dict[str, Any]:
     key = gene.upper()
     info = cache.get(key)
     if info is not None:
-        info.setdefault("summary", [])
-        if want_summary and info.get("found") and info.get("function") and not info["summary"]:
-            bullets = _summarize_ko(gene, info.get("protein_name"), info["function"])
-            if bullets:
-                info["summary"] = bullets
-                cache[key] = info
-                _persist()
-        return info
+        _ensure_summary(info, key, cache, lang)
+        return _shaped(info, lang)
 
     result = _empty(gene)
     try:
@@ -285,7 +349,8 @@ def get_protein_info(gene: str, want_summary: bool = True) -> dict[str, Any]:
                 "accession": acc,
                 "protein_name": pname,
                 "function": fn,
-                "summary": _summarize_ko(gene, pname, fn) if (want_summary and fn) else [],
+                "summary": [],       # ko bullets, filled lazily by _ensure_summary
+                "summary_en": [],    # en bullets, filled lazily by _ensure_summary
                 "families": _families(e),
                 "length": length,
                 "mass_kda": round(mol / 1000.0, 1) if mol else None,
@@ -303,4 +368,5 @@ def get_protein_info(gene: str, want_summary: bool = True) -> dict[str, Any]:
     if result.get("found"):
         cache[key] = result
         _persist()
-    return result
+        _ensure_summary(result, key, cache, lang)
+    return _shaped(result, lang)

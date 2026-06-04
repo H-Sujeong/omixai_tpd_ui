@@ -1,13 +1,15 @@
 import Plot from "react-plotly.js";
 import type { PhenotypicProfiling } from "@/types/api";
 import { EmptyBlock } from "@/components/LoadingBlock";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   data: PhenotypicProfiling | null;
 }
 
 export function PhenotypicProfilingPanel({ data }: Props) {
-  if (!data) return <EmptyBlock label="Growth-rate 데이터가 없습니다." />;
+  const t = useT();
+  if (!data) return <EmptyBlock label={t("Growth-rate 데이터가 없습니다.", "No growth-rate data.")} />;
 
   const sharedLayout = {
     paper_bgcolor: "transparent",
@@ -46,7 +48,10 @@ export function PhenotypicProfilingPanel({ data }: Props) {
             {
               type: "scatter",
               mode: "lines",
-              x: [0, Math.max(...data.gr_curve.map((p) => p.t_hours), 28)],
+              x: [
+                data.gr_curve[0]?.t_hours ?? 0,
+                data.gr_curve[data.gr_curve.length - 1]?.t_hours ?? 0,
+              ],
               y: [1, 1],
               line: { color: "#7D8590", dash: "dot", width: 1 },
               hoverinfo: "skip",
@@ -55,40 +60,11 @@ export function PhenotypicProfilingPanel({ data }: Props) {
           ]}
           layout={{
             ...sharedLayout,
+            // The curve already spans exactly the drug-effect window (e.g.
+            // 10–23.5h at 0.5h steps), so the x-axis range itself conveys the
+            // window — no separate shaded sub-region is drawn.
             xaxis: { title: { text: "Time (hr)" }, zeroline: false },
             yaxis: { title: { text: "GR(t)" }, zeroline: false, range: [-0.5, 1.5] },
-            // Shade the drug-effect window the GR score is computed over, so the
-            // score is clearly tied to this sub-window — not the whole curve.
-            shapes: data.gr_window
-              ? [
-                  {
-                    type: "rect" as const,
-                    xref: "x" as const,
-                    yref: "paper" as const,
-                    x0: data.gr_window[0],
-                    x1: data.gr_window[1],
-                    y0: 0,
-                    y1: 1,
-                    fillcolor: "rgba(168,113,255,0.12)",
-                    line: { width: 0 },
-                    layer: "below" as const,
-                  },
-                ]
-              : [],
-            annotations: data.gr_window
-              ? [
-                  {
-                    x: (data.gr_window[0] + data.gr_window[1]) / 2,
-                    y: 1,
-                    xref: "x" as const,
-                    yref: "paper" as const,
-                    yanchor: "bottom" as const,
-                    showarrow: false,
-                    text: `약효 확인 ${data.gr_window[0]}–${data.gr_window[1]}h`,
-                    font: { size: 9, color: "#A871FF" },
-                  },
-                ]
-              : [],
           }}
           config={{ displayModeBar: false, responsive: true }}
           style={{ width: "100%" }}

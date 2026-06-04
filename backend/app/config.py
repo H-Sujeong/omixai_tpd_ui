@@ -28,10 +28,13 @@ class Settings(BaseSettings):
     # to 1024 px → 3×1292 / 1024 ≈ 3.785 µm/pixel. Adjust if the stitch layout
     # or export size changes.
     um_per_pixel: float = 3.785
-    # Drug-effect observation window (hours) — the GR slope / gr_score is
-    # computed over this sub-window, NOT the full time course. A hyperparameter.
+    # GR time axis. The GR curve is already restricted to the drug-effect
+    # observation window (the slope / gr_score is computed over it), so the whole
+    # curve IS the window — there is no separate sub-window. Rows are spaced
+    # gr_step_h hours starting at gr_window_start_h (e.g. 10h, 10.5h, …). The end
+    # is derived from the row count. A hyperparameter.
     gr_window_start_h: float = 10.0
-    gr_window_end_h: float = 23.0
+    gr_step_h: float = 0.5
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

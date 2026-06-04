@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PpiPanel } from "@/types/api";
 import { EXPORT_FORMATS, downloadText } from "./exportNetwork";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   panel: PpiPanel;
@@ -13,6 +14,7 @@ interface Props {
  * format; the file is generated client-side and downloaded.
  */
 export function NetworkExportMenu({ panel, baseName }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,7 @@ export function NetworkExportMenu({ panel, baseName }: Props) {
         type="button"
         className="chip text-meta hover:text-brand-primary transition-colors duration-fast"
         onClick={() => setOpen((o) => !o)}
-        title="현재 community 네트워크를 파일로 내보내기"
+        title={t("현재 community 네트워크를 파일로 내보내기", "Export the current community network as a file")}
       >
         Export ▾
       </button>

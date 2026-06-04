@@ -4,8 +4,10 @@ import { useT, useUiLang } from "@/store/uiLang";
 import type { ProteinInfo } from "@/types/api";
 
 interface Props {
-  /** Gene symbol of the selected node; null = panel closed. */
+  /** Gene symbol of the selected node (drives the data). */
   gene: string | null;
+  /** Panel visibility. Closing (✕) hides the panel but keeps the node selected. */
+  open: boolean;
   onClose: () => void;
 }
 
@@ -15,11 +17,10 @@ interface Props {
  * (function, family/domain, size, localization, structures) + UniProt / STRING
  * / PDB links. Data is fetched on demand from UniProt (cached server-side).
  */
-export function ProteinInfoPanel({ gene, onClose }: Props) {
+export function ProteinInfoPanel({ gene, open, onClose }: Props) {
   const lang = useUiLang((s) => s.lang);
   const t = useT();
   const { data, isLoading } = useProtein(gene, lang);
-  const open = !!gene;
 
   return (
     <aside

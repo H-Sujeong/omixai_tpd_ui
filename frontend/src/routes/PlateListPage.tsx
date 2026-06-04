@@ -5,6 +5,7 @@ import { usePlates } from "@/api/queries";
 import { apiGet } from "@/api/client";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import type { DrugSummaryRow, PlateSummary } from "@/types/api";
+import { useT } from "@/store/uiLang";
 
 /**
  * Workspace home — list of plates. Rewrite 2026-06-02:
@@ -19,6 +20,7 @@ import type { DrugSummaryRow, PlateSummary } from "@/types/api";
  *     this plate?" before you click into it.
  */
 export function PlateListPage() {
+  const t = useT();
   const { data, isLoading, error } = usePlates();
 
   // Same queryKey shape as useDrugSummary so navigating into a plate hits
@@ -103,7 +105,7 @@ export function PlateListPage() {
 
       {isLoading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
-      {data && data.length === 0 && <EmptyBlock label="등록된 plate가 없습니다." />}
+      {data && data.length === 0 && <EmptyBlock label={t("등록된 plate가 없습니다.", "No registered plates.")} />}
 
       {data && data.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

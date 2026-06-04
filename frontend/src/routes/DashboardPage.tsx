@@ -16,6 +16,7 @@ import { CsvExportButton } from "@/features/export/CsvExportButton";
 import { buildEnrichmentCsv, buildLandscapeCsv, buildProfilingCsv } from "@/features/export/tableExports";
 import { DashboardExportMenu } from "@/features/export/DashboardExportMenu";
 import { KpiStrip } from "@/features/kpi/KpiStrip";
+import { useT } from "@/store/uiLang";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
 /**
@@ -32,6 +33,7 @@ import type { DashboardResponse, PpiPanel } from "@/types/api";
  *          d.insight.mechanism + top key_findings titles as 2-3 lines.
  */
 export function DashboardPage() {
+  const t = useT();
   const { plateId, drugId } = useParams<{ plateId: string; drugId: string }>();
   const [search, setSearch] = useSearchParams();
 
@@ -41,6 +43,9 @@ export function DashboardPage() {
   const [selectedCommunity, setSelectedCommunity] = useState<number | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  // Panel visibility is decoupled from selectedNode: closing (✕) hides the
+  // panel but keeps the node highlighted in the graph.
+  const [proteinPanelOpen, setProteinPanelOpen] = useState(false);
   const [bridgeNotice, setBridgeNotice] = useState<{
     text: string;
     direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump";
@@ -107,6 +112,7 @@ export function DashboardPage() {
     // re-scoped the PPI). Community navigation is done from the landscape.
     setSelectedNode(nodeId);
     setSelectedEdgeId(null);
+    setProteinPanelOpen(true);
   };
 
   const handleEdgeClick = (edge: {
@@ -122,17 +128,28 @@ export function DashboardPage() {
     const related = findRelatedCommunityFromEdge(activePpi, edge, here);
     if (!related) {
       setBridgeNotice({
-        text: `Edge ${edge.source} ↔ ${edge.target} — 외부 community 매칭 없음 (현재 community 내부 연결)`,
+        text: `Edge ${edge.source} ↔ ${edge.target} — ${t(
+          "외부 community 매칭 없음 (현재 community 내부 연결)",
+          "no external community match (internal connection within current community)",
+        )}`,
         direction: "ppi-to-landscape",
       });
       return;
     }
     const reasonText =
       related.reason === "shared"
-        ? `양쪽 노드 모두 community ${related.communityId} 에도 속함`
-        : `landscape 거리 기준 community ${related.communityId} 가 가장 인접 (Δ=${
-            related.distance?.toFixed(2) ?? "?"
-          })`;
+        ? t(
+            `양쪽 노드 모두 community ${related.communityId} 에도 속함`,
+            `both nodes also belong to community ${related.communityId}`,
+          )
+        : t(
+            `landscape 거리 기준 community ${related.communityId} 가 가장 인접 (Δ=${
+              related.distance?.toFixed(2) ?? "?"
+            })`,
+            `community ${related.communityId} is nearest by landscape distance (Δ=${
+              related.distance?.toFixed(2) ?? "?"
+            })`,
+          );
     // Edge click is informational only — highlight the edge and report the
     // related community. It must NOT switch the PPI community (that's node /
     // landscape click). Switching here was a bug.
@@ -148,7 +165,10 @@ export function DashboardPage() {
     setSelectedEdgeId(null);
     setSelectedNode(null);
     setBridgeNotice({
-      text: `Landscape peak → community ${cid} 선택 → PPI 재구성`,
+      text: `Landscape peak → ${t(
+        `community ${cid} 선택 → PPI 재구성`,
+        `selected community ${cid} → PPI rebuilt`,
+      )}`,
       direction: "landscape-to-ppi",
     });
     setSelectedCommunity(cid);
@@ -167,9 +187,11 @@ export function DashboardPage() {
   // Clear the active protein selection: close the info panel and drop the
   // node/edge highlights. Does NOT change the community — node click no longer
   // navigates, so closing the panel keeps you in the current community.
+  // Full deselect: used by the "선택 해제"/reset button and graph clear.
   const clearProteinSelection = () => {
     setSelectedNode(null);
     setSelectedEdgeId(null);
+    setProteinPanelOpen(false);
     setBridgeNotice(null);
   };
 
@@ -227,7 +249,10 @@ export function DashboardPage() {
           >
             <PanelCard
               title="Target Landscape"
-              tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
+              tooltip={t(
+                "x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터.",
+                "x=Distance, y=−log10(p), z=avg(PCC). 2D contour by default, 3D toggle available. Click a point → PPI rebuilt. ✚ = target community. PCC slider filters communities above the threshold.",
+              )}
               status={d.status_flags.landscape}
               actions={
                 d.landscape ? (
@@ -259,7 +284,10 @@ export function DashboardPage() {
           >
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
-              tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = 엣지 강조 + 관련 community 안내(전환하지 않음)."
+              tooltip={t(
+                "노드 클릭 = 단백질 정보 확인(community 전환 없음). 엣지 클릭 = 엣지 강조 + 관련 community 안내(전환하지 않음). community 전환은 landscape에서.",
+                "Node click = inspect protein info (no community switch). Edge click = highlight edge + show related community (no switch). Switch communities from the landscape.",
+              )}
               accent
               status={d.status_flags.ppi}
               meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
@@ -280,7 +308,7 @@ export function DashboardPage() {
               <div className="relative overflow-hidden">
                 {!activePpi ? (
                   <div className="h-[520px] flex items-center justify-center">
-                    <EmptyBlock label="PPI 데이터 없음" />
+                    <EmptyBlock label={t("PPI 데이터 없음", "No PPI data")} />
                   </div>
                 ) : (
                   <PpiGraph
@@ -295,10 +323,12 @@ export function DashboardPage() {
                     height={520}
                   />
                 )}
-                {/* Protein info slides in from the right when a node is selected */}
+                {/* Protein info slides in from the right when a node is selected.
+                    ✕ only hides the panel; the node stays highlighted. */}
                 <ProteinInfoPanel
                   gene={selectedNode}
-                  onClose={clearProteinSelection}
+                  open={proteinPanelOpen}
+                  onClose={() => setProteinPanelOpen(false)}
                 />
               </div>
             </PanelCard>
@@ -313,7 +343,10 @@ export function DashboardPage() {
           >
             <PanelCard
               title="Pathway Enrichment"
-              tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
+              tooltip={t(
+                "현재 community의 GO BP/MF/CC enrichment score 상위 항목",
+                "Top GO BP/MF/CC enrichment scores for the current community",
+              )}
               actions={
                 d.enrichment?.length ? (
                   <CsvExportButton
@@ -810,6 +843,7 @@ function BridgeNotice({
   onReset: () => void;
   onDismiss: () => void;
 }) {
+  const t = useT();
   const arrow =
     notice.direction === "ppi-to-landscape"
       ? "PPI → Landscape"
@@ -823,7 +857,7 @@ function BridgeNotice({
       </span>
       <span className="flex-1 min-w-0 truncate text-ink-secondary">{notice.text}</span>
       <button className="btn btn--ghost text-meta" onClick={onReset}>
-        단백질 선택 해제
+        {t("단백질 선택 해제", "Clear protein selection")}
       </button>
       <button
         className="btn btn--ghost text-meta"

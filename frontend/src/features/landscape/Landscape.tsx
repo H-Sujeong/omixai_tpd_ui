@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import Plot from "react-plotly.js";
 import { useTheme } from "@/hooks/useTheme";
+import { useT } from "@/store/uiLang";
 import type { LandscapePanel } from "@/types/api";
 
 interface Props {
@@ -76,6 +77,7 @@ export function Landscape({
   onCommunityClick,
   height = 380,
 }: Props) {
+  const t = useT();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   // Plotly takes literal color strings, not CSS vars, so we branch here.
@@ -446,7 +448,10 @@ export function Landscape({
          *  in the current landscape. */}
         <div
           className="flex items-center gap-2 rounded-md border border-line bg-surface-elevated px-2 py-1"
-          title={`avg(PCC) ≥ threshold 인 community 만 표시 (data range: ${rangeMin.toFixed(3)} … ${rangeMax.toFixed(3)})`}
+          title={t(
+            `avg(PCC) ≥ threshold 인 community 만 표시 (data range: ${rangeMin.toFixed(3)} … ${rangeMax.toFixed(3)})`,
+            `Show only communities with avg(PCC) ≥ threshold (data range: ${rangeMin.toFixed(3)} … ${rangeMax.toFixed(3)})`,
+          )}
         >
           <span className="whitespace-nowrap">PCC ≥</span>
           <input
@@ -474,7 +479,10 @@ export function Landscape({
         {/* Distance (x) lower-bound filter — show only far-enough communities */}
         <div
           className="flex items-center gap-2 rounded-md border border-line bg-surface-elevated px-2 py-1"
-          title={`Distance from anchor ≥ threshold 인 community 만 표시 (data range: ${distMin.toFixed(2)} … ${distMax.toFixed(2)})`}
+          title={t(
+            `Distance from anchor ≥ threshold 인 community 만 표시 (data range: ${distMin.toFixed(2)} … ${distMax.toFixed(2)})`,
+            `Show only communities with distance from anchor ≥ threshold (data range: ${distMin.toFixed(2)} … ${distMax.toFixed(2)})`,
+          )}
         >
           <span className="whitespace-nowrap">Dist ≥</span>
           <input
@@ -507,8 +515,17 @@ export function Landscape({
       </div>
 
       {!dataHasTarget && landscape.scatter.length > 0 && (
-        <div className="mb-2 text-meta text-ink-muted" title="on_target.json 의 PPI 데이터에 target 단백질 노드가 없어 target community(✚)를 표시할 수 없음">
-          ⓘ target community 미표시 — 이 약물의 PPI 데이터에 target 단백질이 없습니다.
+        <div
+          className="mb-2 text-meta text-ink-muted"
+          title={t(
+            "on_target.json 의 PPI 데이터에 target 단백질 노드가 없어 target community(✚)를 표시할 수 없음",
+            "The PPI data in on_target.json has no target protein node, so the target community (✚) cannot be shown",
+          )}
+        >
+          {t(
+            "ⓘ target community 미표시 — 이 약물의 PPI 데이터에 target 단백질이 없습니다.",
+            "ⓘ Target community not shown — this drug's PPI data has no target protein.",
+          )}
         </div>
       )}
 

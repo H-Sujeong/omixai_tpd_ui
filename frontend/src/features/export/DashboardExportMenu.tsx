@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type ExportCtx, buildBulkZip, downloadBlob, exportGroups } from "./bulkExport";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   ctx: ExportCtx;
@@ -12,6 +13,7 @@ interface Props {
  * currently-selected target, then download them together as a single ZIP.
  */
 export function DashboardExportMenu({ ctx, zipBase }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -66,7 +68,10 @@ export function DashboardExportMenu({ ctx, zipBase }: Props) {
         type="button"
         className="btn btn--ghost text-body font-medium px-3 py-1.5"
         onClick={() => setOpen((o) => !o)}
-        title="현재 target의 선택 항목을 ZIP으로 일괄 내보내기"
+        title={t(
+          "현재 target의 선택 항목을 ZIP으로 일괄 내보내기",
+          "Export the selected items for the current target as a single ZIP",
+        )}
       >
         Export ⬇
       </button>
@@ -75,7 +80,7 @@ export function DashboardExportMenu({ ctx, zipBase }: Props) {
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold text-ink-primary">Export (ZIP)</span>
             <button type="button" className="text-ink-muted hover:text-ink-primary" onClick={toggleAll}>
-              {allSelected ? "전체 해제" : "전체 선택"}
+              {allSelected ? t("전체 해제", "Deselect all") : t("전체 선택", "Select all")}
             </button>
           </div>
           <div className="max-h-[320px] overflow-y-auto space-y-2">
@@ -110,7 +115,7 @@ export function DashboardExportMenu({ ctx, zipBase }: Props) {
             disabled={count === 0 || busy}
             onClick={run}
           >
-            {busy ? "생성 중…" : `Download ZIP (${count})`}
+            {busy ? t("생성 중…", "Generating…") : `Download ZIP (${count})`}
           </button>
         </div>
       )}

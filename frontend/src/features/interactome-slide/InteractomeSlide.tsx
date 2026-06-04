@@ -3,6 +3,7 @@ import Plot from "react-plotly.js";
 import { useInteractomeNode } from "@/api/queries";
 import { PpiGraph } from "@/features/ppi-graph/PpiGraph";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/LoadingBlock";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   plateId: string;
@@ -19,6 +20,7 @@ interface Props {
  * Back nav: Level 2 → Level 1 → close.
  */
 export function InteractomeSlide({ plateId, drugId, target, nodeId, onClose }: Props) {
+  const t = useT();
   const [level, setLevel] = useState<1 | 2>(1);
 
   // Escape key: L2 → L1 → close
@@ -86,7 +88,14 @@ export function InteractomeSlide({ plateId, drugId, target, nodeId, onClose }: P
         className="overflow-y-auto p-3"
         style={{ height: "calc(100vh - var(--height-topbar) - 3.5rem)" }}
       >
-        {!open && <EmptyBlock label="PPI 노드를 클릭하면 ego network가 열립니다." />}
+        {!open && (
+          <EmptyBlock
+            label={t(
+              "PPI 노드를 클릭하면 ego network가 열립니다.",
+              "Click a PPI node to open its ego network.",
+            )}
+          />
+        )}
         {open && isLoading && <LoadingBlock />}
         {open && error && <ErrorBlock error={error} />}
         {open && data && level === 1 && <InteractomeLevel1 data={data} />}
@@ -97,6 +106,7 @@ export function InteractomeSlide({ plateId, drugId, target, nodeId, onClose }: P
 }
 
 function InteractomeLevel1({ data }: { data: any }) {
+  const t = useT();
   const { node } = data;
   return (
     <div className="space-y-3">
@@ -105,13 +115,17 @@ function InteractomeLevel1({ data }: { data: any }) {
       </div>
       <PpiGraph nodes={node.ego.nodes} edges={node.ego.edges} height={360} />
       <div className="text-caption text-ink-secondary">
-        클릭한 노드가 속한 community 전환은 좌측 PPI 패널의 노드 메뉴를 사용하세요.
+        {t(
+          "클릭한 노드가 속한 community 전환은 좌측 PPI 패널의 노드 메뉴를 사용하세요.",
+          "To switch to the clicked node's community, use the node menu in the left PPI panel.",
+        )}
       </div>
     </div>
   );
 }
 
 function InteractomeLevel2({ data }: { data: any }) {
+  const t = useT();
   const { node } = data;
   const decay = node.decay as Array<{ concentration_um: number; t_hours: number; remaining: number }>;
   const byConc = useMemo(() => {
@@ -141,7 +155,12 @@ function InteractomeLevel2({ data }: { data: any }) {
       <section>
         <div className="text-body font-semibold mb-1">Proteome decay (concentration × time)</div>
         {traces.length === 0 ? (
-          <EmptyBlock label="Decay 데이터가 아직 계산되지 않았습니다 (합성 fallback 사용 가능)." />
+          <EmptyBlock
+            label={t(
+              "Decay 데이터가 아직 계산되지 않았습니다.",
+              "Decay data has not been computed yet.",
+            )}
+          />
         ) : (
           <Plot
             data={traces as any}

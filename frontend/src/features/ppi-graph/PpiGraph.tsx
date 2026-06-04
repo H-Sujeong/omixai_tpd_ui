@@ -2,6 +2,7 @@ import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import coseBilkent from "cytoscape-cose-bilkent";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PpiEdge, PpiNode } from "@/types/api";
+import { useT } from "@/store/uiLang";
 
 let registered = false;
 function ensureRegistered() {
@@ -77,6 +78,7 @@ export function PpiGraph({
   onClearSelection,
   height,
 }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
   const [filter, setFilter] = useState<FilterMode>("all");
@@ -321,18 +323,18 @@ export function PpiGraph({
     <div className="flex flex-col gap-2 w-full">
       {/* Filter chips + view controls */}
       <div className="flex flex-wrap items-center gap-1.5 text-meta text-ink-muted">
-        <span className="mr-1">필터:</span>
-        <FilterChip mode="all" label="전체" />
-        <FilterChip mode="target" label="타깃" accent="#F59E0B" />
-        <FilterChip mode="pos" label="양성" accent="#185FA5" />
-        <FilterChip mode="neg" label="음성" accent="#7C3AED" />
-        <FilterChip mode="neutral" label="중립" />
+        <span className="mr-1">{t("필터:", "Filter:")}</span>
+        <FilterChip mode="all" label={t("전체", "All")} />
+        <FilterChip mode="target" label={t("타깃", "Target")} accent="#F59E0B" />
+        <FilterChip mode="pos" label={t("양성", "Positive")} accent="#185FA5" />
+        <FilterChip mode="neg" label={t("음성", "Negative")} accent="#7C3AED" />
+        <FilterChip mode="neutral" label={t("중립", "Neutral")} />
         <span className="mx-1 text-line">|</span>
         <button
           type="button"
           onClick={handleFit}
           className="px-2 py-0.5 text-meta border border-line rounded text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
-          title="화면에 맞추기"
+          title={t("화면에 맞추기", "Fit to view")}
         >
           Fit
         </button>
@@ -340,9 +342,9 @@ export function PpiGraph({
           type="button"
           onClick={handleReset}
           className="px-2 py-0.5 text-meta border border-line rounded text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
-          title="단백질 선택 해제 (보기 유지)"
+          title={t("단백질 선택 해제 (보기 유지)", "Clear protein selection (keep view)")}
         >
-          선택 해제
+          {t("선택 해제", "Clear")}
         </button>
       </div>
 
@@ -362,7 +364,7 @@ export function PpiGraph({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-ink-muted">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full" style={{ background: "#F59E0B", border: "2px solid #92400E" }} />
-          주 타깃 (✚)
+          {t("주 타깃 (✚)", "Main target (✚)")}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#EF4444", border: "1.5px solid #DC2626" }} />
@@ -370,17 +372,17 @@ export function PpiGraph({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#185FA5" }} />
-          양성 corr &gt; 0.2
+          {t("양성", "Positive")} corr &gt; 0.2
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#7C3AED" }} />
-          음성 corr &lt; −0.2
+          {t("음성", "Negative")} corr &lt; −0.2
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#9CA3AF" }} />
-          중립
+          {t("중립", "Neutral")}
         </span>
-        <span className="ml-auto opacity-70">노드 크기 = degree</span>
+        <span className="ml-auto opacity-70">{t("노드 크기 = degree", "Node size = degree")}</span>
       </div>
     </div>
   );

@@ -314,10 +314,12 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
         well_cols = list(df_gr.columns)
 
     n_points = len(next(iter(gr_curves.values()))) if gr_curves else 0
-    # Convention: each row = 1 hour step in the source CSV (but unclear; fall back
-    # to evenly spaced 0..28h to match the dashboard mockup). We use 1h step here
-    # since the CSV typically has ~28 rows; the time axis is rendered in hours.
-    gr_t_hours = [float(i) for i in range(n_points)]
+    # The GR CSV rows ARE the drug-effect observation window (already restricted
+    # upstream), spaced gr_step_h hours from gr_window_start_h. So row i = real
+    # clock time start + i*step (e.g. 10h, 10.5h, …) — NOT a 0-based index.
+    s = get_settings()
+    gr_start_h, gr_step_h = s.gr_window_start_h, s.gr_step_h
+    gr_t_hours = [gr_start_h + i * gr_step_h for i in range(n_points)]
 
     df_slope = _read_csv_lenient(fs.slope_csv)
     slope_by_well: dict[str, dict[str, Any]] = {}
@@ -352,7 +354,7 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
         slope = slope_by_well.get(str(well_id_str), {})
         gr_curve = []
         for i, val in enumerate(gr_curves.get(str(well_id_str), [])):
-            gr_curve.append((float(i), float(val) if pd.notna(val) else 0.0))
+            gr_curve.append((gr_start_h + i * gr_step_h, float(val) if pd.notna(val) else 0.0))
         wells[str(well_id_str)] = WellRecord(
             well_id=str(well_id_str),
             well_label=well_label,

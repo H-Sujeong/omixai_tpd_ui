@@ -1,6 +1,7 @@
 import type { InsightFinding, InsightIcon, InsightSummary, KpiSentiment } from "@/types/api";
 import { PanelCard } from "@/components/PanelCard";
 import { EmptyBlock } from "@/components/LoadingBlock";
+import { useT } from "@/store/uiLang";
 
 interface Props {
   data: InsightSummary | null;
@@ -25,12 +26,16 @@ const SENTIMENT_STYLE: Record<KpiSentiment, { dot: string; text: string }> = {
 };
 
 export function InsightSidebar({ data, target, communityId }: Props) {
-  if (!data) return <EmptyBlock label="Insight 데이터 없음" />;
+  const t = useT();
+  if (!data) return <EmptyBlock label={t("Insight 데이터 없음", "No insight data")} />;
   return (
     <aside className="flex flex-col gap-4">
       <PanelCard
         title="Mechanism summary"
-        tooltip="Primary mechanism of action — 모든 모듈에서 공유되는 컨텍스트"
+        tooltip={t(
+          "Primary mechanism of action — 모든 모듈에서 공유되는 컨텍스트",
+          "Primary mechanism of action — context shared across all modules",
+        )}
       >
         <p className="text-body text-ink-primary leading-relaxed">{data.mechanism}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -41,7 +46,7 @@ export function InsightSidebar({ data, target, communityId }: Props) {
 
       <PanelCard title="Key findings">
         {data.key_findings.length === 0 ? (
-          <EmptyBlock label="findings 없음" />
+          <EmptyBlock label={t("findings 없음", "No findings")} />
         ) : (
           <ul className="space-y-3">
             {data.key_findings.map((f, i) => (
@@ -51,9 +56,15 @@ export function InsightSidebar({ data, target, communityId }: Props) {
         )}
       </PanelCard>
 
-      <PanelCard title="Biomarkers" tooltip="Target과 PPI 상관이 높은 community 파트너">
+      <PanelCard
+        title="Biomarkers"
+        tooltip={t(
+          "Target과 PPI 상관이 높은 community 파트너",
+          "Community partners with high PPI correlation to the target",
+        )}
+      >
         {data.biomarkers.length === 0 ? (
-          <EmptyBlock label="biomarkers 없음" />
+          <EmptyBlock label={t("biomarkers 없음", "No biomarkers")} />
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {data.biomarkers.map((b) => (
