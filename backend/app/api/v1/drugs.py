@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...data_loader import get_registry
 from ...domain.dashboard import build_dashboard, interactome_node, switch_community
+from ...ownership import require_owned_plate
 from ...schemas import (
     CommunitySwitchResponse,
     DashboardResponse,
@@ -28,6 +29,7 @@ _FILE_PREFIX = "/api/v1/files"
 def get_dashboard(
     plate_id: str,
     drug_id: str,
+    _owned: str = Depends(require_owned_plate),
     target: str | None = Query(default=None, description="Target gene (default = first)"),
 ) -> DashboardResponse:
     plate = get_registry().get_plate(plate_id)
@@ -47,6 +49,7 @@ def get_community(
     plate_id: str,
     drug_id: str,
     community_id: int,
+    _owned: str = Depends(require_owned_plate),
     target: str | None = Query(default=None),
 ) -> PpiPanel:
     plate = get_registry().get_plate(plate_id)
@@ -71,6 +74,7 @@ def get_community(
 def post_switch_community(
     plate_id: str,
     drug_id: str,
+    _owned: str = Depends(require_owned_plate),
     from_community_id: int = Query(..., description="Current community id"),
     to_community_id: int = Query(..., description="Community to switch to"),
     bridging_node: str = Query(..., description="Node id clicked to trigger the switch"),
@@ -112,6 +116,7 @@ def get_interactome_node(
     plate_id: str,
     drug_id: str,
     node_id: str,
+    _owned: str = Depends(require_owned_plate),
     target: str | None = Query(default=None),
 ) -> InteractomeNodeResponse:
     plate = get_registry().get_plate(plate_id)

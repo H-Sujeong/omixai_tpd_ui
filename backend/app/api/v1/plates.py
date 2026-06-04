@@ -13,7 +13,8 @@ from ...auth import require_user
 from ...config import get_settings
 from ...data_loader import PlateRegistry, get_registry
 from ...db import get_db
-from ...models import Plate, User
+from ...models import User
+from ...ownership import owned_plate_ids
 from ...schemas import DrugSummaryRow, DrugTargetEntry, PlateSummary
 
 router = APIRouter(prefix="/api/v1", tags=["plates"])
@@ -87,10 +88,6 @@ def _resolve_dates(store: dict[str, dict[str, str]], plate_id: str, data_dir: Pa
     if dirty:
         store[plate_id] = {"created_at": created, "updated_at": updated}
     return created, updated, dirty
-
-
-def owned_plate_ids(db: DbSession, user: User) -> set[str]:
-    return {pid for (pid,) in db.query(Plate.plate_id).filter(Plate.owner_id == user.id)}
 
 
 @router.get("/plates", response_model=list[PlateSummary])

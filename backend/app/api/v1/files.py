@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session as DbSession
 
+from ...auth import require_user
 from ...config import get_settings
 from ...data_loader import get_registry
+from ...db import get_db
+from ...models import User
+from ...ownership import owned_plates, require_owned_plate
 
 router = APIRouter(prefix="/api/v1/files", tags=["files"])
 
@@ -24,7 +29,11 @@ def _resolve_safely(base: Path, *parts: str) -> Path:
 
 
 @router.get("/mosaic/{plate_id}/{filename}")
-def get_mosaic(plate_id: str, filename: str) -> FileResponse:
+def get_mosaic(
+    plate_id: str,
+    filename: str,
+    _owned: str = Depends(require_owned_plate),
+) -> FileResponse:
     plate = get_registry().get_plate(plate_id)
     if not plate or not plate.mosaic_dir:
         raise HTTPException(status_code=404, detail=f"plate {plate_id} mosaic not found")
@@ -33,9 +42,14 @@ def get_mosaic(plate_id: str, filename: str) -> FileResponse:
 
 
 @router.get("/drug-asset/{drug_id}/timelapse/{filename}")
-def get_drug_timelapse(drug_id: str, filename: str) -> FileResponse:
-    # Search across plates
-    for plate in get_registry().list_plates():
+def get_drug_timelapse(
+    drug_id: str,
+    filename: str,
+    user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> FileResponse:
+    # Search only the user's owned plates (ownership scope).
+    for plate in owned_plates(db, user):
         drug = plate.drugs.get(drug_id)
         if not drug or not drug.asset_dir:
             continue
@@ -47,8 +61,13 @@ def get_drug_timelapse(drug_id: str, filename: str) -> FileResponse:
 
 
 @router.get("/drug-asset/{drug_id}/{filename}")
-def get_drug_asset(drug_id: str, filename: str) -> FileResponse:
-    for plate in get_registry().list_plates():
+def get_drug_asset(
+    drug_id: str,
+    filename: str,
+    user: User = Depends(require_user),
+    db: DbSession = Depends(get_db),
+) -> FileResponse:
+    for plate in owned_plates(db, user):
         drug = plate.drugs.get(drug_id)
         if not drug or not drug.asset_dir:
             continue
