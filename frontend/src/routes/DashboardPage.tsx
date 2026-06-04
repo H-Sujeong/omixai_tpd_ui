@@ -250,8 +250,8 @@ export function DashboardPage() {
             <PanelCard
               title="Target Landscape"
               tooltip={t(
-                "x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터.",
-                "x=Distance, y=−log10(p), z=avg(PCC). 2D contour by default, 3D toggle available. Click a point → PPI rebuilt. ✚ = target community. PCC slider filters communities above the threshold.",
+                "• 축: x=Distance, y=−log10(p), z=avg(PCC)\n• 2D contour 기본 · 3D 토글 가능\n• 점 = community, ✚ = 타깃 community\n• 점 클릭 → PPI 재구성\n• PCC 슬라이더: 임계값 이상만 표시",
+                "• Axes: x=Distance, y=−log10(p), z=avg(PCC)\n• 2D contour by default · 3D toggle\n• Dots = communities, ✚ = target community\n• Click a dot → rebuild PPI\n• PCC slider: show only above threshold",
               )}
               status={d.status_flags.landscape}
               actions={
@@ -285,8 +285,8 @@ export function DashboardPage() {
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
               tooltip={t(
-                "노드=단백질(크기=연결 수). 색 = 타깃과의 상관(PCC) — 양성(파랑)=타깃과 함께 ↑(activated/상향 조절), 음성(보라)=타깃과 반대로 ↓(suppressed/하향 조절), 중립(회색)=뚜렷한 변화 없음. 엣지=STRING 상호작용(두께=신뢰도, 가까울수록 강함). 노드 클릭=단백질 정보, 엣지 클릭=관련 community 안내. community 전환은 landscape에서.",
-                "Nodes = proteins (size = degree). Color = correlation (PCC) with the target — positive (blue) = moves up with the target (activated / up-regulated), negative (purple) = moves opposite (suppressed / down-regulated), neutral (grey) = no clear change. Edges = STRING interactions (thickness = confidence; closer = stronger). Node click = protein info; edge click = related community. Switch communities from the landscape.",
+                "• 노드 = 단백질 (크기 = 연결 수)\n• 색 = 타깃과의 상관(PCC):\n   · 양성(파랑) = 함께 ↑ 상향(activated)\n   · 음성(보라) = 반대 ↓ 하향(suppressed)\n   · 중립(회색) = 뚜렷한 변화 없음\n• 엣지 = STRING 상호작용 (두께 = 신뢰도)\n• 노드 클릭 = 단백질 정보\n• 엣지 클릭 = 관련 community 안내\n• community 전환은 landscape에서",
+                "• Nodes = proteins (size = degree)\n• Color = correlation (PCC) with target:\n   · Positive (blue) = up with target (activated)\n   · Negative (purple) = opposite ↓ (suppressed)\n   · Neutral (grey) = no clear change\n• Edges = STRING interactions (width = confidence)\n• Node click = protein info\n• Edge click = related community\n• Switch communities from the landscape",
               )}
               accent
               status={d.status_flags.ppi}
@@ -344,8 +344,8 @@ export function DashboardPage() {
             <PanelCard
               title="Pathway Enrichment"
               tooltip={t(
-                "현재 community 단백질들의 GO 기능 농축. 막대=enrichment score(길수록 강함), 색=카테고리(BP/MF/CC), p=유의확률. 이 community가 어떤 생물학적 기능에 모여 있는지 보여줌.",
-                "GO functional enrichment of the current community's proteins. Bar = enrichment score (longer = stronger), color = category (BP/MF/CC), p = significance. Shows which biological functions this community is concentrated in.",
+                "• 현재 community 단백질의 GO 기능 농축\n• 막대 길이 = enrichment score (길수록 강함)\n• 색 = 카테고리 (BP/MF/CC)\n• p = 유의확률\n→ 이 community가 어떤 기능에 모여 있는지",
+                "• GO functional enrichment of this community\n• Bar length = enrichment score (longer = stronger)\n• Color = category (BP/MF/CC)\n• p = significance\n→ which functions this community is concentrated in",
               )}
               actions={
                 d.enrichment?.length ? (
@@ -367,8 +367,8 @@ export function DashboardPage() {
             <PanelCard
               title="Time-lapse Imaging"
               tooltip={t(
-                "약물 처리 후 0–48시간 세포 이미지(0.5h 간격 촬영, 표시 간격 조절 가능). 시간에 따른 세포 수·형태 변화로 표현형 효과를 확인. 스케일바=실제 크기 기준.",
-                "Cell images 0–48 h after treatment (captured every 0.5 h; display interval adjustable). Read cell-count/morphology change over time for the phenotypic effect. Scale bar = real size.",
+                "• 약물 처리 후 0–48h 세포 이미지\n• 0.5h 간격 촬영 (표시 간격 조절 가능)\n• 시간에 따른 세포 수·형태 변화 = 표현형 효과\n• 스케일바 = 실제 크기\n• GIF로 내보내기 가능",
+                "• Cell images 0–48 h after treatment\n• Captured every 0.5 h (display interval adjustable)\n• Cell-count / morphology change over time = effect\n• Scale bar = real size\n• Exportable as GIF",
               )}
               status={d.status_flags.time_lapse}
               meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
@@ -380,8 +380,8 @@ export function DashboardPage() {
             <PanelCard
               title="Phenotypic Profiling"
               tooltip={t(
-                "Growth Rate: GR(t)=DMSO 기준 상대 성장(1=DMSO 수준, 0=정지, <0=사멸; clip −1~1.5). 곡선은 초기·후기 구간을 제외한 약효 관찰창(실제 촬영 시각). Phenome Tracking: vehicle 궤적축에서 벗어난 정도(표현형 이탈).",
-                "Growth Rate: GR(t) = growth relative to DMSO (1 = DMSO rate, 0 = stasis, <0 = death; clipped −1…1.5). The curve spans the drug-effect window (early/late frames excluded, real capture times). Phenome Tracking: deviation from the vehicle trajectory axis.",
+                "Growth Rate — GR(t) = DMSO 대비 성장:\n   · 1 = DMSO 수준 · 0 = 정지 · <0 = 사멸\n   · clip −1~1.5\n   · 곡선 = 약효 관찰창(실제 촬영 시각)\nPhenome Tracking:\n   · vehicle 궤적축에서 벗어난 정도(표현형 이탈)",
+                "Growth Rate — GR(t) = growth vs DMSO:\n   · 1 = DMSO rate · 0 = stasis · <0 = death\n   · clipped −1…1.5\n   · curve = drug-effect window (real capture times)\nPhenome Tracking:\n   · deviation from the vehicle trajectory axis",
               )}
               status={d.status_flags.phenotypic}
               meta={
@@ -777,8 +777,8 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
     <PanelCard
       title="Mechanistic Signatures"
       tooltip={t(
-        "각 항목의 5칸 = 신호 강도(level/5). 이 화합물의 기전 시그니처(국소화 등) 상대 강도를 보여주며, ★는 가장 강한 항목.",
-        "Each row's 5 cells = signature strength (level out of 5) — the relative intensity of this compound's mechanistic signatures (e.g. localization); ★ marks the strongest.",
+        "• 각 항목 5칸 = 신호 강도 (level / 5)\n• 화합물 기전 시그니처(국소화 등) 상대 강도\n• ★ = 가장 강한 항목",
+        "• Each row's 5 cells = strength (level / 5)\n• Relative intensity of mechanistic signatures (e.g. localization)\n• ★ = strongest",
       )}
     >
       <ul className="flex flex-col gap-2">

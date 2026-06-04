@@ -34,7 +34,7 @@ export function PanelCard({
                 </span>
                 <span
                   role="tooltip"
-                  className="pointer-events-none absolute left-0 top-full mt-1.5 z-50 w-72 max-w-[18rem] rounded-md border border-line bg-surface-elevated px-3 py-2 text-meta text-ink-secondary leading-relaxed shadow-lg opacity-0 invisible transition-opacity duration-fast group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible"
+                  className="pointer-events-none absolute left-0 top-full mt-1.5 z-50 w-72 max-w-[19rem] whitespace-pre-wrap rounded-md border border-line bg-surface-elevated px-3 py-2.5 text-meta text-ink-secondary leading-relaxed shadow-lg opacity-0 invisible transition-opacity duration-fast group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible"
                 >
                   {tooltip}
                 </span>

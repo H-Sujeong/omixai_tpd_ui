@@ -33,8 +33,8 @@ export function InsightSidebar({ data, target, communityId }: Props) {
       <PanelCard
         title="Mechanism summary"
         tooltip={t(
-          "Primary mechanism of action — 모든 모듈에서 공유되는 컨텍스트",
-          "Primary mechanism of action — context shared across all modules",
+          "• 주요 작용 기전 (primary MoA)\n• 모든 모듈이 공유하는 컨텍스트",
+          "• Primary mechanism of action\n• Context shared across all modules",
         )}
       >
         <p className="text-body text-ink-primary leading-relaxed">{data.mechanism}</p>
