@@ -4,6 +4,7 @@ import { useDrugSummary, usePlates } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useDrugListFilters, type DrugSortKey as SortKey } from "@/store/drugListFilters";
+import { PlateExportMenu } from "@/features/export/PlateExportMenu";
 import type { DrugSummaryRow } from "@/types/api";
 
 /**
@@ -116,19 +117,27 @@ export function DrugSummaryPage() {
       {/* Page title (T1 display). 2026-06-02: 3-level breadcrumb removed
        * earlier; the back link above now carries the upward affordance
        * and the h1 below shows the plate id at the display scale. */}
-      <header className="mt-2 mb-5">
-        <h1
-          className="text-ink-primary"
-          style={{
-            fontSize:      "var(--font-display-size)",
-            lineHeight:    "var(--font-display-lh)",
-            fontWeight:    "var(--font-display-weight)" as any,
-            letterSpacing: "var(--font-display-tracking)",
-          }}
-        >
-          {plateId}
-        </h1>
-        <PlateMetaRow meta={plateMeta} />
+      <header className="mt-2 mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1
+            className="text-ink-primary"
+            style={{
+              fontSize:      "var(--font-display-size)",
+              lineHeight:    "var(--font-display-lh)",
+              fontWeight:    "var(--font-display-weight)" as any,
+              letterSpacing: "var(--font-display-tracking)",
+            }}
+          >
+            {plateId}
+          </h1>
+          <PlateMetaRow meta={plateMeta} />
+        </div>
+        {plateId && data && (
+          <PlateExportMenu
+            plateId={plateId}
+            drugs={data.filter((d) => d.has_dashboard_assets)}
+          />
+        )}
       </header>
 
       {/* Plate Summary — stacked horizontal bar, replaces the prior 4-tile

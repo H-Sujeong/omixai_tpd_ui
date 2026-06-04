@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import type {
+  DashboardResponse,
   GoTerm,
   LandscapePanel,
   PhenotypicProfiling,
@@ -32,6 +33,8 @@ export interface ExportItem {
   id: string;
   label: string;
   ext: string;
+  /** Bare filename inside a plate/drug/target/ folder, e.g. "ppi.graphml". */
+  file: string;
   available: boolean;
   build: () => string | Promise<Uint8Array>;
 }
@@ -63,29 +66,29 @@ export function exportGroups(ctx: ExportCtx): ExportGroup[] {
     {
       box: "PPI Network",
       items: [
-        { id: "ppi.graphml", label: "GraphML", ext: "graphml", available: !!ppi, build: () => toGraphML(ppi!) },
-        { id: "ppi.edges", label: "Edge CSV", ext: "edges.csv", available: !!ppi, build: () => toEdgeCsv(ppi!) },
-        { id: "ppi.nodes", label: "Node CSV", ext: "nodes.csv", available: !!ppi, build: () => toNodeCsv(ppi!) },
-        { id: "ppi.genes", label: "Gene list", ext: "genes.txt", available: !!ppi, build: () => toGeneList(ppi!) },
-        { id: "ppi.json", label: "JSON", ext: "json", available: !!ppi, build: () => toJson(ppi!) },
+        { id: "ppi.graphml", label: "GraphML", ext: "graphml", file: "ppi.graphml", available: !!ppi, build: () => toGraphML(ppi!) },
+        { id: "ppi.edges", label: "Edge CSV", ext: "edges.csv", file: "ppi.edges.csv", available: !!ppi, build: () => toEdgeCsv(ppi!) },
+        { id: "ppi.nodes", label: "Node CSV", ext: "nodes.csv", file: "ppi.nodes.csv", available: !!ppi, build: () => toNodeCsv(ppi!) },
+        { id: "ppi.genes", label: "Gene list", ext: "genes.txt", file: "ppi.genes.txt", available: !!ppi, build: () => toGeneList(ppi!) },
+        { id: "ppi.json", label: "JSON", ext: "json", file: "ppi.json", available: !!ppi, build: () => toJson(ppi!) },
       ],
     },
     {
       box: "Landscape",
       items: [
-        { id: "landscape.csv", label: "CSV", ext: "landscape.csv", available: !!landscape, build: () => buildLandscapeCsv(landscape!, meta) },
+        { id: "landscape.csv", label: "CSV", ext: "landscape.csv", file: "landscape.csv", available: !!landscape, build: () => buildLandscapeCsv(landscape!, meta) },
       ],
     },
     {
       box: "Enrichment",
       items: [
-        { id: "enrichment.csv", label: "CSV", ext: "enrichment.csv", available: enrichment.length > 0, build: () => buildEnrichmentCsv(enrichment, meta) },
+        { id: "enrichment.csv", label: "CSV", ext: "enrichment.csv", file: "enrichment.csv", available: enrichment.length > 0, build: () => buildEnrichmentCsv(enrichment, meta) },
       ],
     },
     {
       box: "Profiling",
       items: [
-        { id: "profiling.csv", label: "CSV", ext: "profiling.csv", available: !!phenotypic, build: () => buildProfilingCsv(phenotypic!, meta) },
+        { id: "profiling.csv", label: "CSV", ext: "profiling.csv", file: "profiling.csv", available: !!phenotypic, build: () => buildProfilingCsv(phenotypic!, meta) },
       ],
     },
     {
@@ -95,6 +98,7 @@ export function exportGroups(ctx: ExportCtx): ExportGroup[] {
           id: "timelapse.gif",
           label: "GIF",
           ext: "gif",
+          file: "timelapse.gif",
           available: !!timeLapse && timeLapse.frames.length > 0,
           build: () =>
             buildTimeLapseGif(subsample(timeLapse!.frames, 2), {
@@ -119,6 +123,20 @@ export async function buildBulkZip(selected: Set<string>, ctx: ExportCtx): Promi
     }
   }
   return zip.generateAsync({ type: "blob" });
+}
+
+/** Build an ExportCtx from a fetched dashboard response (for plate-level export). */
+export function ctxFromDashboard(r: DashboardResponse): ExportCtx {
+  return {
+    ppi: r.ppi,
+    landscape: r.landscape,
+    enrichment: r.enrichment,
+    phenotypic: r.phenotypic,
+    timeLapse: r.time_lapse,
+    drugName: r.drug_name,
+    meta: { plate: r.plate_id, drug: r.drug_name, drugId: r.drug_id, target: r.target_id },
+    base: `${r.drug_id}_${r.target_id}`.replace(/[^A-Za-z0-9._-]+/g, "_"),
+  };
 }
 
 export function downloadBlob(filename: string, blob: Blob): void {
