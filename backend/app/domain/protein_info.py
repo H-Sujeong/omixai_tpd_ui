@@ -10,11 +10,18 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 import httpx
+
+_HANGUL = re.compile(r"[가-힣]")
+
+
+def _has_hangul(text: str) -> bool:
+    return bool(_HANGUL.search(text))
 
 from ..config import get_settings
 
@@ -178,12 +185,12 @@ def _anglicize_terms(text: str) -> str:
     return text
 
 
-def _run_ollama(prompt: str) -> str:
-    """Run the local Ollama model and return the raw response text ("" on error)."""
+def _run_ollama(prompt: str, model: str) -> str:
+    """Run the given local Ollama model and return the raw response text."""
     s = get_settings()
     r = httpx.post(
         f"{s.ollama_url}/api/generate",
-        json={"model": s.ollama_model, "prompt": prompt, "stream": False,
+        json={"model": model, "prompt": prompt, "stream": False,
               "keep_alive": "30m", "options": {"temperature": 0.2}},
         timeout=120.0,
     )
@@ -221,33 +228,51 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
         f"영문 설명:\n{function_text}"
     )
     try:
-        return _to_bullets(_run_ollama(prompt), anglicize=True)
+        return _to_bullets(_run_ollama(prompt, get_settings().ollama_model), anglicize=True)
     except Exception as exc:                                      # noqa: BLE001
         log.info("Ollama summary (ko) unavailable for %s: %s", gene, exc)
         return []
 
 
+def _extractive_en_bullets(function_text: str) -> list[str]:
+    """Deterministic English fallback: split the UniProt function prose into
+    sentence bullets. Guaranteed English, instant — used when the English LLM is
+    unavailable or (defensively) emits non-English text."""
+    sents = re.split(r"(?<=[.;])\s+", (function_text or "").strip())
+    out: list[str] = []
+    for s in sents:
+        s = s.strip().rstrip(".").strip()
+        if len(s) > 3:
+            out.append(s)
+    return out[:5]
+
+
 def _summarize_en(gene: str, protein_name: str | None, function_text: str) -> list[str]:
-    """Summarize the English UniProt function into concise English bullets via the
-    local model (NOT a translation of the Korean summary). Returns [] on failure
-    (panel then falls back to the raw English UniProt function paragraph)."""
+    """Summarize the English UniProt function into concise English bullets using
+    the English-strong model (Qwen). NOT a translation of the Korean summary. If
+    the model is unavailable or (defensively) returns Korean, fall back to a
+    deterministic extractive English summary so the panel is never Korean."""
     prompt = (
-        f"The following is the function description of the human protein {gene}"
+        "You are a scientific assistant. Respond in English only — never use Korean.\n"
+        f"Summarize the function of the human protein {gene}"
         + (f" ({protein_name})" if protein_name else "")
-        + ". Summarize it into 3-5 concise English bullet points for a researcher.\n"
+        + " into 3-5 concise English bullet points for a researcher.\n"
         "Rules:\n"
+        "- Write in English only.\n"
         "- Each line starts with '- '.\n"
         "- Keep gene, protein, domain, and complex names as written.\n"
-        "- Keep biochemistry/molecular-biology terms (e.g. ubiquitination, "
-        "degradation, transcription, phosphorylation, chromatin) as-is.\n"
         "- Output only the bullet lines (no preamble or closing remarks).\n\n"
-        f"Description:\n{function_text}"
+        f"Function description:\n{function_text}"
     )
     try:
-        return _to_bullets(_run_ollama(prompt), anglicize=False)
+        bullets = _to_bullets(_run_ollama(prompt, get_settings().ollama_model_en), anglicize=False)
     except Exception as exc:                                      # noqa: BLE001
         log.info("Ollama summary (en) unavailable for %s: %s", gene, exc)
-        return []
+        bullets = []
+    # Guard: empty, or the model ignored "English only" → deterministic fallback.
+    if not bullets or any(_has_hangul(b) for b in bullets):
+        bullets = _extractive_en_bullets(function_text)
+    return bullets
 
 
 def _summarize(gene: str, protein_name: str | None, function_text: str, lang: str) -> list[str]:
@@ -270,7 +295,10 @@ def _ensure_summary(info: dict[str, Any], key: str, cache: dict[str, Any], lang:
     info.setdefault("summary", [])
     info.setdefault("summary_en", [])
     field = _summary_field(lang)
-    if not info[field]:
+    existing = info[field]
+    # Regenerate if missing, or (english) if a previous run cached Korean bullets.
+    stale = not existing or (lang == "en" and any(_has_hangul(b) for b in existing))
+    if stale:
         bullets = _summarize(info.get("gene", key), info.get("protein_name"), info["function"], lang)
         if bullets:
             info[field] = bullets
