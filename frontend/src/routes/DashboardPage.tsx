@@ -14,6 +14,7 @@ import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
 import { CsvExportButton } from "@/features/export/CsvExportButton";
 import { buildEnrichmentCsv, buildLandscapeCsv, buildProfilingCsv } from "@/features/export/tableExports";
+import { DashboardExportMenu } from "@/features/export/DashboardExportMenu";
 import { KpiStrip } from "@/features/kpi/KpiStrip";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
@@ -216,6 +217,7 @@ export function DashboardPage() {
         d={d}
         plateId={plateId}
         target={activeTarget}
+        activePpi={activePpi}
         onTargetChange={(t) => {
           setTarget(t);
           setSelectedCommunity(null);
@@ -459,15 +461,29 @@ function DashboardHeader({
   d,
   plateId,
   target,
+  activePpi,
   onTargetChange,
 }: {
   d: DashboardResponse;
   plateId: string | undefined;
   target: string;
+  activePpi: PpiPanel | null;
   onTargetChange: (t: string) => void;
 }) {
   const c = d.compound;
   const activeSection = useActiveSection(SECTION_NAV.map((s) => s.id));
+
+  const exportCtx = {
+    ppi: activePpi,
+    landscape: d.landscape,
+    enrichment: d.enrichment,
+    phenotypic: d.phenotypic,
+    timeLapse: d.time_lapse,
+    drugName: d.drug_name,
+    meta: { plate: d.plate_id, drug: d.drug_name, drugId: d.drug_id, target },
+    base: `${d.drug_id}_${target}`.replace(/[^A-Za-z0-9._-]+/g, "_"),
+  };
+  const zipBase = `${d.plate_id}_${d.drug_name}_${target}`;
 
   const conditions = [
     c.dose_um != null ? `${c.dose_um} µM` : null,
@@ -491,9 +507,12 @@ function DashboardHeader({
           <span aria-hidden>←</span>
           <span>Back to Plate {plateId}</span>
         </Link>
-        <span className="text-meta text-ink-muted tabular shrink-0">
-          v{d.provenance.pipeline_version}
-        </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <DashboardExportMenu ctx={exportCtx} zipBase={zipBase} />
+          <span className="text-meta text-ink-muted tabular">
+            v{d.provenance.pipeline_version}
+          </span>
+        </div>
       </div>
 
       {/* Identity body — single column (no right cluster). Each role
