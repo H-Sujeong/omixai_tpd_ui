@@ -173,112 +173,26 @@ export function Landscape({
     return [lo, inMax + pad];
   }, [landscape.scatter]);
 
-  // Smooth terrain for the 3D surface. The precomputed grid doesn't track the
-  // communities and a raw Delaunay mesh through them is jagged (spikes where
-  // neighbouring communities differ), so kernel-smooth (Gaussian-weighted mean)
-  // the real community avg(PCC) onto a regular grid: peaks/valleys follow the
-  // data but local triangle spikes are damped. Cells far from any community are
-  // left null so the surface doesn't bleed into empty space. Real data only —
-  // just a smoothed read of the points, no fabricated values.
-  const smoothGrid = useMemo(() => {
-    const pts = landscape.scatter.filter(
-      (p) =>
-        Number.isFinite(p.x) &&
-        Number.isFinite(p.y) &&
-        Number.isFinite(p.z) &&
-        (!yClip || p.y <= yClip[1]),
-    );
-    if (pts.length < 3) return null;
-    const xs = pts.map((p) => p.x);
-    const ys = pts.map((p) => p.y);
-    const zs = pts.map((p) => p.z);
-    const xMin = Math.min(...xs), xMax = Math.max(...xs);
-    const yMin = Math.min(...ys), yMax = Math.max(...ys);
-    const xSpan = xMax - xMin || 1, ySpan = yMax - yMin || 1;
-    const N = 56;
-    const h = 0.09;          // smoothing bandwidth (normalized axis units);
-                             // ≈ point spacing → keeps peaks, not a bald dome
-    const h2 = h * h;
-    const maxD = 0.16;       // mask cells whose nearest community is farther
-    const xg: number[] = [];
-    const yg: number[] = [];
-    for (let i = 0; i < N; i++) {
-      xg.push(xMin + (xSpan * i) / (N - 1));
-      yg.push(yMin + (ySpan * i) / (N - 1));
-    }
-    const zg: (number | null)[][] = [];
-    for (let r = 0; r < N; r++) {
-      const yn = (yg[r] - yMin) / ySpan;
-      const row: (number | null)[] = [];
-      for (let c = 0; c < N; c++) {
-        const xn = (xg[c] - xMin) / xSpan;
-        let wsum = 0, zsum = 0, dmin = Infinity;
-        for (let k = 0; k < pts.length; k++) {
-          const dx = (xs[k] - xMin) / xSpan - xn;
-          const dy = (ys[k] - yMin) / ySpan - yn;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < dmin) dmin = d2;
-          const w = Math.exp(-d2 / h2);
-          wsum += w;
-          zsum += w * zs[k];
-        }
-        row.push(Math.sqrt(dmin) > maxD || wsum === 0 ? null : zsum / wsum);
-      }
-      zg.push(row);
-    }
-    return { xg, yg, zg };
-  }, [landscape.scatter, yClip]);
-
   const traces: any[] = mode === "2d" ? build2D() : build3D();
 
   function build2D(): any[] {
     const t: any[] = [];
-    const g = landscape.grid;
 
-    // 1. Filled smooth contour (heatmap-like)
-    if (g) {
-      t.push({
-        type: "contour",
-        x: g.xi,
-        y: g.yi,
-        // 2D contour can't interpolate a mostly-null grid (it renders blank), so
-        // keep the full grid here; the 0-fill plane is only an issue in 3D.
-        z: g.z,
-        colorscale: COLORSCALE_2D,
-        zmin: -0.5,
-        zmax: 0.5,
-        contours: {
-          coloring: "heatmap",
-          showlabels: false,
-          start: -0.5,
-          end: 0.5,
-          size: 0.001,
-        },
-        line: { width: 0, smoothing: 1.5 },
-        ncontours: 200,
-        colorbar: {
-          title: { text: "avg(PCC)", side: "right" },
-          len: 0.85,
-          thickness: 14,
-          tickvals: [-0.4, -0.2, 0, 0.2, 0.4],
-          tickfont: { size: 10 },
-        },
-        hovertemplate: "x=%{x:.2f}  y=%{y:.2f}<br>PCC=%{z:.3f}<extra></extra>",
-      });
+    // 1. y = 1 reference line (significance cutoff for -log10(p))
+    t.push({
+      type: "scatter",
+      mode: "lines",
+      x: [distMin, distMax],
+      y: [1, 1],
+      line: { color: REF_LINE_COLOR, width: 1.5, dash: "dash" },
+      hoverinfo: "none",
+      showlegend: false,
+    });
 
-      // 2. y = 1 reference line (significance cutoff for -log10(p))
-      t.push({
-        type: "scatter",
-        mode: "lines",
-        x: [g.xi[0], g.xi[g.xi.length - 1]],
-        y: [1, 1],
-        line: { color: REF_LINE_COLOR, width: 1.5, dash: "dash" },
-        hoverinfo: "none",
-        showlegend: false,
-      });
-    }
-
-    // 3. Other community scatter — grey circles
+    // 2. Communities as value-colored points (avg(PCC), normalized to the data
+    //    range with 0 = neutral). No surface/contour — a continuous surface over
+    //    these few scattered communities only ever looked spiky or smeared, so
+    //    each community reads clearly as its own colored point.
     if (scOther.length > 0) {
       t.push({
         type: "scatter",
@@ -287,13 +201,24 @@ export function Landscape({
         y: scOther.map((p) => p.y),
         customdata: scOther.map((p) => p.community_id),
         marker: {
-          size: 9,
+          size: 13,
           symbol: "circle",
-          color: COLOR_OTHER_FILL,
-          line: { width: 1.5, color: COLOR_OTHER_EDGE },
+          color: scOther.map((p) => p.z),
+          colorscale: COLORSCALE_2D,
+          cmin: rangeMin,
+          cmax: rangeMax,
+          cmid: 0,
+          showscale: true,
+          colorbar: {
+            title: { text: "avg(PCC)", side: "right" },
+            len: 0.85,
+            thickness: 14,
+            tickfont: { size: 10 },
+          },
+          line: { width: 1, color: "rgba(30,30,30,0.55)" },
         },
         hovertemplate:
-          "<b>community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
+          "<b>community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<br>PCC=%{marker.color:.3f}<extra></extra>",
         showlegend: false,
       });
     }
@@ -350,45 +275,45 @@ export function Landscape({
 
   function build3D(): any[] {
     const t: any[] = [];
-    const g = landscape.grid;
 
-    // Terrain = a kernel-smoothed surface over the REAL community points (see
-    // smoothGrid). The precomputed grid doesn't track the communities, and a raw
-    // Delaunay mesh through them is jagged; this follows the data trend smoothly.
-    if (smoothGrid) {
-      t.push({
-        type: "surface",
-        x: smoothGrid.xg,
-        y: smoothGrid.yg,
-        z: smoothGrid.zg,
-        connectgaps: false,
-        colorscale: COLORSCALE_3D_JET,
-        cmin: rangeMin,
-        cmax: rangeMax,
-        cauto: false,
-        opacity: 0.9,
-        contours: { x: { show: false }, y: { show: false }, z: { show: false } },
-        colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 14 },
-        hoverinfo: "none",
-      });
-    }
-    if (g) {
-      // y=1 reference line in 3D (along x at y=1, z=0)
-      const xMin = g.xi[0];
-      const xMax = g.xi[g.xi.length - 1];
-      const xL: number[] = [];
-      for (let i = 0; i < 50; i++) xL.push(xMin + (i * (xMax - xMin)) / 49);
+    // No continuous surface — over these few scattered communities it only ever
+    // looked spiky or smeared. Instead: value-colored points at height =
+    // avg(PCC) with drop-stems to z=0, which gives a landscape/elevation feel
+    // while every community stays distinct.
+    const pts3d = [...scOther, ...scTarget];
+    if (pts3d.length > 0) {
+      const sx: (number | null)[] = [];
+      const sy: (number | null)[] = [];
+      const sz: (number | null)[] = [];
+      for (const p of pts3d) {
+        sx.push(p.x, p.x, null);
+        sy.push(p.y, p.y, null);
+        sz.push(0, p.z, null);
+      }
       t.push({
         type: "scatter3d",
         mode: "lines",
-        x: xL,
-        y: xL.map(() => 1),
-        z: xL.map(() => 0),
-        line: { color: REF_LINE_COLOR, width: 3, dash: "dash" },
-        showlegend: false,
+        x: sx,
+        y: sy,
+        z: sz,
+        line: { color: "rgba(140,150,170,0.45)", width: 1 },
         hoverinfo: "none",
+        showlegend: false,
       });
     }
+
+    // y=1 reference line in 3D (significance cutoff), at z=0
+    t.push({
+      type: "scatter3d",
+      mode: "lines",
+      x: [distMin, distMax],
+      y: [1, 1],
+      z: [0, 0],
+      line: { color: REF_LINE_COLOR, width: 3, dash: "dash" },
+      showlegend: false,
+      hoverinfo: "none",
+    });
+
     if (scOther.length > 0) {
       t.push({
         type: "scatter3d",
@@ -398,12 +323,18 @@ export function Landscape({
         z: scOther.map((p) => p.z),
         customdata: scOther.map((p) => p.community_id),
         marker: {
-          size: 4,
-          color: "rgba(30,30,30,0.85)",
-          line: { width: 1, color: "rgba(255,255,255,0.9)" },
+          size: 5,
+          color: scOther.map((p) => p.z),
+          colorscale: COLORSCALE_3D_JET,
+          cmin: rangeMin,
+          cmax: rangeMax,
+          cmid: 0,
+          showscale: true,
+          colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 14 },
+          line: { width: 0.5, color: "rgba(255,255,255,0.7)" },
         },
         hovertemplate:
-          "community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
+          "community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<br>PCC=%{marker.color:.3f}<extra></extra>",
         showlegend: false,
       });
     }
