@@ -285,8 +285,8 @@ export function DashboardPage() {
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
               tooltip={t(
-                "노드 클릭 = 단백질 정보 확인(community 전환 없음). 엣지 클릭 = 엣지 강조 + 관련 community 안내(전환하지 않음). community 전환은 landscape에서.",
-                "Node click = inspect protein info (no community switch). Edge click = highlight edge + show related community (no switch). Switch communities from the landscape.",
+                "노드=단백질(크기=연결 수, 색=타깃과의 상관 양/음), 엣지=STRING 상호작용(두께=신뢰도, 가까울수록 강한 상호작용). 노드 클릭=단백질 정보, 엣지 클릭=관련 community 안내(전환 X). community 전환은 landscape에서.",
+                "Nodes = proteins (size = degree, color = correlation sign with the target); edges = STRING interactions (thickness = confidence; closer = stronger). Node click = protein info; edge click = related community (no switch). Switch communities from the landscape.",
               )}
               accent
               status={d.status_flags.ppi}
@@ -344,8 +344,8 @@ export function DashboardPage() {
             <PanelCard
               title="Pathway Enrichment"
               tooltip={t(
-                "현재 community의 GO BP/MF/CC enrichment score 상위 항목",
-                "Top GO BP/MF/CC enrichment scores for the current community",
+                "현재 community 단백질들의 GO 기능 농축. 막대=enrichment score(길수록 강함), 색=카테고리(BP/MF/CC), p=유의확률. 이 community가 어떤 생물학적 기능에 모여 있는지 보여줌.",
+                "GO functional enrichment of the current community's proteins. Bar = enrichment score (longer = stronger), color = category (BP/MF/CC), p = significance. Shows which biological functions this community is concentrated in.",
               )}
               actions={
                 d.enrichment?.length ? (
@@ -366,7 +366,10 @@ export function DashboardPage() {
           >
             <PanelCard
               title="Time-lapse Imaging"
-              tooltip="0–48 h timelapse (4 h cadence)"
+              tooltip={t(
+                "약물 처리 후 0–48시간 세포 이미지(0.5h 간격 촬영, 표시 간격 조절 가능). 시간에 따른 세포 수·형태 변화로 표현형 효과를 확인. 스케일바=실제 크기 기준.",
+                "Cell images 0–48 h after treatment (captured every 0.5 h; display interval adjustable). Read cell-count/morphology change over time for the phenotypic effect. Scale bar = real size.",
+              )}
               status={d.status_flags.time_lapse}
               meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
               actions={<CellLineInline cell={d.cell_line} />}
@@ -376,7 +379,10 @@ export function DashboardPage() {
 
             <PanelCard
               title="Phenotypic Profiling"
-              tooltip="Growth Rate + Phenome Tracking"
+              tooltip={t(
+                "Growth Rate: 약물군 GR(t)을 DMSO 대비 성장 속도로(1=정상, <1=성장 둔화/세포독성), 곡선은 약효 관찰창 10–23.5h. Phenome Tracking: vehicle 궤적축에서 벗어난 정도(표현형 이탈).",
+                "Growth Rate: GR(t) of the drug vs DMSO (1 = normal, <1 = slowed / cytotoxic); the curve spans the 10–23.5 h drug-effect window. Phenome Tracking: deviation from the vehicle trajectory axis (phenotypic divergence).",
+              )}
               status={d.status_flags.phenotypic}
               meta={
                 d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
@@ -754,6 +760,7 @@ function ExecutiveSummary({ d }: { d: DashboardResponse }) {
  *     the per-cell intensity ramp already communicates the same scale)
  */
 function MechanisticSignatures({ d }: { d: DashboardResponse }) {
+  const t = useT();
   if (d.localization_annotations.length === 0) return null;
   // Top signature = the entry with the highest level. Marked with a ★
   // so the dominant interpretive layer is immediately scannable
@@ -767,7 +774,13 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
   );
 
   return (
-    <PanelCard title="Mechanistic Signatures">
+    <PanelCard
+      title="Mechanistic Signatures"
+      tooltip={t(
+        "각 항목의 5칸 = 신호 강도(level/5). 이 화합물의 기전 시그니처(국소화 등) 상대 강도를 보여주며, ★는 가장 강한 항목.",
+        "Each row's 5 cells = signature strength (level out of 5) — the relative intensity of this compound's mechanistic signatures (e.g. localization); ★ marks the strongest.",
+      )}
+    >
       <ul className="flex flex-col gap-2">
         {d.localization_annotations.map((l, idx) => {
           const clamped = Math.max(0, Math.min(5, l.level));
