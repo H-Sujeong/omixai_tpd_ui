@@ -105,6 +105,7 @@ class PhenotypicProfiling(BaseModel):
     gr_curve_dmso: list[GrCurvePoint] = []
     gr_score: float | None = None
     growth_class: str | None = None
+    gr_window: list[float] | None = None   # [start_h, end_h] used for gr_score
     phenome_drug: list[PhenomeTrackingPoint]
     phenome_dmso: list[PhenomeTrackingPoint] = []
 

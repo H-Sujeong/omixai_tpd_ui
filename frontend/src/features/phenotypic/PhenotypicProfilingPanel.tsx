@@ -57,12 +57,48 @@ export function PhenotypicProfilingPanel({ data }: Props) {
             ...sharedLayout,
             xaxis: { title: { text: "Time (hr)" }, zeroline: false },
             yaxis: { title: { text: "GR(t)" }, zeroline: false, range: [-0.5, 1.5] },
+            // Shade the drug-effect window the GR score is computed over, so the
+            // score is clearly tied to this sub-window — not the whole curve.
+            shapes: data.gr_window
+              ? [
+                  {
+                    type: "rect" as const,
+                    xref: "x" as const,
+                    yref: "paper" as const,
+                    x0: data.gr_window[0],
+                    x1: data.gr_window[1],
+                    y0: 0,
+                    y1: 1,
+                    fillcolor: "rgba(168,113,255,0.12)",
+                    line: { width: 0 },
+                    layer: "below" as const,
+                  },
+                ]
+              : [],
+            annotations: data.gr_window
+              ? [
+                  {
+                    x: (data.gr_window[0] + data.gr_window[1]) / 2,
+                    y: 1,
+                    xref: "x" as const,
+                    yref: "paper" as const,
+                    yanchor: "bottom" as const,
+                    showarrow: false,
+                    text: `약효 확인 ${data.gr_window[0]}–${data.gr_window[1]}h`,
+                    font: { size: 9, color: "#A871FF" },
+                  },
+                ]
+              : [],
           }}
           config={{ displayModeBar: false, responsive: true }}
           style={{ width: "100%" }}
         />
         <div className="mt-1 text-caption text-ink-secondary">
-          <span className="font-semibold">GR score</span>:{" "}
+          <span className="font-semibold">GR score</span>
+          {data.gr_window && (
+            <span className="text-ink-muted"> ({data.gr_window[0]}–{data.gr_window[1]}h)</span>
+          )}
+          :{" "}
           <span className="tabular">{data.gr_score !== null ? data.gr_score.toFixed(4) : "—"}</span>
           {data.growth_class && <span className="ml-3 chip">{data.growth_class}</span>}
         </div>

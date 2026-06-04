@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # to 1024 px → 3×1292 / 1024 ≈ 3.785 µm/pixel. Adjust if the stitch layout
     # or export size changes.
     um_per_pixel: float = 3.785
+    # Drug-effect observation window (hours) — the GR slope / gr_score is
+    # computed over this sub-window, NOT the full time course. A hyperparameter.
+    gr_window_start_h: float = 10.0
+    gr_window_end_h: float = 23.0
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

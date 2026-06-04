@@ -332,11 +332,13 @@ def _build_phenotypic(plate: PlateRecord, drug: DrugRecord) -> PhenotypicProfili
         [v for _, v in well.gr_curve],
         plate.gr_dmso,
     )
+    s = get_settings()
     return PhenotypicProfiling(
         gr_curve=gr_drug,
         gr_curve_dmso=gr_dmso,
         gr_score=well.gr_score,
         growth_class=_classify_growth(well),
+        gr_window=[s.gr_window_start_h, s.gr_window_end_h],
         phenome_drug=[PhenomeTrackingPoint(t_step=p["t_step"], deviation=p["deviation"]) for p in track_drug],
         phenome_dmso=[PhenomeTrackingPoint(t_step=i, deviation=0.0) for i in range(len(track_drug))],
     )

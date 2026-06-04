@@ -72,6 +72,7 @@ export interface PhenotypicProfiling {
   gr_curve_dmso: GrCurvePoint[];
   gr_score: number | null;
   growth_class: string | null;
+  gr_window: [number, number] | null;
   phenome_drug: PhenomeTrackingPoint[];
   phenome_dmso: PhenomeTrackingPoint[];
 }
