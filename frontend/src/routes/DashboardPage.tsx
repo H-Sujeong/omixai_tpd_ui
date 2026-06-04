@@ -12,6 +12,8 @@ import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
 import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel";
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
+import { CsvExportButton } from "@/features/export/CsvExportButton";
+import { buildEnrichmentCsv, buildLandscapeCsv, buildProfilingCsv } from "@/features/export/tableExports";
 import { KpiStrip } from "@/features/kpi/KpiStrip";
 import type { DashboardResponse, PpiPanel } from "@/types/api";
 
@@ -205,6 +207,8 @@ export function DashboardPage() {
   if (!dash.data) return <EmptyBlock />;
   const d = dash.data;
   const activeTarget = target ?? d.target_id;
+  const exportMeta = { plate: d.plate_id, drug: d.drug_name, drugId: d.drug_id, target: activeTarget };
+  const exportBase = `${d.drug_id}_${activeTarget}`.replace(/[^A-Za-z0-9._-]+/g, "_");
 
   return (
     <div className="flex-1 flex flex-col">
@@ -253,6 +257,14 @@ export function DashboardPage() {
               title="Target Landscape"
               tooltip="x=Distance, y=−log10(p), z=avg(PCC). 2D contour 기본, 3D 토글 가능. 점 클릭 → PPI 재구성. ✚ = target community. PCC 슬라이더로 임계값 이상 community만 필터."
               status={d.status_flags.landscape}
+              actions={
+                d.landscape ? (
+                  <CsvExportButton
+                    filename={`${exportBase}_landscape.csv`}
+                    build={() => buildLandscapeCsv(d.landscape!, exportMeta)}
+                  />
+                ) : undefined
+              }
             >
               {d.landscape ? (
                 <Landscape
@@ -329,6 +341,14 @@ export function DashboardPage() {
             <PanelCard
               title="Pathway Enrichment"
               tooltip="현재 community의 GO BP/MF/CC enrichment score 상위 항목"
+              actions={
+                d.enrichment?.length ? (
+                  <CsvExportButton
+                    filename={`${exportBase}_enrichment.csv`}
+                    build={() => buildEnrichmentCsv(d.enrichment, exportMeta)}
+                  />
+                ) : undefined
+              }
             >
               <EnrichmentBar terms={d.enrichment} />
             </PanelCard>
@@ -356,6 +376,14 @@ export function DashboardPage() {
                 d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
                   ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
                   : undefined
+              }
+              actions={
+                d.phenotypic ? (
+                  <CsvExportButton
+                    filename={`${exportBase}_profiling.csv`}
+                    build={() => buildProfilingCsv(d.phenotypic!, exportMeta)}
+                  />
+                ) : undefined
               }
             >
               <PhenotypicProfilingPanel data={d.phenotypic} />
