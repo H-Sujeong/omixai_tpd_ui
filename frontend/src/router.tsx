@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
+import { RequireAuth } from "@/components/RequireAuth";
+import { LoginPage } from "@/routes/LoginPage";
 import { PlateListPage } from "@/routes/PlateListPage";
 import { DrugSummaryPage } from "@/routes/DrugSummaryPage";
 import { DashboardPage } from "@/routes/DashboardPage";
@@ -7,12 +9,15 @@ import { GuidePage } from "@/routes/GuidePage";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 
 export const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
   {
     path: "/",
     element: (
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      <RequireAuth>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      </RequireAuth>
     ),
     children: [
       { index: true, element: <Navigate to="/plates" replace /> },

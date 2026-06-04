@@ -1,6 +1,29 @@
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LangToggle } from "@/components/LangToggle";
+import { useMe, useLogout } from "@/api/auth";
+import { useT } from "@/store/uiLang";
+
+const SignOutButton = () => {
+  const t = useT();
+  const { data: me } = useMe();
+  const logout = useLogout();
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      title={`${me?.email ?? ""} · ${t("로그아웃", "Sign out")}`}
+      aria-label={t("로그아웃", "Sign out")}
+      onClick={() => logout.mutate(undefined, { onSuccess: () => navigate("/login", { replace: true }) })}
+      className="sidebar-item__icon text-ink-muted hover:text-status-error transition-colors"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="M15 17v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" strokeLinecap="round" />
+        <path d="M10 12h10m0 0-3-3m3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+};
 
 /**
  * Global icon-rail sidebar (~64px). Carries only the brand, the
@@ -117,6 +140,7 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
       <div className="sidebar-footer mt-auto flex flex-col items-center gap-1">
         <LangToggle />
         <ThemeToggle />
+        <SignOutButton />
       </div>
     </aside>
   );
