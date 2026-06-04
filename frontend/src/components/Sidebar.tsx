@@ -45,9 +45,26 @@ const PlatesIcon = () => (
   </svg>
 );
 
+const GuideIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
+    <path d="M12 11.2v5" strokeLinecap="round" />
+  </svg>
+);
+
 export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
   const location = useLocation();
   const onPlatesIndex = location.pathname === "/plates";
+  const onGuide = location.pathname === "/guide";
 
   return (
     <aside
@@ -82,6 +99,17 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         >
           <span className="sidebar-item__icon">
             <PlatesIcon />
+          </span>
+        </Link>
+        <Link
+          to="/guide"
+          className={`sidebar-item ${onGuide ? "sidebar-item--active" : ""}`}
+          onClick={onCloseMobile}
+          title="Guide"
+          aria-label="Guide"
+        >
+          <span className="sidebar-item__icon">
+            <GuideIcon />
           </span>
         </Link>
       </nav>
