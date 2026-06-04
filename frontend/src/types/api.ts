@@ -95,7 +95,7 @@ export interface ProteinInfo {
 export interface TimeLapseFrame { t_hours: number; image_url: string; n_cells?: number | null; }
 export interface TimeLapseViewer {
   frames: TimeLapseFrame[];
-  scale_bar_um: number | null;
+  um_per_pixel: number | null;
   well_id: string | null;
   n_cells_t0: number | null;
 }

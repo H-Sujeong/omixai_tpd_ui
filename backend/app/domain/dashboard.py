@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..config import get_settings
 from ..data_loader import DrugRecord, PlateRecord
 from ..schemas import (
     CellLine,
@@ -686,7 +687,7 @@ def build_dashboard(
 
     time_lapse = TimeLapseViewer(
         frames=frames,
-        scale_bar_um=10.0,
+        um_per_pixel=get_settings().um_per_pixel,
         well_id=well_id,
         n_cells_t0=n_cells_t0,
     )

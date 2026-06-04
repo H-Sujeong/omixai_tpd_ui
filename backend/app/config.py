@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # protein panel falls back to the English UniProt text.
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "exaone3.5:7.8b"
+    # Time-lapse image scale. Operetta CLS 10x: one field = 1292 µm across
+    # (2160 px native). Images are served as a 3×3 stitched montage downscaled
+    # to 1024 px → 3×1292 / 1024 ≈ 3.785 µm/pixel. Adjust if the stitch layout
+    # or export size changes.
+    um_per_pixel: float = 3.785
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

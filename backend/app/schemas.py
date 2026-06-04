@@ -135,7 +135,7 @@ class TimeLapseFrame(BaseModel):
 
 class TimeLapseViewer(BaseModel):
     frames: list[TimeLapseFrame]
-    scale_bar_um: float | None = None
+    um_per_pixel: float | None = None   # physical scale of the served image
     well_id: str | None = None
     n_cells_t0: int | None = None
 

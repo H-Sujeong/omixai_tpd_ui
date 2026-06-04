@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { TimeLapseFrame, TimeLapseViewer } from "@/types/api";
 import { EmptyBlock } from "@/components/LoadingBlock";
-import { buildTimeLapseGif, downloadBytes } from "./exportGif";
+import { buildTimeLapseGif, downloadBytes, pickBarUm, barLabel } from "./exportGif";
 
 interface Props {
   data: TimeLapseViewer | null;
@@ -55,6 +55,46 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
   const [playing, setPlaying] = useState(false);
   const [gifBusy, setGifBusy] = useState(false);
 
+  // Scale bar, computed from um/pixel + the object-contain rendered image size.
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [bar, setBar] = useState<{ w: number; left: number; bottom: number; label: string } | null>(
+    null,
+  );
+  const umPerPixel = data?.um_per_pixel ?? null;
+
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el || !umPerPixel) {
+      setBar(null);
+      return;
+    }
+    const compute = () => {
+      const natW = el.naturalWidth || 0;
+      const natH = el.naturalHeight || natW;
+      const cw = el.clientWidth;
+      const ch = el.clientHeight;
+      if (!natW || !cw) return;
+      const scale = Math.min(cw / natW, ch / natH); // object-contain
+      const offX = (cw - natW * scale) / 2;
+      const offY = (ch - natH * scale) / 2;
+      const barUm = pickBarUm(natW * umPerPixel);
+      setBar({
+        w: (barUm / umPerPixel) * scale,
+        left: offX + 8,
+        bottom: offY + 8,
+        label: barLabel(barUm),
+      });
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    el.addEventListener("load", compute);
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("load", compute);
+    };
+  }, [umPerPixel]);
+
   useEffect(() => {
     if (!playing || frames.length === 0) return;
     const id = window.setInterval(() => {
@@ -81,6 +121,7 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
         drugName: drugName ?? "",
         wellId: data.well_id,
         fallbackCells: data.n_cells_t0,
+        umPerPixel: data.um_per_pixel,
       });
       const base = `${drugName || "timelapse"}_${data.well_id ?? ""}`.replace(
         /[^A-Za-z0-9._-]+/g,
@@ -98,6 +139,7 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
     <div className="flex flex-col gap-2">
       <div className="relative bg-black rounded-md overflow-hidden h-[431px]">
         <img
+          ref={imgRef}
           src={frame.image_url}
           alt={`t=${fmtHours(frame.t_hours)}h`}
           className="w-full h-full block object-contain"
@@ -108,12 +150,15 @@ export function TimeLapseViewerPanel({ data, drugName }: Props) {
           <div>{fmtHours(frame.t_hours)} h</div>
           <div>{cells ?? "—"} cells</div>
         </div>
-        <div className="absolute bottom-2 left-2 text-white text-caption font-mono">
-          <div className="flex items-center gap-1.5">
-            <div className="w-8 border-t-2 border-white" />
-            <span>{data.scale_bar_um ?? 10} µm</span>
+        {bar && (
+          <div
+            className="absolute text-white text-caption font-mono"
+            style={{ left: bar.left, bottom: bar.bottom }}
+          >
+            <div className="border-t-2 border-white" style={{ width: `${bar.w}px` }} />
+            <span>{bar.label}</span>
           </div>
-        </div>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <button
