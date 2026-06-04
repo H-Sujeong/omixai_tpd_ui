@@ -1,5 +1,5 @@
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
-import coseBilkent from "cytoscape-cose-bilkent";
+import fcose from "cytoscape-fcose";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PpiEdge, PpiNode } from "@/types/api";
 import { useT } from "@/store/uiLang";
@@ -7,7 +7,7 @@ import { useT } from "@/store/uiLang";
 let registered = false;
 function ensureRegistered() {
   if (!registered) {
-    cytoscape.use(coseBilkent);
+    cytoscape.use(fcose);
     registered = true;
   }
 }
@@ -103,12 +103,13 @@ export function PpiGraph({
       });
     });
     edges.forEach((e) => {
+      const score = e.string_score ?? 0; // STRING combined confidence 0..1000
       els.push({
         data: {
           id: `${e.source}__${e.target}`,
           source: e.source,
           target: e.target,
-          weight: Math.max(0.4, Math.abs(e.corr)),
+          score,
           corr: e.corr,
         },
       });
@@ -161,12 +162,14 @@ export function PpiGraph({
           } as any,
         },
         {
+          // STRING style: edge thickness encodes the combined confidence
+          // (string_score 0..1000), so strong interactions read as heavier lines.
           selector: "edge",
           style: {
-            "width": "mapData(weight, 0, 1, 0.8, 3)",
+            "width": "mapData(score, 0, 1000, 0.5, 4.5)",
             "line-color": "#B4B2A9",
-            "opacity": 0.5,
-            "curve-style": "bezier",
+            "opacity": 0.55,
+            "curve-style": "straight",
           },
         },
         {
@@ -187,10 +190,23 @@ export function PpiGraph({
         },
       ],
       layout: {
-        name: nodes.length > 50 ? "concentric" : "cose-bilkent",
+        // STRING-style confidence-weighted spring layout (fcose): high
+        // string_score edges get a shorter ideal length + stronger elasticity,
+        // so well-supported partners pull together while weak links float out.
+        name: "fcose",
+        quality: "default",
         animate: false,
-        idealEdgeLength: 80,
-        nodeRepulsion: 9000,
+        randomize: true,
+        nodeRepulsion: 8000,
+        nodeSeparation: 80,
+        idealEdgeLength: (edge: any) => {
+          const s01 = Math.max(0, Math.min(1, ((edge.data("score") as number) ?? 0) / 1000));
+          return 45 + (1 - s01) * 125; // 1000 → ~45 (close), 0 → ~170 (far)
+        },
+        edgeElasticity: (edge: any) => {
+          const s01 = Math.max(0, Math.min(1, ((edge.data("score") as number) ?? 0) / 1000));
+          return 0.1 + s01 * 0.45;
+        },
       } as any,
       wheelSensitivity: 1.5,
     });
@@ -382,7 +398,9 @@ export function PpiGraph({
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#9CA3AF" }} />
           {t("중립", "Neutral")}
         </span>
-        <span className="ml-auto opacity-70">{t("노드 크기 = degree", "Node size = degree")}</span>
+        <span className="ml-auto opacity-70">
+          {t("노드 크기 = degree · 엣지 두께 = STRING 신뢰도", "Node size = degree · Edge width = STRING confidence")}
+        </span>
       </div>
     </div>
   );

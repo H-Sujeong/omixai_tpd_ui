@@ -1,7 +1,7 @@
 {
   "name": "omixai-tpd-frontend",
   "private": true,
-  "version": "2.6.14",
+  "version": "2.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "@tanstack/react-query": "^5.59.20",
     "cytoscape": "^3.30.4",
     "cytoscape-cose-bilkent": "^4.1.0",
+    "cytoscape-fcose": "^2.2.0",
     "gifenc": "^1.0.3",
     "jszip": "^3.10.1",
     "plotly.js-dist-min": "^2.35.3",
