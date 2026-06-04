@@ -156,21 +156,13 @@ export function DashboardPage() {
         : `landscape 거리 기준 community ${related.communityId} 가 가장 인접 (Δ=${
             related.distance?.toFixed(2) ?? "?"
           })`;
+    // Edge click is informational only — highlight the edge and report the
+    // related community. It must NOT switch the PPI community (that's node /
+    // landscape click). Switching here was a bug.
     setBridgeNotice({
       text: `Edge ${edge.source} ↔ ${edge.target} → ${reasonText}`,
       direction: "ppi-to-landscape",
     });
-    setSelectedCommunity(related.communityId);
-    if (plateId && drugId && target) {
-      switchCommunity.mutate({
-        plateId,
-        drugId,
-        fromCommunityId: here,
-        toCommunityId: related.communityId,
-        bridgingNode: `${edge.source}↔${edge.target}`,
-        target,
-      });
-    }
   };
 
   const handleLandscapeClick = (cid: number) => {
@@ -289,7 +281,7 @@ export function DashboardPage() {
           >
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
-              tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = landscape에서 관련 community 자동 선택."
+              tooltip="노드 클릭 = 해당 community로 in-place 전환. 엣지 클릭 = 엣지 강조 + 관련 community 안내(전환하지 않음)."
               accent
               status={d.status_flags.ppi}
               meta={`target community = ${activePpi?.target_community_id ?? "—"} · nodes=${
