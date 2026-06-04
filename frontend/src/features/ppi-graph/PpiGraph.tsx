@@ -312,8 +312,9 @@ export function PpiGraph({
     cyRef.current?.fit(undefined, 20);
   };
   const handleReset = () => {
-    cyRef.current?.reset(); // reset zoom/pan
-    onClearSelection?.(); // and clear the active protein selection
+    // Clear the active protein selection only — keep the current zoom/pan
+    // (resetting the camera was jarring). Use "Fit" to re-frame the view.
+    onClearSelection?.();
   };
 
   return (
@@ -339,9 +340,9 @@ export function PpiGraph({
           type="button"
           onClick={handleReset}
           className="px-2 py-0.5 text-meta border border-line rounded text-ink-secondary hover:text-ink-primary transition-colors duration-fast"
-          title="줌/팬 초기화"
+          title="단백질 선택 해제 (보기 유지)"
         >
-          Reset
+          선택 해제
         </button>
       </div>
 

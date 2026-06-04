@@ -201,7 +201,7 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
         r = httpx.post(
             f"{s.ollama_url}/api/generate",
             json={"model": s.ollama_model, "prompt": prompt, "stream": False,
-                  "options": {"temperature": 0.2}},
+                  "keep_alive": "30m", "options": {"temperature": 0.2}},
             timeout=120.0,
         )
         r.raise_for_status()
@@ -220,11 +220,10 @@ def _summarize_ko(gene: str, protein_name: str | None, function_text: str) -> li
 
 
 def get_protein_info(gene: str) -> dict[str, Any]:
-    """Return protein info dict for a human gene symbol (cached, never raises).
+    """Return UniProt facts for a human gene symbol — FAST (no LLM).
 
-    UniProt facts are cached on first lookup. The Korean summary is filled in
-    lazily and retried until the local model succeeds, then cached too — so a
-    protein fetched while Ollama was down still gets summarized later.
+    The Korean summary is generated separately via get_protein_summary so the
+    info panel never blocks on the local model. UniProt facts are cached.
     """
     gene = (gene or "").strip()
     if not gene:
@@ -234,12 +233,6 @@ def get_protein_info(gene: str) -> dict[str, Any]:
     info = cache.get(key)
     if info is not None:
         info.setdefault("summary", [])
-        if info.get("found") and info.get("function") and not info["summary"]:
-            bullets = _summarize_ko(gene, info.get("protein_name"), info["function"])
-            if bullets:
-                info["summary"] = bullets
-                cache[key] = info
-                _persist()
         return info
 
     result = _empty(gene)
@@ -285,7 +278,7 @@ def get_protein_info(gene: str) -> dict[str, Any]:
                 "accession": acc,
                 "protein_name": pname,
                 "function": fn,
-                "summary": _summarize_ko(gene, pname, fn) if fn else [],
+                "summary": [],  # generated lazily by get_protein_summary
                 "families": _families(e),
                 "length": length,
                 "mass_kda": round(mol / 1000.0, 1) if mol else None,
@@ -304,3 +297,20 @@ def get_protein_info(gene: str) -> dict[str, Any]:
         cache[key] = result
         _persist()
     return result
+
+
+def get_protein_summary(gene: str) -> list[str]:
+    """Korean 개조식 summary for a gene (slow — local LLM). Cached after first
+    success; retried until the model is reachable. Returns [] if no function."""
+    info = get_protein_info(gene)
+    if not info.get("found") or not info.get("function"):
+        return []
+    if info.get("summary"):
+        return info["summary"]
+    bullets = _summarize_ko(gene, info.get("protein_name"), info["function"])
+    if bullets:
+        info["summary"] = bullets
+        cache = _load()
+        cache[gene.strip().upper()] = info
+        _persist()
+    return bullets

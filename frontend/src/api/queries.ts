@@ -19,6 +19,21 @@ export function useProtein(gene: string | null) {
   });
 }
 
+// Korean function summary — separate (slow, local LLM) so the info panel never
+// blocks on it. Long timeout tolerated; cached for the session.
+export function useProteinSummary(gene: string | null) {
+  return useQuery<{ gene: string; summary: string[] }>({
+    queryKey: ["protein-summary", gene],
+    enabled: !!gene,
+    staleTime: 1000 * 60 * 60,
+    retry: false,
+    queryFn: () =>
+      apiGet<{ gene: string; summary: string[] }>(
+        `/api/v1/proteins/${encodeURIComponent(gene as string)}/summary`,
+      ),
+  });
+}
+
 export function usePlates() {
   return useQuery<PlateSummary[]>({
     queryKey: ["plates"],

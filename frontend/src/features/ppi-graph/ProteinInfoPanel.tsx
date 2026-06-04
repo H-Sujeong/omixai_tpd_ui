@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useProtein } from "@/api/queries";
+import { useProtein, useProteinSummary } from "@/api/queries";
 import { LoadingBlock } from "@/components/LoadingBlock";
 import type { ProteinInfo } from "@/types/api";
 
@@ -17,6 +17,7 @@ interface Props {
  */
 export function ProteinInfoPanel({ gene, onClose }: Props) {
   const { data, isLoading } = useProtein(gene);
+  const summaryQ = useProteinSummary(gene);
   const open = !!gene;
 
   return (
@@ -51,12 +52,14 @@ export function ProteinInfoPanel({ gene, onClose }: Props) {
                   </div>
                 )}
                 <Field label="기능">
-                  {data.summary.length ? (
+                  {summaryQ.data?.summary.length ? (
                     <ul className="list-disc pl-4 space-y-0.5">
-                      {data.summary.map((b, i) => (
+                      {summaryQ.data.summary.map((b, i) => (
                         <li key={i}>{b}</li>
                       ))}
                     </ul>
+                  ) : summaryQ.isLoading ? (
+                    <span className="text-ink-muted">한글 요약 생성 중…</span>
                   ) : (
                     data.function ?? "—"
                   )}
