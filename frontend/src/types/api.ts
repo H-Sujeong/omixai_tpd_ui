@@ -76,7 +76,7 @@ export interface PhenotypicProfiling {
   phenome_dmso: PhenomeTrackingPoint[];
 }
 
-export interface TimeLapseFrame { t_hours: number; image_url: string; }
+export interface TimeLapseFrame { t_hours: number; image_url: string; n_cells?: number | null; }
 export interface TimeLapseViewer {
   frames: TimeLapseFrame[];
   scale_bar_um: number | null;

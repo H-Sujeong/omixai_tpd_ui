@@ -253,7 +253,7 @@ export function DrugSummaryPage() {
                   Growth
                 </Th>
                 <th>Wells</th>
-                <th>Assets</th>
+                <th className="text-center">Assets</th>
               </tr>
             </thead>
             <tbody>
@@ -294,24 +294,22 @@ export function DrugSummaryPage() {
                     <StatusBadge label={d.growth_class} />
                   </td>
                   <td className="font-mono text-meta text-ink-muted">{d.wells.join(", ")}</td>
-                  <td>
+                  <td className="text-center">
                     {d.has_dashboard_assets ? (
                       <span
-                        className="inline-flex items-center gap-1 text-status-success font-semibold"
-                        title="실제 on-target / landscape JSON 자산이 있음 (synth fallback 아님)"
+                        className="text-status-success font-semibold"
+                        title="on-target / landscape JSON 자산 있음"
                         aria-label="asset available"
                       >
-                        <span aria-hidden>✓</span>
-                        <span className="text-meta">Asset</span>
+                        ✓
                       </span>
                     ) : (
                       <span
-                        className="inline-flex items-center gap-1 text-ink-muted"
-                        title="실측 자산 없음 — synth (절차적 생성) panel로 대체됨"
-                        aria-label="no asset, synth fallback"
+                        className="text-ink-muted"
+                        title="PPI / landscape 자산 없음"
+                        aria-label="no asset"
                       >
-                        <span aria-hidden>○</span>
-                        <span className="text-meta">Synth</span>
+                        ○
                       </span>
                     )}
                   </td>

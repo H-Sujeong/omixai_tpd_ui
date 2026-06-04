@@ -36,17 +36,9 @@ export function PanelCard({
                 ⓘ
               </span>
             )}
-            {status === "synth" && (
-              <span
-                className="chip text-meta"
-                title="Synthesized fallback (no on_target.json asset)"
-              >
-                synth
-              </span>
-            )}
             {status === "empty" && (
-              <span className="chip text-meta" title="No data for this drug/target">
-                empty
+              <span className="text-ink-muted text-meta" title="No data for this drug/target">
+                ○
               </span>
             )}
           </div>
