@@ -1,7 +1,7 @@
 {
   "name": "omixai-tpd-frontend",
   "private": true,
-  "version": "2.6.4",
+  "version": "2.6.5",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -166,15 +166,6 @@ export function Landscape({
     return [lo, inMax + pad];
   }, [landscape.scatter]);
 
-  // Grid cells outside the data hull were filled with exactly 0 (a flat fake
-  // plane). Render them as gaps (null) so only the real interpolated terrain
-  // shows — not a sheet plastered across the whole axis box.
-  const maskedZ = useMemo<(number | null)[][] | null>(() => {
-    const g = landscape.grid;
-    if (!g) return null;
-    return g.z.map((row) => row.map((v) => (v === 0 ? null : v)));
-  }, [landscape.grid]);
-
   const traces: any[] = mode === "2d" ? build2D() : build3D();
 
   function build2D(): any[] {
@@ -280,30 +271,39 @@ export function Landscape({
   function build3D(): any[] {
     const t: any[] = [];
     const g = landscape.grid;
-    if (g) {
+
+    // Terrain = a Delaunay surface through the REAL community points. The
+    // precomputed grid (landscape.grid) doesn't track the communities — in the
+    // data-dense region it's a flat ~0 sheet — so triangulating the actual
+    // points gives a height field that passes through them. Use all communities
+    // within the −log10(p) clip (not the PCC/dist marker filter) so the surface
+    // is stable as the user moves the sliders. Not synthetic: it only connects
+    // real points.
+    const terr = landscape.scatter.filter(
+      (p) =>
+        Number.isFinite(p.x) &&
+        Number.isFinite(p.y) &&
+        Number.isFinite(p.z) &&
+        (!yClip || p.y <= yClip[1]),
+    );
+    if (terr.length >= 3) {
       t.push({
-        type: "surface",
-        x: g.xi,
-        y: g.yi,
-        z: maskedZ ?? g.z,
-        connectgaps: false,
+        type: "mesh3d",
+        x: terr.map((p) => p.x),
+        y: terr.map((p) => p.y),
+        z: terr.map((p) => p.z),
+        intensity: terr.map((p) => p.z),
+        delaunayaxis: "z", // triangulate in the x–y (Distance × −log10p) plane
         colorscale: COLORSCALE_3D_JET,
-        // Tie the jet ramp to the real community avg(PCC) range (scatter z) so a
-        // single off-screen outlier valley can't wash the visible terrain into
-        // one flat color.
         cmin: rangeMin,
         cmax: rangeMax,
-        cauto: false,
-        opacity: 1,
-        contours: { x: { show: false }, y: { show: false }, z: { show: false } },
-        colorbar: {
-          title: { text: "avg(PCC)", side: "right" },
-          len: 0.6,
-          thickness: 14,
-        },
+        opacity: 0.85,
+        flatshading: false,
+        colorbar: { title: { text: "avg(PCC)", side: "right" }, len: 0.6, thickness: 14 },
         hoverinfo: "none",
       });
-
+    }
+    if (g) {
       // y=1 reference line in 3D (along x at y=1, z=0)
       const xMin = g.xi[0];
       const xMax = g.xi[g.xi.length - 1];
