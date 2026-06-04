@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .auth import hash_password
+from .auth import hash_password, initial_password_for
 from .data_loader import get_registry
 from .db import SessionLocal, init_db
 from .models import Plate, User
@@ -32,10 +32,11 @@ def cmd_create_user(args) -> int:
         if _get_user(db, email):
             print(f"user already exists: {email}", file=sys.stderr)
             return 1
-        db.add(User(email=email, password_hash=hash_password(args.password),
-                    display_name=args.name, is_demo=False))
+        pw = args.password or initial_password_for(email)
+        db.add(User(email=email, password_hash=hash_password(pw),
+                    display_name=args.name, is_demo=False, must_change_password=True))
         db.commit()
-        print(f"created user: {email}")
+        print(f"created user: {email}  (initial password: {pw}; must change on first login)")
         return 0
     finally:
         db.close()
@@ -150,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="app.manage", description="Account provisioning")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    c = sub.add_parser("create-user"); c.add_argument("--email", required=True); c.add_argument("--password", required=True); c.add_argument("--name", default=None); c.set_defaults(fn=cmd_create_user)
+    c = sub.add_parser("create-user"); c.add_argument("--email", required=True); c.add_argument("--password", default=None, help="blank → <local-part>123!@"); c.add_argument("--name", default=None); c.set_defaults(fn=cmd_create_user)
     sub.add_parser("list-users").set_defaults(fn=cmd_list_users)
     c = sub.add_parser("set-password"); c.add_argument("--email", required=True); c.add_argument("--password", required=True); c.set_defaults(fn=cmd_set_password)
     c = sub.add_parser("deactivate"); c.add_argument("--email", required=True); c.set_defaults(fn=lambda a: _set_active(a.email, False))

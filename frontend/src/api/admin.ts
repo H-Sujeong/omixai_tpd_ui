@@ -58,7 +58,7 @@ function useInvalidate() {
 
 export function useCreateUser() {
   const inv = useInvalidate();
-  return useMutation<AdminUser, ApiError, { email: string; password: string; display_name?: string; is_admin?: boolean }>({
+  return useMutation<AdminUser, ApiError, { email: string; password?: string; display_name?: string; is_admin?: boolean }>({
     mutationFn: (b) => apiPostJson<AdminUser>("/api/v1/admin/users", b),
     onSuccess: inv,
   });

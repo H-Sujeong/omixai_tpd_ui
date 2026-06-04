@@ -53,3 +53,5 @@ def _migrate() -> None:
         cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(users)")}
         if "is_admin" not in cols:
             conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0")
+        if "must_change_password" not in cols:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0")

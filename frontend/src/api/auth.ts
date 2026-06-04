@@ -7,6 +7,7 @@ export interface AuthUser {
   display_name: string | null;
   is_demo: boolean;
   is_admin: boolean;
+  must_change_password: boolean;
 }
 
 /** Current session user; 401 (not logged in) surfaces as a query error. */
@@ -24,6 +25,14 @@ export function useLogin() {
   return useMutation<AuthUser, Error, { email: string; password: string }>({
     mutationFn: (body) => apiPostJson<AuthUser>("/api/v1/auth/login", body),
     onSuccess: (user) => qc.setQueryData(["auth", "me"], user),
+  });
+}
+
+export function useChangePassword() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, string>({
+    mutationFn: (newPassword) => apiPostJson<{ ok: boolean }>("/api/v1/auth/change-password", { new_password: newPassword }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["auth", "me"] }),
   });
 }
 

@@ -39,11 +39,13 @@ class UserOut(BaseModel):
     display_name: str | None = None
     is_demo: bool = False
     is_admin: bool = False
+    must_change_password: bool = False
 
 
 def _to_out(u: User) -> UserOut:
     return UserOut(id=u.id, email=u.email, display_name=u.display_name,
-                   is_demo=u.is_demo, is_admin=u.is_admin)
+                   is_demo=u.is_demo, is_admin=u.is_admin,
+                   must_change_password=u.must_change_password)
 
 
 @router.post("/login", response_model=UserOut)
@@ -69,6 +71,23 @@ def logout(request: Request, response: Response, db: DbSession = Depends(get_db)
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(require_user)) -> UserOut:
     return _to_out(user)
+
+
+class ChangePasswordIn(BaseModel):
+    new_password: str
+
+
+@router.post("/change-password")
+def change_password(body: ChangePasswordIn, db: DbSession = Depends(get_db),
+                    user: User = Depends(require_user)) -> dict:
+    """Set a new password for the logged-in user (used for the forced first-login
+    change). Clears the must_change_password flag."""
+    if len(body.new_password) < 4:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password too short")
+    user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
+    db.commit()
+    return {"ok": True}
 
 
 class ForgotIn(BaseModel):

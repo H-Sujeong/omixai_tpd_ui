@@ -72,12 +72,17 @@ function CreateUserCard() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [issued, setIssued] = useState<{ email: string; pw: string } | null>(null);
+
+  const conventionPw = (e: string) => `${e.split("@")[0].trim().toLowerCase()}123!@`;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const em = email.trim();
+    const initial = password || conventionPw(em);
     create.mutate(
-      { email: email.trim(), password, display_name: name || undefined, is_admin: isAdmin },
-      { onSuccess: () => { setEmail(""); setPassword(""); setName(""); setIsAdmin(false); } },
+      { email: em, password: password || undefined, display_name: name || undefined, is_admin: isAdmin },
+      { onSuccess: () => { setIssued({ email: em, pw: initial }); setEmail(""); setPassword(""); setName(""); setIsAdmin(false); } },
     );
   }
 
@@ -89,9 +94,10 @@ function CreateUserCard() {
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
             className="w-56 border border-line rounded-md px-2.5 py-1.5 text-body bg-surface-base text-ink-primary outline-none focus:border-brand-primary" />
         </Field>
-        <Field label={t("비밀번호", "Password")}>
-          <input type="text" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="w-40 border border-line rounded-md px-2.5 py-1.5 text-body bg-surface-base text-ink-primary outline-none focus:border-brand-primary" />
+        <Field label={t("비밀번호 (선택)", "Password (optional)")}>
+          <input type="text" value={password} onChange={(e) => setPassword(e.target.value)}
+            placeholder={t("비우면 자동", "auto if blank")}
+            className="w-40 border border-line rounded-md px-2.5 py-1.5 text-body bg-surface-base text-ink-primary placeholder:text-ink-muted outline-none focus:border-brand-primary" />
         </Field>
         <Field label={t("이름", "Name")}>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)}
@@ -105,11 +111,21 @@ function CreateUserCard() {
           {create.isPending ? t("발급 중…", "Creating…") : t("발급", "Create")}
         </button>
       </div>
+      <div className="mt-2 text-meta text-ink-muted">
+        {t("비밀번호를 비우면 초기비번은 ‘아이디+123!@’ 이며, 첫 로그인 시 변경해야 합니다.",
+           "Leave password blank → initial password is ‘<id>123!@’; the user must change it on first login.")}
+      </div>
       {create.isError && (
-        <div className="mt-2 text-meta text-status-error">
+        <div className="mt-1 text-meta text-status-error">
           {create.error?.status === 409
             ? t("이미 존재하는 이메일입니다.", "Email already exists.")
             : t("발급에 실패했습니다.", "Failed to create account.")}
+        </div>
+      )}
+      {issued && (
+        <div className="mt-2 text-meta text-status-success">
+          {t("발급됨", "Created")}: <span className="font-mono text-ink-primary">{issued.email}</span>
+          {" · "}{t("초기비번", "Initial password")} <span className="font-mono text-ink-primary">{issued.pw}</span>
         </div>
       )}
     </form>

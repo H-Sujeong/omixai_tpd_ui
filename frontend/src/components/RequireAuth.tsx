@@ -9,7 +9,7 @@ import { LoadingBlock } from "@/components/LoadingBlock";
  * the attempted path so login can return there.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { isLoading, isError } = useMe();
+  const { data: me, isLoading, isError } = useMe();
   const location = useLocation();
 
   if (isLoading) {
@@ -21,6 +21,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
   if (isError) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  }
+  // Forced first-login password change: lock the user to /set-password until done.
+  if (me?.must_change_password && location.pathname !== "/set-password") {
+    return <Navigate to="/set-password" replace />;
   }
   return <>{children}</>;
 }

@@ -24,6 +24,7 @@ class User(Base):
     is_demo: Mapped[bool] = mapped_column(default=False)
     is_admin: Mapped[bool] = mapped_column(default=False)
     is_active: Mapped[bool] = mapped_column(default=True)
+    must_change_password: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=_now)
     last_login_at: Mapped[datetime | None] = mapped_column(default=None)
 

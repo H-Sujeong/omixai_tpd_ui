@@ -31,6 +31,13 @@ def hash_password(password: str, iterations: int = _PBKDF2_ITERS) -> str:
     return f"pbkdf2_sha256${iterations}${base64.b64encode(salt).decode()}${base64.b64encode(dk).decode()}"
 
 
+def initial_password_for(email: str) -> str:
+    """Convention for admin-provisioned accounts: <local-part>123!@.
+    e.g. sjhong@omixai.com -> sjhong123!@. The user must change it on first login."""
+    local = (email or "").split("@", 1)[0].strip().lower()
+    return f"{local}123!@"
+
+
 def verify_password(password: str, stored: str) -> bool:
     try:
         algo, iters, salt_b64, hash_b64 = stored.split("$")

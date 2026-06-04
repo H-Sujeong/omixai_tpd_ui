@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DbSession
 
-from ...auth import hash_password, require_admin
+from ...auth import hash_password, initial_password_for, require_admin
 from ...data_loader import get_registry
 from ...db import get_db
 from ...models import Plate, User
@@ -21,13 +21,14 @@ class AdminUserOut(BaseModel):
     is_demo: bool = False
     is_admin: bool = False
     is_active: bool = True
+    must_change_password: bool = False
     plate_ids: list[str] = []
     last_login_at: str | None = None
 
 
 class CreateUserIn(BaseModel):
     email: str
-    password: str
+    password: str | None = None  # blank → convention <local-part>123!@
     display_name: str | None = None
     is_admin: bool = False
 
@@ -54,7 +55,8 @@ def _to_out(db: DbSession, u: User) -> AdminUserOut:
     pids = [pid for (pid,) in db.query(Plate.plate_id).filter(Plate.owner_id == u.id)]
     return AdminUserOut(
         id=u.id, email=u.email, display_name=u.display_name, is_demo=u.is_demo,
-        is_admin=u.is_admin, is_active=u.is_active, plate_ids=sorted(pids),
+        is_admin=u.is_admin, is_active=u.is_active,
+        must_change_password=u.must_change_password, plate_ids=sorted(pids),
         last_login_at=u.last_login_at.isoformat() if u.last_login_at else None,
     )
 
@@ -67,12 +69,16 @@ def list_users(db: DbSession = Depends(get_db)) -> list[AdminUserOut]:
 @router.post("/users", response_model=AdminUserOut)
 def create_user(body: CreateUserIn, db: DbSession = Depends(get_db)) -> AdminUserOut:
     email = body.email.strip().lower()
-    if not email or not body.password:
-        raise HTTPException(status_code=400, detail="email and password are required")
+    if not email:
+        raise HTTPException(status_code=400, detail="email is required")
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=409, detail="email already exists")
-    u = User(email=email, password_hash=hash_password(body.password),
-             display_name=body.display_name, is_admin=body.is_admin)
+    # No password → convention <local-part>123!@. New accounts must change it at
+    # first login.
+    pw = body.password or initial_password_for(email)
+    u = User(email=email, password_hash=hash_password(pw),
+             display_name=body.display_name, is_admin=body.is_admin,
+             must_change_password=True)
     db.add(u)
     db.commit()
     db.refresh(u)
