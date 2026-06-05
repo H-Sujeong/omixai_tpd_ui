@@ -20,7 +20,7 @@ interface Props {
  *
  *   - 2D contour by default, 3D surface on toggle
  *   - Smooth heatmap colorscale (5 stops, ncontours=200, smoothing=1.5)
- *   - y = 1 dashed reference line (significance cutoff in -log10(p))
+ *   - dashed reference line at the p = 0.05 significance cutoff (−log10 p ≈ 1.30)
  *   - Target community = amber cross ✚, others = grey circles
  *   - No highlight ring (was a click-trap; selection is conveyed via the
  *     BridgeNotice and the PPI panel switching to the chosen community)
@@ -63,6 +63,10 @@ const COLOR_TARGET_EDGE = "#92400E";
 const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
 const COLOR_OTHER_EDGE  = "#FFFFFF";
 const REF_LINE_COLOR    = "#1F2937";
+// Significance cutoff drawn as the dashed reference line: p = 0.05 →
+// −log10(0.05) ≈ 1.301 (was p = 0.1 at y = 1).
+const SIG_P = 0.05;
+const SIG_Y = -Math.log10(SIG_P);
 
 /**
  * Visual flag for the extra "target itself" glyph that sits on top of the
@@ -296,14 +300,14 @@ export function Landscape({
         hovertemplate: "x=%{x:.2f}  y=%{y:.2f}<br>PCC=%{z:.3f}<extra></extra>",
       });
 
-      // 2. y = 1 reference line (significance cutoff for -log10(p))
+      // 2. significance cutoff reference line at p = 0.05 (−log10 p ≈ 1.30)
       t.push({
         type: "scatter",
         mode: "lines",
         x: [g.xi[0], g.xi[g.xi.length - 1]],
-        y: [1, 1],
+        y: [SIG_Y, SIG_Y],
         line: { color: REF_LINE_COLOR, width: 1.5, dash: "dash" },
-        hoverinfo: "none",
+        hovertemplate: `p = ${SIG_P} (−log10 p = ${SIG_Y.toFixed(2)})<extra></extra>`,
         showlegend: false,
       });
     }
@@ -436,7 +440,7 @@ export function Landscape({
         hoverinfo: "none",
       });
 
-      // y=1 reference line in 3D (along x at y=1, z=0)
+      // significance cutoff reference line at p = 0.05 (−log10 p ≈ 1.30), z=0
       const xMin = g.xi[0];
       const xMax = g.xi[g.xi.length - 1];
       const xL: number[] = [];
@@ -445,7 +449,7 @@ export function Landscape({
         type: "scatter3d",
         mode: "lines",
         x: xL,
-        y: xL.map(() => 1),
+        y: xL.map(() => SIG_Y),
         z: xL.map(() => 0),
         line: { color: REF_LINE_COLOR, width: 3, dash: "dash" },
         showlegend: false,
