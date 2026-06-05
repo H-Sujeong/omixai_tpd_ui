@@ -110,6 +110,7 @@ function extendGridFlat(
 export function Landscape({
   landscape,
   targetName,
+  highlightCommunity,
   onCommunityClick,
   height = 380,
 }: Props) {
@@ -152,6 +153,26 @@ export function Landscape({
     const q = listQuery.trim().toUpperCase();
     return q ? proteinList.filter((n) => n.protein.toUpperCase().includes(q)) : proteinList;
   }, [proteinList, listQuery]);
+
+  // Community picker — selecting a peak by clicking is painful in 3D when points
+  // overlap/cluster, so offer a dropdown (and ring the selection on the plot).
+  const communityOptions = useMemo(() => {
+    const seen = new Set<number>();
+    const out: { id: number; size: number; z: number; isTarget: boolean }[] = [];
+    for (const p of landscape.scatter) {
+      if (seen.has(p.community_id)) continue;
+      seen.add(p.community_id);
+      out.push({ id: p.community_id, size: p.size, z: p.z, isTarget: p.is_target });
+    }
+    return out.sort((a, b) => a.id - b.id);
+  }, [landscape.scatter]);
+  const selectedCommunityPoint = useMemo(
+    () =>
+      highlightCommunity == null
+        ? null
+        : landscape.scatter.find((p) => p.community_id === highlightCommunity) ?? null,
+    [landscape.scatter, highlightCommunity],
+  );
 
   const [rangeMin, rangeMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
@@ -351,6 +372,24 @@ export function Landscape({
       });
     }
 
+    // Selected-community ring (from the dropdown / click) — amber.
+    if (selectedCommunityPoint) {
+      t.push({
+        type: "scatter",
+        mode: "markers",
+        x: [selectedCommunityPoint.x],
+        y: [selectedCommunityPoint.y],
+        marker: {
+          size: 26,
+          symbol: "circle-open",
+          color: "#F59E0B",
+          line: { width: 3, color: "#F59E0B" },
+        },
+        hovertemplate: `<b>community ${selectedCommunityPoint.community_id}</b> · selected<extra></extra>`,
+        showlegend: false,
+      });
+    }
+
     // Protein-search highlight — ring on the found protein's community point.
     if (foundNode) {
       t.push({
@@ -474,6 +513,25 @@ export function Landscape({
         z: [anchorPoint.z],
         marker: { size: 6, color: COLOR_SELF_ANCHOR, symbol: "diamond" },
         hovertemplate: `${selfAnchorLabel}<br>PCC=1 (self)<extra></extra>`,
+        showlegend: false,
+      });
+    }
+
+    // Selected-community ring (from the dropdown / click) — amber.
+    if (selectedCommunityPoint) {
+      t.push({
+        type: "scatter3d",
+        mode: "markers",
+        x: [selectedCommunityPoint.x],
+        y: [selectedCommunityPoint.y],
+        z: [selectedCommunityPoint.z],
+        marker: {
+          size: 13,
+          symbol: "circle-open",
+          color: "#F59E0B",
+          line: { width: 3, color: "#F59E0B" },
+        },
+        hovertemplate: `community ${selectedCommunityPoint.community_id} · selected<extra></extra>`,
         showlegend: false,
       });
     }
@@ -628,6 +686,31 @@ export function Landscape({
             3D
           </button>
         </div>
+
+        {/* Community picker — pick a peak without fighting overlapping 3D markers */}
+        {communityOptions.length > 0 && (
+          <label className="flex items-center gap-1.5 rounded-md border border-line bg-surface-elevated px-2 py-1">
+            <span className="whitespace-nowrap">{t("커뮤니티", "Community")}</span>
+            <select
+              value={highlightCommunity ?? ""}
+              onChange={(e) => {
+                if (e.target.value !== "") onCommunityClick?.(Number(e.target.value));
+              }}
+              className="max-w-[170px] bg-transparent text-ink-primary focus:outline-none"
+              style={{ colorScheme: isDark ? "dark" : "light" }}
+              aria-label={t("커뮤니티 선택", "Select community")}
+            >
+              <option value="">{t("선택…", "Select…")}</option>
+              {communityOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {`c${String(c.id).padStart(3, "0")} · n=${c.size} · PCC ${c.z.toFixed(2)}${
+                    c.isTarget ? " ★" : ""
+                  }`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* PCC threshold — signed, 0.001 step. Slider bounds derived from
          *  actual data min/max so users never see values that don't exist
