@@ -562,6 +562,37 @@ export function Landscape({
     return t;
   }
 
+  // 3D scene arrow annotations — clustered peaks are hard to tell apart by a
+  // ring alone, so point at the selected community / found protein with an arrow
+  // (3D only; the 2D ring is already legible flat-on).
+  const scene3dAnnotations: any[] = [];
+  if (mode === "3d") {
+    if (selectedCommunityPoint) {
+      scene3dAnnotations.push({
+        x: selectedCommunityPoint.x,
+        y: selectedCommunityPoint.y,
+        z: selectedCommunityPoint.z,
+        text: `community ${selectedCommunityPoint.community_id}`,
+        showarrow: true, arrowhead: 2, arrowsize: 1.3, arrowwidth: 2.5,
+        arrowcolor: "#F59E0B", ax: 42, ay: -55, borderpad: 2,
+        font: { color: "#B45309", size: 11 },
+        bgcolor: "rgba(255,255,255,0.9)", bordercolor: "#F59E0B",
+      });
+    }
+    if (foundNode) {
+      scene3dAnnotations.push({
+        x: foundNode.x,
+        y: foundNode.y,
+        z: foundNode.z,
+        text: foundNode.protein,
+        showarrow: true, arrowhead: 2, arrowsize: 1.3, arrowwidth: 2.5,
+        arrowcolor: "#D946EF", ax: -42, ay: -55, borderpad: 2,
+        font: { color: "#A21CAF", size: 11 },
+        bgcolor: "rgba(255,255,255,0.9)", bordercolor: "#D946EF",
+      });
+    }
+  }
+
   const layout: any =
     mode === "2d"
       ? {
@@ -641,6 +672,7 @@ export function Landscape({
             camera: { eye: { x: 1.35, y: -1.35, z: 0.32 } },
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
+            annotations: scene3dAnnotations,
           },
         };
 
