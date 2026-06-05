@@ -116,6 +116,53 @@ def _load_asset(drug: DrugRecord, target: str, suffix: str) -> dict[str, Any] | 
     return None
 
 
+# Canonical 4-axis order/labels for Mechanistic Signatures, matching the
+# pipeline's tpd_export/moa_bars.py (build_moa_bars output).
+_MOA_AXES = ("pac", "cytostatic", "transcriptional_stress", "dna_damage_response")
+_MOA_LABELS = {
+    "pac": "Protein Abundance Control",
+    "cytostatic": "Cytostatic Effect",
+    "transcriptional_stress": "Transcriptional Stress",
+    "dna_damage_response": "DNA Damage Response",
+}
+
+
+def _moa_bars_to_annotations(on_target_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Map the pipeline's `on_target["moa_bars"]` block to the Mechanistic
+    Signatures rows the UI renders (`[{label, level, value, placeholder}]`).
+
+    No synthetic fallback: if the asset carries no `moa_bars`, return [] so the
+    panel hides itself. Each axis' 0-5 `score` becomes the bar `level`; the
+    continuous `value` rides along for tooltips, and `_meta.placeholder` (set by
+    the dev seed) is surfaced so placeholder data can be flagged in the UI.
+    """
+    if not on_target_payload:
+        return []
+    mb = on_target_payload.get("moa_bars")
+    if not isinstance(mb, dict):
+        return []
+    meta = mb.get("_meta", {}) if isinstance(mb.get("_meta"), dict) else {}
+    axes = meta.get("axes") or list(_MOA_AXES)
+    labels = {**_MOA_LABELS, **(meta.get("labels") or {})}
+    placeholder = bool(meta.get("placeholder", False))
+    rows: list[dict[str, Any]] = []
+    for ax in axes:
+        entry = mb.get(ax)
+        if not isinstance(entry, dict):
+            continue
+        try:
+            level = int(entry.get("score", 0) or 0)
+        except (TypeError, ValueError):
+            level = 0
+        rows.append({
+            "label": labels.get(ax, ax),
+            "level": max(0, min(5, level)),
+            "value": entry.get("value"),
+            "placeholder": placeholder,
+        })
+    return rows
+
+
 # -----------------------------------------------------------------------------
 # Conversions from asset JSON shapes -> Pydantic
 # -----------------------------------------------------------------------------
@@ -719,12 +766,10 @@ def build_dashboard(
         "landscape": "ok" if landscape_payload else "empty",
     }
     moa_summary = info["moa"]
-    localization = [
-        {"label": "Protein Abundance Control", "level": 3},
-        {"label": "Cytostatic Effect", "level": 2 if (phenotypic and (phenotypic.gr_score or 0) > 0.0) else 1},
-        {"label": "Transcriptional Stress", "level": 2 if drug.drug_group == "Epigenetic_chromatin" else 1},
-        {"label": "DNA Damage Response", "level": 2 if drug.drug_group in ("CDK_cell_cycle", "DNA_damage_survival") else 1},
-    ]
+    # Mechanistic Signatures now read the pipeline's real `moa_bars` (4 MoA axes,
+    # 0-5 each) from on_target.json. No synthetic fallback: when the asset has no
+    # moa_bars the panel stays empty instead of fabricating levels.
+    localization = _moa_bars_to_annotations(on_target_payload)
 
     kpis = _compute_kpis(phenotypic, ppi, target, drug.drug_group)
     insight = _compute_insight(drug, target, drug.drug_group, kpis, moa_summary, ppi, enrichment)

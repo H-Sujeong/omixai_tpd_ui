@@ -221,7 +221,12 @@ export interface DashboardResponse {
   landscape: LandscapePanel | null;
   enrichment: GoTerm[];
   moa_summary: string | null;
-  localization_annotations: Array<{ label: string; level: number }>;
+  localization_annotations: Array<{
+    label: string;
+    level: number;
+    value?: number | null;
+    placeholder?: boolean;
+  }>;
   status_flags: Record<string, string>;
   provenance: ProvenancePanel;
   kpis: KpiMetric[];

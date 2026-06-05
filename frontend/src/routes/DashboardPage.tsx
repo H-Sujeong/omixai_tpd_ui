@@ -783,10 +783,19 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
   const topIndex = d.localization_annotations.findIndex(
     (l) => l.level === topLevel,
   );
+  const isPlaceholder = d.localization_annotations.some((l) => l.placeholder);
 
   return (
     <PanelCard
       title="Mechanistic Signatures"
+      meta={
+        isPlaceholder
+          ? t(
+              "⚠ 예시(placeholder) 값 — 실제 moa_bars 데이터 연동 대기",
+              "⚠ Placeholder values — awaiting real moa_bars data",
+            )
+          : undefined
+      }
       tooltip={t(
         "화합물의 작용기전(MoA)을 4개 축으로 점수화 — 5칸 = 강도(0~5):\n• PAC (단백질 존재량 제어): 타깃 단백질 분해·감소 정도\n• Cytostatic: 세포분열·증식 정지 효과\n• Transcriptional Stress: 전사 스트레스 반응\n• DNA Damage Response: DNA 손상 반응\n• ★ = 가장 강한 축",
         "Mechanism of action (MoA) scored on 4 axes — 5 cells = strength (0–5):\n• PAC (Protein Abundance Control): degradation / loss of the target protein\n• Cytostatic: arrest of cell division / proliferation\n• Transcriptional Stress: transcriptional stress response\n• DNA Damage Response: DNA damage response\n• ★ = strongest axis",
