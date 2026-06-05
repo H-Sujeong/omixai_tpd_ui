@@ -212,7 +212,9 @@ class LandscapePanel(BaseModel):
     axes: dict[str, str]
     grid: LandscapeGrid | None = None
     scatter: list[LandscapePoint]
-    target_point: dict[str, float] | None = None
+    # x/y/z are floats; the real pipeline also adds a "source" string
+    # (anchor_community / target_node_self / placeholder), so allow Any.
+    target_point: dict[str, Any] | None = None
 
 
 class InteractomeNodeEgo(BaseModel):

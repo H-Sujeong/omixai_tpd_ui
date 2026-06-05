@@ -23,8 +23,11 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
     credentials: "include",
   });
   if (!res.ok) {
+    // Read the body ONCE, then try to parse as JSON. Calling res.json() and
+    // then res.text() on failure throws "body stream already read".
+    const raw = await res.text();
     let body: unknown;
-    try { body = await res.json(); } catch { body = await res.text(); }
+    try { body = raw ? JSON.parse(raw) : undefined; } catch { body = raw; }
     throw new ApiError(res.status, `${res.status} ${res.statusText}`, body);
   }
   return res.json() as Promise<T>;
@@ -39,8 +42,9 @@ export async function apiPostJson<T>(path: string, body?: unknown): Promise<T> {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    const raw = await res.text();
     let b: unknown;
-    try { b = await res.json(); } catch { b = await res.text(); }
+    try { b = raw ? JSON.parse(raw) : undefined; } catch { b = raw; }
     throw new ApiError(res.status, `${res.status} ${res.statusText}`, b);
   }
   return res.json() as Promise<T>;
