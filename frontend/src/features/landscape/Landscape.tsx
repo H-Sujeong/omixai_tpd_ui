@@ -136,25 +136,22 @@ export function Landscape({
   // with x >= threshold. Default 0 clamps to data min (= no filter).
   const [distThreshold, setDistThreshold] = useState<number>(0);
 
-  // Protein search: locate a protein on the landscape (its community point) and
-  // pop a small card with the community id + hops from the community hub.
-  const [proteinQuery, setProteinQuery] = useState<string>("");
+  // Protein locator: users often don't know the exact symbol, so instead of a
+  // blind text search we open a slide-in panel that LISTS every searchable
+  // protein (search filters the list). Picking one highlights its community on
+  // the landscape + shows a small card with the community id + hops-from-hub.
+  const [listOpen, setListOpen] = useState<boolean>(false);
+  const [listQuery, setListQuery] = useState<string>("");
   const [foundNode, setFoundNode] = useState<LandscapeNode | null>(null);
-  const [searchMiss, setSearchMiss] = useState<boolean>(false);
-  const runProteinSearch = () => {
-    const q = proteinQuery.trim().toUpperCase();
-    if (!q) {
-      setFoundNode(null);
-      setSearchMiss(false);
-      return;
-    }
-    const idx = landscape.node_index ?? [];
-    const hit =
-      idx.find((n) => n.protein.toUpperCase() === q) ??
-      idx.find((n) => n.protein.toUpperCase().startsWith(q));
-    setFoundNode(hit ?? null);
-    setSearchMiss(!hit);
-  };
+  const proteinList = useMemo(
+    () => [...(landscape.node_index ?? [])].sort((a, b) =>
+      a.protein.localeCompare(b.protein)),
+    [landscape.node_index],
+  );
+  const filteredProteins = useMemo(() => {
+    const q = listQuery.trim().toUpperCase();
+    return q ? proteinList.filter((n) => n.protein.toUpperCase().includes(q)) : proteinList;
+  }, [proteinList, listQuery]);
 
   const [rangeMin, rangeMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
@@ -696,44 +693,24 @@ export function Landscape({
           />
         </div>
 
-        {/* Protein search — locate a protein's community point + hops-from-hub */}
-        <form
-          className="flex items-center gap-1.5 rounded-md border border-line bg-surface-elevated px-2 py-1"
-          onSubmit={(e) => {
-            e.preventDefault();
-            runProteinSearch();
-          }}
-        >
-          <span className="whitespace-nowrap">🔍 {t("단백질", "protein")}</span>
-          <input
-            type="text"
-            value={proteinQuery}
-            onChange={(e) => setProteinQuery(e.target.value)}
-            placeholder={t("예: BRD4", "e.g. BRD4")}
-            className="w-28 rounded border border-line bg-transparent px-1.5 py-0.5 text-ink-primary focus:outline-none focus:border-brand-primary"
-            aria-label={t("단백질 검색", "Protein search")}
-          />
+        {/* Protein locator — opens the slide-in list (search is inside it) */}
+        {proteinList.length > 0 && (
           <button
-            type="submit"
-            className="px-2 py-0.5 rounded bg-brand-primary text-white hover:opacity-90"
+            type="button"
+            onClick={() => setListOpen((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors duration-fast ${
+              listOpen
+                ? "bg-brand-primary text-white border-brand-primary"
+                : "border-line bg-surface-elevated hover:text-ink-primary"
+            }`}
+            aria-expanded={listOpen}
           >
-            {t("찾기", "Find")}
+            🔍 {t("단백질 찾기", "Find protein")}
+            <span className={listOpen ? "opacity-80" : "text-ink-muted"}>
+              ({proteinList.length})
+            </span>
           </button>
-          {(foundNode || searchMiss) && (
-            <button
-              type="button"
-              onClick={() => {
-                setProteinQuery("");
-                setFoundNode(null);
-                setSearchMiss(false);
-              }}
-              className="px-1.5 py-0.5 rounded border border-line text-ink-secondary hover:text-ink-primary"
-              aria-label={t("검색 지우기", "Clear search")}
-            >
-              ✕
-            </button>
-          )}
-        </form>
+        )}
 
         {visibleCount < totalPoints && (
           <span className="text-ink-muted whitespace-nowrap">
@@ -778,10 +755,7 @@ export function Landscape({
               </span>
               <button
                 type="button"
-                onClick={() => {
-                  setFoundNode(null);
-                  setSearchMiss(false);
-                }}
+                onClick={() => setFoundNode(null)}
                 className="text-ink-muted hover:text-ink-primary"
                 aria-label={t("닫기", "Close")}
               >
@@ -816,11 +790,66 @@ export function Landscape({
             </ul>
           </div>
         )}
-        {searchMiss && !foundNode && (
-          <div className="absolute left-2 top-2 z-10 rounded-md border border-line bg-surface-elevated/95 backdrop-blur px-3 py-2 text-meta text-status-warning shadow-lg">
-            {t(`"${proteinQuery}" — community에 없음`, `"${proteinQuery}" — not in any community`)}
+        {/* Protein list slide-in — search inside, click to highlight community */}
+        <div
+          className={`absolute inset-y-0 right-0 z-20 flex w-64 max-w-[80%] flex-col border-l border-line bg-surface-panel shadow-xl transition-transform duration-base ${
+            listOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-line px-3 py-2">
+            <span className="text-body font-semibold text-ink-primary">
+              {t("단백질 목록", "Proteins")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setListOpen(false)}
+              className="text-ink-muted hover:text-ink-primary"
+              aria-label={t("닫기", "Close")}
+            >
+              ✕
+            </button>
           </div>
-        )}
+          <div className="border-b border-line p-2">
+            <input
+              type="text"
+              value={listQuery}
+              onChange={(e) => setListQuery(e.target.value)}
+              placeholder={t("검색…", "Search…")}
+              className="w-full rounded border border-line bg-transparent px-2 py-1 text-meta text-ink-primary focus:border-brand-primary focus:outline-none"
+              aria-label={t("단백질 검색", "Search proteins")}
+            />
+          </div>
+          <ul className="flex-1 overflow-y-auto text-meta">
+            {filteredProteins.slice(0, 300).map((n) => (
+              <li key={`${n.protein}-${n.community_id}`}>
+                <button
+                  type="button"
+                  onClick={() => setFoundNode(n)}
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left transition-colors duration-fast hover:bg-surface-soft ${
+                    foundNode?.protein === n.protein ? "bg-surface-soft" : ""
+                  }`}
+                >
+                  <span className="truncate font-mono text-ink-primary">{n.protein}</span>
+                  <span className="shrink-0 text-ink-muted">
+                    c{n.community_id}
+                    {n.hops != null ? ` · ${n.hops}h` : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {filteredProteins.length === 0 && (
+              <li className="px-3 py-2 text-ink-muted">{t("결과 없음", "No matches")}</li>
+            )}
+            {filteredProteins.length > 300 && (
+              <li className="px-3 py-2 text-ink-muted">
+                {t(
+                  `+${filteredProteins.length - 300}개 더 — 검색으로 좁히세요`,
+                  `+${filteredProteins.length - 300} more — narrow via search`,
+                )}
+              </li>
+            )}
+          </ul>
+        </div>
 
         <Plot
           data={traces}
