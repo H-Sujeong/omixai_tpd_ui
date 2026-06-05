@@ -68,6 +68,14 @@ const REF_LINE_COLOR    = "#1F2937";
 const SIG_P = 0.05;
 const SIG_Y = -Math.log10(SIG_P);
 
+// Clamp the RBF surface to the real community PCC range. The gaussian RBF
+// overshoots between data points (grid max ~1.09 vs data max ~0.55), which
+// renders as a tall fake spike that isn't any community — so the highest peak
+// looked wrong. Clamping keeps the surface honest (peaks = real data).
+function clampGrid(z: number[][], lo: number, hi: number): number[][] {
+  return z.map((row) => row.map((v) => (v < lo ? lo : v > hi ? hi : v)));
+}
+
 /**
  * Visual flag for the extra "target itself" glyph that sits on top of the
  * target-community marker (a larger ✚ text overlay).  Per user request the
@@ -278,7 +286,7 @@ export function Landscape({
         type: "contour",
         x: g.xi,
         y: g.yi,
-        z: g.z,
+        z: clampGrid(g.z, rangeMin, rangeMax),
         colorscale: COLORSCALE_2D,
         zmin: -zlim,
         zmax: zlim,
@@ -429,7 +437,7 @@ export function Landscape({
         type: "surface",
         x: g.xi,
         y: g.yi,
-        z: g.z,
+        z: clampGrid(g.z, rangeMin, rangeMax),
         colorscale: COLORSCALE_3D_JET,
         cmin: -zlim,
         cmax: zlim,
