@@ -745,7 +745,7 @@ export function Landscape({
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative overflow-hidden">
         {/* Protein-search result card — small opaque popup. */}
         {foundNode && (
           <div className="absolute left-2 top-2 z-10 w-56 rounded-md border border-line bg-surface-elevated/95 backdrop-blur px-3 py-2.5 shadow-lg text-meta">
@@ -790,9 +790,11 @@ export function Landscape({
             </ul>
           </div>
         )}
-        {/* Protein list slide-in — search inside, click to highlight community */}
+        {/* Protein list slide-in — search inside, click to highlight community.
+            bg-surface-card (opaque) + the wrapper's overflow-hidden match the
+            PPI ProteinInfoPanel so it's fully opaque and fully tucked when closed. */}
         <div
-          className={`absolute inset-y-0 right-0 z-20 flex w-64 max-w-[80%] flex-col border-l border-line bg-surface-panel shadow-xl transition-transform duration-base ${
+          className={`absolute inset-y-0 right-0 z-20 flex w-64 max-w-[80%] flex-col border-l border-line bg-surface-card shadow-lg transition-transform duration-200 ${
             listOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
