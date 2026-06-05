@@ -154,26 +154,6 @@ export function Landscape({
     return q ? proteinList.filter((n) => n.protein.toUpperCase().includes(q)) : proteinList;
   }, [proteinList, listQuery]);
 
-  // Community picker — selecting a peak by clicking is painful in 3D when points
-  // overlap/cluster, so offer a dropdown (and ring the selection on the plot).
-  const communityOptions = useMemo(() => {
-    const seen = new Set<number>();
-    const out: { id: number; size: number; z: number; isTarget: boolean }[] = [];
-    for (const p of landscape.scatter) {
-      if (seen.has(p.community_id)) continue;
-      seen.add(p.community_id);
-      out.push({ id: p.community_id, size: p.size, z: p.z, isTarget: p.is_target });
-    }
-    return out.sort((a, b) => a.id - b.id);
-  }, [landscape.scatter]);
-  const selectedCommunityPoint = useMemo(
-    () =>
-      highlightCommunity == null
-        ? null
-        : landscape.scatter.find((p) => p.community_id === highlightCommunity) ?? null,
-    [landscape.scatter, highlightCommunity],
-  );
-
   const [rangeMin, rangeMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
     let lo = Infinity;
@@ -213,6 +193,27 @@ export function Landscape({
 
   const scTarget = visibleScatter.filter((p) => p.is_target);
   const scOther  = visibleScatter.filter((p) => !p.is_target);
+
+  // Community picker — selecting a peak by clicking is painful in 3D when points
+  // overlap/cluster, so offer a dropdown (and ring the selection on the plot).
+  // Listed from `visibleScatter` so the options track the PCC / distance filters.
+  const communityOptions = useMemo(() => {
+    const seen = new Set<number>();
+    const out: { id: number; size: number; z: number; isTarget: boolean }[] = [];
+    for (const p of visibleScatter) {
+      if (seen.has(p.community_id)) continue;
+      seen.add(p.community_id);
+      out.push({ id: p.community_id, size: p.size, z: p.z, isTarget: p.is_target });
+    }
+    return out.sort((a, b) => a.id - b.id);
+  }, [visibleScatter]);
+  const selectedCommunityPoint = useMemo(
+    () =>
+      highlightCommunity == null
+        ? null
+        : landscape.scatter.find((p) => p.community_id === highlightCommunity) ?? null,
+    [landscape.scatter, highlightCommunity],
+  );
 
   // Some assets carry no target community at all (the target protein is absent
   // from the PPI data). Flag it honestly instead of silently omitting the ✚.
@@ -696,13 +697,18 @@ export function Landscape({
               onChange={(e) => {
                 if (e.target.value !== "") onCommunityClick?.(Number(e.target.value));
               }}
-              className="max-w-[170px] bg-transparent text-ink-primary focus:outline-none"
-              style={{ colorScheme: isDark ? "dark" : "light" }}
+              className="max-w-[170px] rounded focus:outline-none"
+              // Hardcode white-on-black-text regardless of system/dark mode (same
+              // as the time-lapse interval dropdown) so the native popup stays
+              // legible — dark colorScheme made the options invisible.
+              style={{ color: "#111827", backgroundColor: "#FFFFFF", colorScheme: "light" }}
               aria-label={t("커뮤니티 선택", "Select community")}
             >
-              <option value="">{t("선택…", "Select…")}</option>
+              <option value="" style={{ color: "#111827", backgroundColor: "#FFFFFF" }}>
+                {t("선택…", "Select…")}
+              </option>
               {communityOptions.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.id} style={{ color: "#111827", backgroundColor: "#FFFFFF" }}>
                   {`c${String(c.id).padStart(3, "0")} · n=${c.size} · PCC ${c.z.toFixed(2)}${
                     c.isTarget ? " ★" : ""
                   }`}
