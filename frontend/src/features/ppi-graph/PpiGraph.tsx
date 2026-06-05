@@ -34,10 +34,14 @@ interface Props {
  *
  * Node colors (corr-based, not role-based):
  *   - Primary target (n.id === targetName)  → amber #F59E0B + thick border, ✚ prefix
- *   - is_target = true                       → red #EF4444
- *   - corr >  0.2                            → blue #185FA5  (positively correlated)
- *   - corr < -0.2                            → purple #7C3AED (negatively correlated)
+ *   - is_target = true                       → purple #7C3AED (target gene)
+ *   - corr >  0.2                            → red  #DC2626  (up-regulated / activated)
+ *   - corr < -0.2                            → blue #2563EB  (down-regulated / suppressed)
  *   - else                                   → grey #9CA3AF  (neutral)
+ *
+ * Up = warm red, down = cool blue — the standard expression-heatmap
+ * convention, so direction of regulation reads at a glance. (Target genes
+ * moved to purple to free red for up-regulation.)
  *
  * Node size scales with degree (test_viz: 18-60px).
  * Plot panel uses a LIGHT background (#FAFAF7) for legibility against the
@@ -48,14 +52,14 @@ interface Props {
 
 function nodeColor(n: PpiNode, isMain: boolean): string {
   if (isMain) return "#F59E0B";
-  if (n.is_target) return "#EF4444";
-  if (n.corr > 0.2) return "#185FA5";
-  if (n.corr < -0.2) return "#7C3AED";
+  if (n.is_target) return "#7C3AED";
+  if (n.corr > 0.2) return "#DC2626"; // up-regulated (warm red)
+  if (n.corr < -0.2) return "#2563EB"; // down-regulated (cool blue)
   return "#9CA3AF";
 }
 function nodeBorder(n: PpiNode, isMain: boolean): string {
   if (isMain) return "#92400E";
-  if (n.is_target) return "#DC2626";
+  if (n.is_target) return "#5B21B6";
   return "#D3D1C7";
 }
 function nodeBorderW(n: PpiNode, isMain: boolean): number {
@@ -342,8 +346,8 @@ export function PpiGraph({
         <span className="mr-1">{t("필터:", "Filter:")}</span>
         <FilterChip mode="all" label={t("전체", "All")} />
         <FilterChip mode="target" label={t("타깃", "Target")} accent="#F59E0B" />
-        <FilterChip mode="pos" label={t("양성", "Positive")} accent="#185FA5" />
-        <FilterChip mode="neg" label={t("음성", "Negative")} accent="#7C3AED" />
+        <FilterChip mode="pos" label={t("상향 ↑", "Up ↑")} accent="#DC2626" />
+        <FilterChip mode="neg" label={t("하향 ↓", "Down ↓")} accent="#2563EB" />
         <FilterChip mode="neutral" label={t("중립", "Neutral")} />
         <span className="mx-1 text-line">|</span>
         <button
@@ -382,17 +386,17 @@ export function PpiGraph({
           <span className="w-3 h-3 rounded-full" style={{ background: "#F59E0B", border: "2px solid #92400E" }} />
           {t("주 타깃 (✚)", "Main target (✚)")}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#EF4444", border: "1.5px solid #DC2626" }} />
+        <span className="flex items-center gap-1.5" title={t("타깃 유전자", "Target gene")}>
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#7C3AED", border: "1.5px solid #5B21B6" }} />
           is_target
         </span>
         <span className="flex items-center gap-1.5" title={t("타깃과 양의 상관 → 상향 조절(activated)", "Positively correlated with target → up-regulated (activated)")}>
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#185FA5" }} />
-          {t("양성 ↑ (상향)", "Positive ↑ (up)")} corr &gt; 0.2
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#DC2626" }} />
+          {t("상향 ↑ (up)", "Up ↑")} corr &gt; 0.2
         </span>
         <span className="flex items-center gap-1.5" title={t("타깃과 음의 상관 → 하향 조절(suppressed)", "Negatively correlated with target → down-regulated (suppressed)")}>
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#7C3AED" }} />
-          {t("음성 ↓ (하향)", "Negative ↓ (down)")} corr &lt; −0.2
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#2563EB" }} />
+          {t("하향 ↓ (down)", "Down ↓")} corr &lt; −0.2
         </span>
         <span className="flex items-center gap-1.5" title={t("뚜렷한 변화 없음", "No clear change")}>
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#9CA3AF" }} />

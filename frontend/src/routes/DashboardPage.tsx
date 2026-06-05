@@ -250,10 +250,14 @@ export function DashboardPage() {
             <PanelCard
               title="Target Landscape"
               tooltip={t(
-                "• 축: x=Distance, y=−log10(p), z=avg(PCC)\n• 2D contour 기본 · 3D 토글 가능\n• 점 = community, ✚ = 타깃 community\n• 점 클릭 → PPI 재구성\n• PCC 슬라이더: 임계값 이상만 표시",
-                "• Axes: x=Distance, y=−log10(p), z=avg(PCC)\n• 2D contour by default · 3D toggle\n• Dots = communities, ✚ = target community\n• Click a dot → rebuild PPI\n• PCC slider: show only above threshold",
+                "단백질 community 지형도 — 타깃과의 연관 구조:\n• x = 타깃 community로부터 거리 (가까울수록 직접 연관)\n• y = −log10(p) (높을수록 연관이 유의)\n• z/색 = 모듈 평균 상관(PCC)\n→ 좌측 하단·고지대 = 타깃과 강하게 직접 연결\n• 점 = community, ✚ = 타깃 community\n• 점 클릭 → 해당 PPI 재구성\n• 2D contour 기본 · 3D 토글 · PCC 슬라이더로 임계값 필터",
+                "Protein-community landscape — structure of association with the target:\n• x = distance from the target community (closer = more direct)\n• y = −log10(p) (higher = more significant)\n• z/color = module-average correlation (PCC)\n→ lower-left & high ground = strongly, directly linked to the target\n• Dots = communities, ✚ = target community\n• Click a dot → rebuild its PPI\n• 2D contour by default · 3D toggle · PCC slider to filter by threshold",
               )}
               status={d.status_flags.landscape}
+              meta={t(
+                "높이·색(PCC) = 타깃 community와의 발현 연관성 — 높을수록 타깃과 함께 변동",
+                "Height · color (PCC) = expression association with the target community — higher = co-varies with the target",
+              )}
               actions={
                 d.landscape ? (
                   <CsvExportButton
@@ -285,8 +289,8 @@ export function DashboardPage() {
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
               tooltip={t(
-                "• 노드 = 단백질 (크기 = 연결 수)\n• 색 = 타깃과의 상관(PCC):\n   · 양성(파랑) = 함께 ↑ 상향(activated)\n   · 음성(보라) = 반대 ↓ 하향(suppressed)\n   · 중립(회색) = 뚜렷한 변화 없음\n• 엣지 = STRING 상호작용 (두께 = 신뢰도)\n• 노드 클릭 = 단백질 정보\n• 엣지 클릭 = 관련 community 안내\n• community 전환은 landscape에서",
-                "• Nodes = proteins (size = degree)\n• Color = correlation (PCC) with target:\n   · Positive (blue) = up with target (activated)\n   · Negative (purple) = opposite ↓ (suppressed)\n   · Neutral (grey) = no clear change\n• Edges = STRING interactions (width = confidence)\n• Node click = protein info\n• Edge click = related community\n• Switch communities from the landscape",
+                "• 노드 = 단백질 (크기 = 연결 수)\n• 색 = 타깃과의 발현 상관(PCC):\n   · 상향(빨강) = 함께 ↑ 증가(activated)\n   · 하향(파랑) = 반대 ↓ 감소(suppressed)\n   · 중립(회색) = 뚜렷한 변화 없음\n   · 보라 = 타깃 유전자(is_target)\n• 엣지 = STRING 상호작용 (두께 = 신뢰도)\n• 노드 클릭 = 단백질 정보\n• 엣지 클릭 = 관련 community 안내\n• community 전환은 landscape에서",
+                "• Nodes = proteins (size = degree)\n• Color = expression correlation (PCC) with target:\n   · Up (red) = increases with target (activated)\n   · Down (blue) = opposite ↓ (suppressed)\n   · Neutral (grey) = no clear change\n   · Purple = target gene (is_target)\n• Edges = STRING interactions (width = confidence)\n• Node click = protein info\n• Edge click = related community\n• Switch communities from the landscape",
               )}
               accent
               status={d.status_flags.ppi}
@@ -705,6 +709,7 @@ function ExternalRefChips({
  * consumers but is no longer rendered here.
  */
 function ExecutiveSummary({ d }: { d: DashboardResponse }) {
+  const t = useT();
   const insight = d.insight;
   const tp = d.target_profile;
   const identityKind = tp.target_class ?? tp.drug_group ?? null;
@@ -719,7 +724,13 @@ function ExecutiveSummary({ d }: { d: DashboardResponse }) {
   if (!identity && lines.length === 0) return null;
 
   return (
-    <PanelCard title="Executive Summary">
+    <PanelCard
+      title="Executive Summary"
+      tooltip={t(
+        "• 첫 줄 = 화합물 정체성 (타깃 클래스/약물군 + 타깃)\n• 아래 = 핵심 발견 상위 3개 (전체 패널 종합)\n• 대시보드를 한눈에 요약한 결론 층",
+        "• First line = compound identity (target class / drug group + targets)\n• Below = top 3 key findings (synthesized across all panels)\n• The bottom-line summary of the whole dashboard",
+      )}
+    >
       {identity && (
         <p className="text-body-strong text-ink-primary">{identity}</p>
       )}
@@ -777,8 +788,8 @@ function MechanisticSignatures({ d }: { d: DashboardResponse }) {
     <PanelCard
       title="Mechanistic Signatures"
       tooltip={t(
-        "• 각 항목 5칸 = 신호 강도 (level / 5)\n• 화합물 기전 시그니처(국소화 등) 상대 강도\n• ★ = 가장 강한 항목",
-        "• Each row's 5 cells = strength (level / 5)\n• Relative intensity of mechanistic signatures (e.g. localization)\n• ★ = strongest",
+        "화합물의 작용기전(MoA)을 4개 축으로 점수화 — 5칸 = 강도(0~5):\n• PAC (단백질 존재량 제어): 타깃 단백질 분해·감소 정도\n• Cytostatic: 세포분열·증식 정지 효과\n• Transcriptional Stress: 전사 스트레스 반응\n• DNA Damage Response: DNA 손상 반응\n• ★ = 가장 강한 축",
+        "Mechanism of action (MoA) scored on 4 axes — 5 cells = strength (0–5):\n• PAC (Protein Abundance Control): degradation / loss of the target protein\n• Cytostatic: arrest of cell division / proliferation\n• Transcriptional Stress: transcriptional stress response\n• DNA Damage Response: DNA damage response\n• ★ = strongest axis",
       )}
     >
       <ul className="flex flex-col gap-2">
