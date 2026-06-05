@@ -600,7 +600,7 @@ export function Landscape({
     <div className="w-full">
       {/* Controls — rendered ABOVE the plot (not overlay) so they don't
           collide with Plotly's modebar (zoom/pan/etc) in the top-right. */}
-      <div className="mb-2 flex flex-wrap items-center gap-3 text-meta text-ink-secondary">
+      <div className="mb-2 flex flex-wrap items-stretch gap-3 text-meta text-ink-secondary">
         {/* 2D / 3D toggle */}
         <div className="flex gap-1 rounded-md overflow-hidden border border-line bg-surface-elevated">
           <button
@@ -713,13 +713,13 @@ export function Landscape({
         )}
 
         {visibleCount < totalPoints && (
-          <span className="text-ink-muted whitespace-nowrap">
+          <span className="self-center text-ink-muted whitespace-nowrap">
             ({visibleCount}/{totalPoints})
           </span>
         )}
         {yClippedCount > 0 && (
           <span
-            className="text-ink-muted whitespace-nowrap"
+            className="self-center text-ink-muted whitespace-nowrap"
             title={t(
               "−log10(p)가 비정상적으로 큰(p≈0) community는 축 범위 밖으로 잘림",
               "Communities with degenerate −log10(p) (p≈0) are clipped beyond the axis range",
@@ -762,32 +762,40 @@ export function Landscape({
                 ✕
               </button>
             </div>
-            <ul className="mt-1.5 space-y-1 text-ink-secondary">
-              <li>
-                {t("소속 community", "community")} ·{" "}
-                <span className="font-semibold text-ink-primary">{foundNode.community_id}</span>
-              </li>
-              <li
-                title={t(
-                  "hop = community 내부 PPI 엣지를 따라 hub(=최다연결 단백질)까지의 최단 경로 길이(엣지 수)",
-                  "hop = shortest-path length (edges) to the community hub (its highest-degree protein), along PPI edges inside the community",
-                )}
-              >
-                {foundNode.hops != null ? (
-                  <>
-                    {t("중심", "hub")}(<span className="font-mono">{foundNode.center}</span>){t("에서", " ·")}{" "}
-                    <span className="font-semibold text-ink-primary">{foundNode.hops}</span> hop
-                  </>
-                ) : (
-                  <span className="text-status-warning">
-                    {t(
-                      `중심(${foundNode.center})과 PPI 연결 없음`,
-                      `no PPI link to the hub (${foundNode.center})`,
-                    )}
+            {foundNode.community_id == null ? (
+              <p className="mt-1.5 text-ink-secondary">
+                {t("소속 커뮤니티가 검출되지 않았습니다.", "Not in any detected community.")}
+              </p>
+            ) : (
+              <ul className="mt-1.5 space-y-1 text-ink-secondary">
+                <li
+                  title={t(
+                    "hop = community 내부 PPI 엣지를 따라 hub(=최다연결 단백질)까지의 최단 경로 길이(엣지 수)",
+                    "hop = shortest-path length (edges) to the community hub (its highest-degree protein), along PPI edges inside the community",
+                  )}
+                >
+                  <span className="font-semibold text-ink-primary">
+                    comm.{foundNode.community_id}
                   </span>
+                  {foundNode.hops != null ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-ink-primary">{foundNode.hops}</span> hop
+                    </>
+                  ) : (
+                    <span className="text-status-warning">
+                      {" · "}
+                      {t("hub 미연결", "hub-disconnected")}
+                    </span>
+                  )}
+                </li>
+                {foundNode.center && (
+                  <li className="text-ink-muted">
+                    {t("중심", "hub")}: <span className="font-mono">{foundNode.center}</span>
+                  </li>
                 )}
-              </li>
-            </ul>
+              </ul>
+            )}
           </div>
         )}
         {/* Protein list slide-in — search inside, click to highlight community.
@@ -833,8 +841,11 @@ export function Landscape({
                 >
                   <span className="truncate font-mono text-ink-primary">{n.protein}</span>
                   <span className="shrink-0 text-ink-muted">
-                    c{n.community_id}
-                    {n.hops != null ? ` · ${n.hops}h` : ""}
+                    {n.community_id == null
+                      ? "—"
+                      : `c${String(n.community_id).padStart(3, "0")}${
+                          n.hops != null ? `·${n.hops} hop` : ""
+                        }`}
                   </span>
                 </button>
               </li>

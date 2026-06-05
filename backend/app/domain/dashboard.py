@@ -380,6 +380,14 @@ def _build_landscape_node_index(on_target: dict[str, Any] | None) -> list[Landsc
                 protein=pid, community_id=cid, hops=hops.get(pid),
                 center=hub, x=xyz[0], y=xyz[1], z=xyz[2],
             ))
+    # The target itself may be in no community (self-anchor). Add it so it stays
+    # searchable — community_id None, positioned at the self-anchor origin.
+    target_name = on_target.get("target")
+    if target_name and target_name not in seen:
+        out.append(LandscapeNode(
+            protein=target_name, community_id=None, hops=None,
+            center=None, x=0.0, y=0.0, z=1.0,
+        ))
     return out
 
 

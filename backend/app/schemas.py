@@ -212,7 +212,7 @@ class LandscapeNode(BaseModel):
     """One protein's locator for the landscape search box."""
 
     protein: str
-    community_id: int
+    community_id: int | None = None        # None = not in any detected community
     # Graph hops from the community hub (highest-degree node) to this protein,
     # following PPI edges WITHIN the community. None = not connected to the hub.
     hops: int | None = None

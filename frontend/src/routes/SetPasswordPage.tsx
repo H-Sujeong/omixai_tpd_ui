@@ -5,7 +5,8 @@ import { useT } from "@/store/uiLang";
 
 /**
  * Forced first-login password change. RequireAuth routes a user here whenever
- * must_change_password is set; on success the flag clears and we go to /plates.
+ * must_change_password is set; on success the flag clears and we send the new
+ * user straight to the guide (their first stop) rather than the plate list.
  */
 export function SetPasswordPage() {
   const t = useT();
@@ -20,7 +21,7 @@ export function SetPasswordPage() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (mismatch || pw.length < 6) return;
-    change.mutate(pw, { onSuccess: () => navigate("/plates", { replace: true }) });
+    change.mutate(pw, { onSuccess: () => navigate("/guide", { replace: true }) });
   }
 
   return (

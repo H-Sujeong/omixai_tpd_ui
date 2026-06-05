@@ -156,7 +156,7 @@ export interface LandscapePoint {
 }
 export interface LandscapeNode {
   protein: string;
-  community_id: number;
+  community_id: number | null;  // null = not in any detected community
   hops: number | null;   // hops from the community hub; null if not connected
   center: string | null; // community hub (highest-degree node)
   x: number; y: number; z: number; // the protein's community point
