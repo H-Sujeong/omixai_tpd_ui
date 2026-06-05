@@ -58,11 +58,6 @@ const COLORSCALE_3D_JET: Array<[number, string]> = [
 
 const COLOR_TARGET_FILL = "#F59E0B";
 const COLOR_TARGET_EDGE = "#92400E";
-// Target community absent from the PPI data: drawn at the would-be target
-// position (landscape.target_point) as a HOLLOW (open) cross so it reads as a
-// pseudo/placeholder marker, in a light slate that stays visible on the dark 3D
-// scene as well as the light 2D plot (the old dark-grey was buried in dark mode).
-const COLOR_TARGET_ABSENT = "#94A3B8";
 const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
 const COLOR_OTHER_EDGE  = "#FFFFFF";
 const REF_LINE_COLOR    = "#1F2937";
@@ -76,6 +71,38 @@ const REF_LINE_COLOR    = "#1F2937";
  * decision lives in one place.
  */
 const SHOW_TARGET_GLYPH = false;
+
+// Self-anchor case: the RBF grid starts at the community x.min (> 0), so the
+// surface and the ✚ at the origin would sit apart with a gap between them.
+// Extend the grid down to (0,0) and let the origin corner rise to z = anchorZ
+// (= 1) with a Gaussian falloff, so the surface connects continuously to the
+// anchor instead of breaking off. Away from the origin the grid is unchanged.
+function extendGridToAnchor(
+  g: { xi: number[]; yi: number[]; z: number[][] },
+  anchorZ: number,
+): { xi: number[]; yi: number[]; z: number[][] } {
+  const addX = g.xi.length > 0 && g.xi[0] > 0;
+  const addY = g.yi.length > 0 && g.yi[0] > 0;
+  if (!addX && !addY) return g;
+  let xi = g.xi.slice();
+  let yi = g.yi.slice();
+  let z = g.z.map((row) => row.slice());
+  const sx = (xi[xi.length - 1] || 1) * 0.35;
+  const sy = (yi[yi.length - 1] || 1) * 0.35;
+  const blend = (base: number, x: number, y: number): number => {
+    const w = Math.exp(-((x * x) / (2 * sx * sx) + (y * y) / (2 * sy * sy)));
+    return w * anchorZ + (1 - w) * base;
+  };
+  if (addX) {
+    z = z.map((row, i) => [blend(row[0], 0, yi[i]), ...row]);
+    xi = [0, ...xi];
+  }
+  if (addY) {
+    z = [xi.map((x, j) => blend(z[0][j], x, 0)), ...z];
+    yi = [0, ...yi];
+  }
+  return { xi, yi, z };
+}
 
 export function Landscape({
   landscape,
@@ -150,15 +177,18 @@ export function Landscape({
   const dataHasTarget = landscape.scatter.some((p) => p.is_target);
   // Precomputed here because inside build2D/build3D the local `t` is the traces
   // array (shadows the useT() translator).
-  const absentTargetLabel = t("target community (PPI 데이터 없음)", "target community (no PPI data)");
-  // The would-be target position. Some assets store a {0,0,0} sentinel meaning
-  // "no position" — drawing a pseudo cross there pins the axis to the origin and
-  // leaves the contour (which only covers the data range) filling half the plot.
-  // Treat all-zero as no position and skip the marker.
-  const pseudoTarget = (() => {
-    const tp = landscape.target_point;
-    return tp && (tp.x !== 0 || tp.y !== 0 || tp.z !== 0) ? tp : null;
-  })();
+  const selfAnchorLabel = t(
+    "target (self-anchor · 거리 0 · self-corr 1)",
+    "target (self-anchor · distance 0 · self-corr 1)",
+  );
+  // When there is NO target community in the scatter (the target protein isn't
+  // anchored in a PPI module — isolated_in_ppi OR absent_from_ppi), we can still
+  // plot the TARGET ITSELF: distance 0 from itself, self-correlation 1 → the
+  // origin (0,0,1), NOT (0,0,0). The grid is extended down to it (build2D/3D) so
+  // the surface stays connected, and the marker is drawn unconditionally — the
+  // PCC / distance sliders never remove it.
+  const selfAnchor = scTarget.length === 0;
+  const anchorPoint = selfAnchor ? { x: 0, y: 0, z: 1 } : null;
 
   // -log10(p) outlier clip. Degenerate p≈0 communities (p underflowed to 0 →
   // -log10(p) capped at ~300) blow the y-axis out and squash every real point
@@ -189,7 +219,9 @@ export function Landscape({
 
   function build2D(): any[] {
     const t: any[] = [];
-    const g = landscape.grid;
+    const g = landscape.grid && selfAnchor
+      ? extendGridToAnchor(landscape.grid, 1)
+      : landscape.grid;
 
     // 1. Filled smooth contour — color on the plane (v1), normalized to the
     //    real data range (symmetric, 0 = neutral) so differences show.
@@ -277,19 +309,20 @@ export function Landscape({
         trace.textfont = { size: 16, color: COLOR_TARGET_FILL };
       }
       t.push(trace);
-    } else if (pseudoTarget) {
+    } else if (anchorPoint) {
+      // No target community → mark the target itself at the origin (0,0,1).
       t.push({
         type: "scatter",
         mode: "markers",
-        x: [pseudoTarget.x],
-        y: [pseudoTarget.y],
+        x: [anchorPoint.x],
+        y: [anchorPoint.y],
         marker: {
           size: 18,
-          symbol: "cross-open",
-          color: COLOR_TARGET_ABSENT,
-          line: { width: 3, color: COLOR_TARGET_ABSENT },
+          symbol: "cross",
+          color: COLOR_TARGET_FILL,
+          line: { width: 3, color: COLOR_TARGET_EDGE },
         },
-        hovertemplate: `<b>${absentTargetLabel}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
+        hovertemplate: `<b>${selfAnchorLabel}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
         showlegend: false,
       });
     }
@@ -299,7 +332,9 @@ export function Landscape({
 
   function build3D(): any[] {
     const t: any[] = [];
-    const g = landscape.grid;
+    const g = landscape.grid && selfAnchor
+      ? extendGridToAnchor(landscape.grid, 1)
+      : landscape.grid;
 
     // Surface — color on the plane (v1), normalized to the real data range.
     if (g) {
@@ -375,22 +410,21 @@ export function Landscape({
         trace.textfont = { color: COLOR_TARGET_FILL, size: 20, family: "Arial Black" };
       }
       t.push(trace);
-    } else if (pseudoTarget) {
-      // No target community — hollow pseudo cross at its would-be spot.
+    } else if (anchorPoint) {
+      // No target community → mark the target itself at the origin (0,0,1).
       t.push({
         type: "scatter3d",
         mode: "markers",
-        x: [pseudoTarget.x],
-        y: [pseudoTarget.y],
-        z: [pseudoTarget.z],
+        x: [anchorPoint.x],
+        y: [anchorPoint.y],
+        z: [anchorPoint.z],
         marker: {
           size: 13,
-          color: COLOR_TARGET_ABSENT,
+          color: COLOR_TARGET_FILL,
           symbol: "cross",
-          opacity: 0.55,
-          line: { width: 2, color: COLOR_TARGET_ABSENT },
+          line: { width: 2, color: COLOR_TARGET_EDGE },
         },
-        hovertemplate: `${absentTargetLabel}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
+        hovertemplate: `${selfAnchorLabel}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
         showlegend: false,
       });
     }
