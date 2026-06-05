@@ -103,13 +103,12 @@ def list_plates(
     for plate in reg.list_plates():
         if plate.plate_id not in owned:
             continue
-        # Real plates expose only drugs that actually have dashboard assets
-        # (partial data arrivals hide the not-yet-arrived drugs); mock plates
-        # show everything.
-        visible = [d for d in plate.drugs.values() if plate.is_mock or d.has_dashboard_assets]
-        n_drugs = len(visible)
-        n_wells = sum(len(d.wells) for d in visible)
-        any_assets = any(d.has_dashboard_assets for d in visible)
+        # Every drug in plate.py is shown (each has a folder + timelapse even
+        # without dashboard assets); the PPI/landscape panels just read empty
+        # for drugs whose analysis hasn't arrived yet.
+        n_drugs = len(plate.drugs)
+        n_wells = sum(len(d.wells) for d in plate.drugs.values())
+        any_assets = any(d.has_dashboard_assets for d in plate.drugs.values())
         created, updated, d = _resolve_dates(dates, plate.plate_id, plate.data_dir)
         dirty = dirty or d
         out.append(PlateSummary(
@@ -146,9 +145,8 @@ def list_drugs(
         raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
     rows: list[DrugSummaryRow] = []
     for drug in plate.drugs.values():
-        # Real plates: hide drugs without dashboard assets (not-yet-arrived).
-        if not plate.is_mock and not drug.has_dashboard_assets:
-            continue
+        # Show all drugs from plate.py; has_dashboard_assets just tells the UI
+        # whether the PPI/landscape/MoA panels have data for this drug.
         wells = [w.well_label for w in drug.wells]
         # Best single (representative) effect class + GR score for the summary row
         gr_scores = [w.gr_score for w in drug.wells if w.gr_score is not None]
