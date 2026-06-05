@@ -68,12 +68,49 @@ const REF_LINE_COLOR    = "#1F2937";
 const SIG_P = 0.05;
 const SIG_Y = -Math.log10(SIG_P);
 
-// Clamp the RBF surface to the real community PCC range. The gaussian RBF
-// overshoots between data points (grid max ~1.09 vs data max ~0.55), which
-// renders as a tall fake spike that isn't any community — so the highest peak
-// looked wrong. Clamping keeps the surface honest (peaks = real data).
-function clampGrid(z: number[][], lo: number, hi: number): number[][] {
-  return z.map((row) => row.map((v) => (v < lo ? lo : v > hi ? hi : v)));
+// Surface interpolation. We do NOT use the pipeline's gaussian-RBF
+// `landscape.grid`: RBF overshoots between data points (grid max ~1.09 vs real
+// community PCC max ~0.55), inventing tall spikes that are no community, and it
+// 0-fills outside the data hull. Instead we re-interpolate from the community
+// points with Nadaraya–Watson kernel smoothing — a weighted AVERAGE of the
+// data, so the result is mathematically bounded by the data range (no overshoot
+// ever). A small baseline weight W0 relaxes empty regions toward z=0, giving a
+// flat neutral plain away from communities (instead of a hard edge / fake fill).
+function kernelSurface(
+  pts: { x: number; y: number; z: number }[],
+  xlo: number,
+  xhi: number,
+  ylo: number,
+  yhi: number,
+  n = 60,
+): { xi: number[]; yi: number[]; z: number[][] } {
+  const xi = Array.from({ length: n }, (_, i) => xlo + (i * (xhi - xlo)) / (n - 1));
+  const yi = Array.from({ length: n }, (_, j) => ylo + (j * (yhi - ylo)) / (n - 1));
+  const sx = (xhi - xlo) * 0.05 || 1;
+  const sy = (yhi - ylo) * 0.05 || 1;
+  const ax = 1 / (2 * sx * sx);
+  const ay = 1 / (2 * sy * sy);
+  const W0 = 0.04; // baseline → empty regions relax to a flat z=0 plain
+  const z: number[][] = [];
+  for (let j = 0; j < n; j++) {
+    const gy = yi[j];
+    const row: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const gx = xi[i];
+      let wsum = 0;
+      let zsum = 0;
+      for (let k = 0; k < pts.length; k++) {
+        const dx = gx - pts[k].x;
+        const dy = gy - pts[k].y;
+        const w = Math.exp(-(dx * dx * ax + dy * dy * ay));
+        wsum += w;
+        zsum += w * pts[k].z;
+      }
+      row.push(zsum / (wsum + W0));
+    }
+    z.push(row);
+  }
+  return { xi, yi, z };
 }
 
 /**
@@ -89,35 +126,6 @@ const SHOW_TARGET_GLYPH = false;
 // Lone-peak red for the self-anchor marker (matches the colorscale's high end:
 // the target's self-correlation is 1, so it reads as a red peak).
 const COLOR_SELF_ANCHOR = "#DC2626";
-
-// Self-anchor: the RBF grid only covers the community x-range (starts at x.min >
-// 0), so the origin (where the lone target peak sits) is a bare white gap that
-// reads as "cut off" and tone-mismatched against the contour. Pad the grid down
-// to the origin with a FLAT z = 0 plain (neutral colour = "no value") so the
-// peak sits on a continuous plain rather than floating. Two extra columns/rows
-// keep the plain flat, then a thin transition into the real data edge.
-function extendGridFlat(
-  g: { xi: number[]; yi: number[]; z: number[][] },
-): { xi: number[]; yi: number[]; z: number[][] } {
-  const addX = g.xi.length > 0 && g.xi[0] > 0;
-  const addY = g.yi.length > 0 && g.yi[0] > 0;
-  if (!addX && !addY) return g;
-  let xi = g.xi.slice();
-  let yi = g.yi.slice();
-  let z = g.z.map((row) => row.slice());
-  if (addX) {
-    const xEdge = xi[0] * 0.98;
-    z = z.map((row) => [0, 0, ...row]);
-    xi = [0, xEdge, ...xi];
-  }
-  if (addY) {
-    const yEdge = yi[0] * 0.98;
-    const zeroRow = () => xi.map(() => 0);
-    z = [zeroRow(), zeroRow(), ...z];
-    yi = [0, yEdge, ...yi];
-  }
-  return { xi, yi, z };
-}
 
 export function Landscape({
   landscape,
@@ -270,6 +278,27 @@ export function Landscape({
     return [lo, inMax + pad];
   }, [landscape.scatter]);
 
+  // Re-interpolated surface (Nadaraya–Watson) from the real community points,
+  // replacing the overshooting pipeline RBF grid. Domain = data hull, extended
+  // to the origin for the self-anchor case so the flat plain reaches the peak.
+  const surfaceGrid = useMemo(() => {
+    const pts = landscape.scatter.filter(
+      (p) => Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z),
+    );
+    if (pts.length === 0) return landscape.grid; // fallback to whatever exists
+    let xlo = Math.min(...pts.map((p) => p.x));
+    let xhi = Math.max(...pts.map((p) => p.x));
+    let ylo = yClip ? yClip[0] : Math.min(...pts.map((p) => p.y));
+    let yhi = yClip ? yClip[1] : Math.max(...pts.map((p) => p.y));
+    if (selfAnchor) {
+      xlo = Math.min(0, xlo);
+      ylo = Math.min(0, ylo);
+    }
+    if (xhi <= xlo) xhi = xlo + 1;
+    if (yhi <= ylo) yhi = ylo + 1;
+    return kernelSurface(pts, xlo, xhi, ylo, yhi);
+  }, [landscape.scatter, landscape.grid, yClip, selfAnchor]);
+
   const traces: any[] = mode === "2d" ? build2D() : build3D();
 
   function build2D(): any[] {
@@ -277,7 +306,7 @@ export function Landscape({
     // Self-anchor: pad the grid to the origin with a FLAT z = 0 plain so the
     // lone peak sits on a continuous "no-value" field (tone-matched to the
     // contour) instead of floating over a bare white gap.
-    const g = landscape.grid && selfAnchor ? extendGridFlat(landscape.grid) : landscape.grid;
+    const g = surfaceGrid;
 
     // 1. Filled smooth contour — color on the plane (v1), normalized to the
     //    real data range (symmetric, 0 = neutral) so differences show.
@@ -286,7 +315,7 @@ export function Landscape({
         type: "contour",
         x: g.xi,
         y: g.yi,
-        z: clampGrid(g.z, rangeMin, rangeMax),
+        z: g.z,
         colorscale: COLORSCALE_2D,
         zmin: -zlim,
         zmax: zlim,
@@ -429,7 +458,7 @@ export function Landscape({
     // Self-anchor: pad the grid to the origin with a FLAT z = 0 plain so the
     // lone peak sits on a continuous "no-value" field (tone-matched to the
     // contour) instead of floating over a bare white gap.
-    const g = landscape.grid && selfAnchor ? extendGridFlat(landscape.grid) : landscape.grid;
+    const g = surfaceGrid;
 
     // Surface — color on the plane (v1), normalized to the real data range.
     if (g) {
@@ -437,7 +466,7 @@ export function Landscape({
         type: "surface",
         x: g.xi,
         y: g.yi,
-        z: clampGrid(g.z, rangeMin, rangeMax),
+        z: g.z,
         colorscale: COLORSCALE_3D_JET,
         cmin: -zlim,
         cmax: zlim,
