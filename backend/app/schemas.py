@@ -29,6 +29,7 @@ class PlateSummary(BaseModel):
     generated_at: str | None = None
     pipeline_version: str | None = None
     has_dashboard_assets: bool = False
+    is_mock: bool = Field(False, description="Legacy seeded/mock plate (shown as 'D3_X (Mock)')")
 
 
 # -----------------------------------------------------------------------------

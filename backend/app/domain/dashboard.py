@@ -81,8 +81,26 @@ def _make_ppi_node(raw: dict[str, Any], community_id: int | None) -> PpiNode:
 # Asset loading
 # -----------------------------------------------------------------------------
 
+# Real plates nest assets one level deeper under a treatment-time folder
+# (<TARGET>_<WELL>/24h/landscape.json). Load 24h by default; 4h is retained on
+# disk for a future time toggle. Legacy/mock plates keep the JSON directly in
+# <TARGET>_<WELL>/, so the resolver falls back to the un-nested path.
+_TIME_PREF = ("24h", "4h")
+
+
+def _resolve_in_well_dir(well_dir: Path, suffix: str) -> Path | None:
+    """Find <suffix>.json in a <TARGET>_<WELL> dir: prefer 24h, then 4h, then
+    the un-nested legacy path."""
+    for tw in _TIME_PREF:
+        cand = well_dir / tw / f"{suffix}.json"
+        if cand.exists():
+            return cand
+    cand = well_dir / f"{suffix}.json"
+    return cand if cand.exists() else None
+
+
 def _load_asset(drug: DrugRecord, target: str, suffix: str) -> dict[str, Any] | None:
-    """Load <drug.asset_dir>/<TARGET>_<WELL>/<suffix>.json.
+    """Load <drug.asset_dir>/<TARGET>_<WELL>/[<24h|4h>/]<suffix>.json.
 
     Layout (plate-unit): each (drug, target) lives in a `<TARGET>_<WELL_LABEL>/`
     subfolder (e.g. dBET6/BRD3_C05/landscape.json). We resolve WELL_LABEL from
@@ -102,16 +120,16 @@ def _load_asset(drug: DrugRecord, target: str, suffix: str) -> dict[str, Any] | 
     # Primary: resolve WELL from drug.wells
     for w in drug.wells:
         if any(t.target == target for t in w.targets):
-            cand = drug.asset_dir / f"{target}_{w.well_label}" / f"{suffix}.json"
-            if cand.exists():
+            cand = _resolve_in_well_dir(drug.asset_dir / f"{target}_{w.well_label}", suffix)
+            if cand:
                 return _read(cand)
             break  # well resolved but file missing → fall through to glob
 
     # Fallback: glob the subfolder by target prefix
     for tdir in sorted(drug.asset_dir.glob(f"{target}_*")):
         if tdir.is_dir():
-            cand = tdir / f"{suffix}.json"
-            if cand.exists():
+            cand = _resolve_in_well_dir(tdir, suffix)
+            if cand:
                 return _read(cand)
     return None
 

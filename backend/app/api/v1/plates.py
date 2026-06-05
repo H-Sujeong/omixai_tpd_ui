@@ -103,9 +103,13 @@ def list_plates(
     for plate in reg.list_plates():
         if plate.plate_id not in owned:
             continue
-        n_drugs = len(plate.drugs)
-        n_wells = sum(len(d.wells) for d in plate.drugs.values())
-        any_assets = any(d.has_dashboard_assets for d in plate.drugs.values())
+        # Real plates expose only drugs that actually have dashboard assets
+        # (partial data arrivals hide the not-yet-arrived drugs); mock plates
+        # show everything.
+        visible = [d for d in plate.drugs.values() if plate.is_mock or d.has_dashboard_assets]
+        n_drugs = len(visible)
+        n_wells = sum(len(d.wells) for d in visible)
+        any_assets = any(d.has_dashboard_assets for d in visible)
         created, updated, d = _resolve_dates(dates, plate.plate_id, plate.data_dir)
         dirty = dirty or d
         out.append(PlateSummary(
@@ -121,6 +125,7 @@ def list_plates(
             generated_at=created,
             pipeline_version="demo-0.1",
             has_dashboard_assets=any_assets,
+            is_mock=plate.is_mock,
         ))
     if dirty:
         _save_plate_dates(dates)
@@ -141,6 +146,9 @@ def list_drugs(
         raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
     rows: list[DrugSummaryRow] = []
     for drug in plate.drugs.values():
+        # Real plates: hide drugs without dashboard assets (not-yet-arrived).
+        if not plate.is_mock and not drug.has_dashboard_assets:
+            continue
         wells = [w.well_label for w in drug.wells]
         # Best single (representative) effect class + GR score for the summary row
         gr_scores = [w.gr_score for w in drug.wells if w.gr_score is not None]

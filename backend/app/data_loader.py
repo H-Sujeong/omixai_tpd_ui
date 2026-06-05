@@ -105,6 +105,7 @@ class PlateRecord:
     mosaic_timepoints: list[float]
     drug_group_summary: list[dict[str, Any]]
     target_map: dict[str, list[str]]                   # group -> targets
+    is_mock: bool = False                              # legacy seeded/mock plate
 
 
 # -----------------------------------------------------------------------------
@@ -223,6 +224,7 @@ class PlateFileSet:
     drug_dirs: list[Path]
     drug_group_summary: Path | None
     target_map: Path | None
+    is_mock: bool = False
 
 
 def _discover_plate_filesets(data_root: Path) -> list[PlateFileSet]:
@@ -252,6 +254,12 @@ def _discover_plate_filesets(data_root: Path) -> list[PlateFileSet]:
             if not m:
                 continue
             code, dose, _ = m.group(1), int(m.group(2)), m.group(3)
+            # plate_id is folder-unique (so a "plate_D3_10_mock" copy coexists
+            # with the real "plate_D3_10" even though both carry D3_10_gr.csv).
+            # Derive it from the `plate_<id>` folder name; fall back to code_dose.
+            folder = plate_dir.name
+            plate_id = folder[len("plate_"):] if folder.startswith("plate_") else f"{code}_{dose}"
+            is_mock = plate_id.endswith("_mock")
             slope = plate_dir / f"{code}_{dose}_slope_class.csv"
             tgt = plate_dir / f"{code}_target.csv"
             plate_py = plate_dir / "plate.py"
@@ -268,7 +276,7 @@ def _discover_plate_filesets(data_root: Path) -> list[PlateFileSet]:
                 and not p.name.startswith(".")
             ]
             out.append(PlateFileSet(
-                plate_id=f"{code}_{dose}",
+                plate_id=plate_id,
                 plate_code=code,
                 dose_um=float(dose),
                 gr_csv=gr,
@@ -281,6 +289,7 @@ def _discover_plate_filesets(data_root: Path) -> list[PlateFileSet]:
                     if (plate_dir / "drug_group_summary.json").exists() else None,
                 target_map=plate_dir / "target_map_clean.json"
                     if (plate_dir / "target_map_clean.json").exists() else None,
+                is_mock=is_mock,
             ))
     return out
 
@@ -400,7 +409,10 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
     for d in fs.drug_dirs:
         slug = _slugify(d.name).lower()
         drug_asset_index[slug] = d
+        # Real plates nest assets under a time folder (<TARGET_WELL>/24h/...),
+        # so check both the 2-deep (mock) and 3-deep (real) layouts.
         if (any(d.glob("*/on_target.json")) or any(d.glob("*/landscape.json"))
+                or any(d.glob("*/*/on_target.json")) or any(d.glob("*/*/landscape.json"))
                 or any(d.glob("on_target.json")) or any(d.glob("landscape.json"))):
             drug_json_slugs.add(slug)
 
@@ -472,6 +484,7 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
         mosaic_timepoints=[float(t) for t in mosaic_timepoints],
         drug_group_summary=dg_summary,
         target_map=target_map,
+        is_mock=fs.is_mock,
     )
 
 

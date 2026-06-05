@@ -322,7 +322,7 @@ function PlateCard({
         {/* Title — pipeline_version removed (was demo-0.1, not a decision
          *  input for "which plate do I open"; lives in plate detail header). */}
         <h3
-          className="text-ink-primary group-hover:text-brand-primary transition-colors tabular"
+          className="text-ink-primary group-hover:text-brand-primary transition-colors tabular flex items-center gap-2 flex-wrap"
           style={{
             fontSize: "24px",
             lineHeight: "1.1",
@@ -330,7 +330,12 @@ function PlateCard({
             letterSpacing: "-0.02em",
           }}
         >
-          {plate.plate_id}
+          {plate.is_mock ? plate.plate_id.replace(/_mock$/, "") : plate.plate_id}
+          {plate.is_mock && (
+            <span className="chip bg-status-warning/15 text-status-warning border-status-warning/30 text-meta font-semibold">
+              Mock
+            </span>
+          )}
         </h3>
 
         {/* Metadata — Set/Cell on one row, Dose/Observation on the next.
@@ -496,7 +501,14 @@ function PlateTable({
                 onClick={() => navigate(`/plates/${p.plate_id}`)}
                 className="border-b border-line/60 last:border-0 hover:bg-surface-soft cursor-pointer transition-colors"
               >
-                <td className="px-4 py-2.5 font-semibold text-ink-primary tabular">{p.plate_id}</td>
+                <td className="px-4 py-2.5 font-semibold text-ink-primary tabular">
+                  {p.is_mock ? p.plate_id.replace(/_mock$/, "") : p.plate_id}
+                  {p.is_mock && (
+                    <span className="ml-2 chip bg-status-warning/15 text-status-warning border-status-warning/30 text-meta font-semibold">
+                      Mock
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5 text-right text-ink-secondary">{p.plate_code || "—"}</td>
                 <td className="px-4 py-2.5 text-right text-ink-secondary">{p.cell_line || "—"}</td>
                 <td className="px-4 py-2.5 text-right text-ink-secondary tabular">

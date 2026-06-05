@@ -13,6 +13,7 @@ export interface PlateSummary {
   generated_at: string | null;
   pipeline_version: string | null;
   has_dashboard_assets: boolean;
+  is_mock?: boolean;
 }
 
 export interface DrugTargetEntry {
