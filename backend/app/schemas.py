@@ -208,6 +208,20 @@ class LandscapeGrid(BaseModel):
     z: list[list[float]]
 
 
+class LandscapeNode(BaseModel):
+    """One protein's locator for the landscape search box."""
+
+    protein: str
+    community_id: int
+    # Graph hops from the community hub (highest-degree node) to this protein,
+    # following PPI edges WITHIN the community. None = not connected to the hub.
+    hops: int | None = None
+    center: str | None = None              # the community hub (highest-degree node)
+    x: float                                # the protein's community point (landscape coords)
+    y: float
+    z: float
+
+
 class LandscapePanel(BaseModel):
     axes: dict[str, str]
     grid: LandscapeGrid | None = None
@@ -215,6 +229,8 @@ class LandscapePanel(BaseModel):
     # x/y/z are floats; the real pipeline also adds a "source" string
     # (anchor_community / target_node_self / placeholder), so allow Any.
     target_point: dict[str, Any] | None = None
+    # protein -> {community, hops-from-hub, point} index for the search box.
+    node_index: list[LandscapeNode] = Field(default_factory=list)
 
 
 class InteractomeNodeEgo(BaseModel):

@@ -270,6 +270,7 @@ export function DashboardPage() {
               {d.landscape ? (
                 <Landscape
                   landscape={d.landscape}
+                  targetName={d.target_id}
                   highlightCommunity={selectedCommunity}
                   onCommunityClick={handleLandscapeClick}
                   height={554}

@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import Plot from "react-plotly.js";
 import { useTheme } from "@/hooks/useTheme";
 import { useT } from "@/store/uiLang";
-import type { LandscapePanel } from "@/types/api";
+import type { LandscapeNode, LandscapePanel } from "@/types/api";
 
 interface Props {
   landscape: LandscapePanel;
+  /** Primary target protein name (for the "no target community" note). */
+  targetName?: string | null;
   /** Currently selected community (informational only — no ring is drawn). */
   highlightCommunity?: number | null;
   onCommunityClick?: (communityId: number) => void;
@@ -72,40 +74,13 @@ const REF_LINE_COLOR    = "#1F2937";
  */
 const SHOW_TARGET_GLYPH = false;
 
-// Self-anchor case: the RBF grid starts at the community x.min (> 0), so the
-// surface and the ✚ at the origin would sit apart with a gap between them.
-// Extend the grid down to (0,0) and let the origin corner rise to z = anchorZ
-// (= 1) with a Gaussian falloff, so the surface connects continuously to the
-// anchor instead of breaking off. Away from the origin the grid is unchanged.
-function extendGridToAnchor(
-  g: { xi: number[]; yi: number[]; z: number[][] },
-  anchorZ: number,
-): { xi: number[]; yi: number[]; z: number[][] } {
-  const addX = g.xi.length > 0 && g.xi[0] > 0;
-  const addY = g.yi.length > 0 && g.yi[0] > 0;
-  if (!addX && !addY) return g;
-  let xi = g.xi.slice();
-  let yi = g.yi.slice();
-  let z = g.z.map((row) => row.slice());
-  const sx = (xi[xi.length - 1] || 1) * 0.35;
-  const sy = (yi[yi.length - 1] || 1) * 0.35;
-  const blend = (base: number, x: number, y: number): number => {
-    const w = Math.exp(-((x * x) / (2 * sx * sx) + (y * y) / (2 * sy * sy)));
-    return w * anchorZ + (1 - w) * base;
-  };
-  if (addX) {
-    z = z.map((row, i) => [blend(row[0], 0, yi[i]), ...row]);
-    xi = [0, ...xi];
-  }
-  if (addY) {
-    z = [xi.map((x, j) => blend(z[0][j], x, 0)), ...z];
-    yi = [0, ...yi];
-  }
-  return { xi, yi, z };
-}
+// Lone-peak red for the self-anchor marker (matches the colorscale's high end:
+// the target's self-correlation is 1, so it reads as a red peak).
+const COLOR_SELF_ANCHOR = "#DC2626";
 
 export function Landscape({
   landscape,
+  targetName,
   onCommunityClick,
   height = 380,
 }: Props) {
@@ -131,6 +106,26 @@ export function Landscape({
   // Distance (x = Distance from anchor) lower-bound filter: show only points
   // with x >= threshold. Default 0 clamps to data min (= no filter).
   const [distThreshold, setDistThreshold] = useState<number>(0);
+
+  // Protein search: locate a protein on the landscape (its community point) and
+  // pop a small card with the community id + hops from the community hub.
+  const [proteinQuery, setProteinQuery] = useState<string>("");
+  const [foundNode, setFoundNode] = useState<LandscapeNode | null>(null);
+  const [searchMiss, setSearchMiss] = useState<boolean>(false);
+  const runProteinSearch = () => {
+    const q = proteinQuery.trim().toUpperCase();
+    if (!q) {
+      setFoundNode(null);
+      setSearchMiss(false);
+      return;
+    }
+    const idx = landscape.node_index ?? [];
+    const hit =
+      idx.find((n) => n.protein.toUpperCase() === q) ??
+      idx.find((n) => n.protein.toUpperCase().startsWith(q));
+    setFoundNode(hit ?? null);
+    setSearchMiss(!hit);
+  };
 
   const [rangeMin, rangeMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
@@ -219,9 +214,11 @@ export function Landscape({
 
   function build2D(): any[] {
     const t: any[] = [];
-    const g = landscape.grid && selfAnchor
-      ? extendGridToAnchor(landscape.grid, 1)
-      : landscape.grid;
+    // Self-anchor: do NOT fill the empty gap between the origin and the
+    // community terrain — the surroundings genuinely have no data. The grid is
+    // left untouched (it only covers the community x-range); the anchor is a
+    // lone sharp peak drawn as a marker at the origin (see below).
+    const g = landscape.grid;
 
     // 1. Filled smooth contour — color on the plane (v1), normalized to the
     //    real data range (symmetric, 0 = neutral) so differences show.
@@ -310,19 +307,39 @@ export function Landscape({
       }
       t.push(trace);
     } else if (anchorPoint) {
-      // No target community → mark the target itself at the origin (0,0,1).
+      // No target community → the target is a LONE peak at the origin (z = 1,
+      // self-correlation). A single red point; the surrounding area stays empty
+      // because there genuinely is no data there.
       t.push({
         type: "scatter",
         mode: "markers",
         x: [anchorPoint.x],
         y: [anchorPoint.y],
         marker: {
-          size: 18,
-          symbol: "cross",
-          color: COLOR_TARGET_FILL,
-          line: { width: 3, color: COLOR_TARGET_EDGE },
+          size: 16,
+          symbol: "diamond",
+          color: COLOR_SELF_ANCHOR,
+          line: { width: 2, color: "#FFFFFF" },
         },
-        hovertemplate: `<b>${selfAnchorLabel}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
+        hovertemplate: `<b>${selfAnchorLabel}</b><br>PCC=1 (self)  x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
+        showlegend: false,
+      });
+    }
+
+    // Protein-search highlight — ring on the found protein's community point.
+    if (foundNode) {
+      t.push({
+        type: "scatter",
+        mode: "markers",
+        x: [foundNode.x],
+        y: [foundNode.y],
+        marker: {
+          size: 22,
+          symbol: "circle-open",
+          color: "#D946EF",
+          line: { width: 3, color: "#D946EF" },
+        },
+        hovertemplate: `<b>${foundNode.protein}</b> · community ${foundNode.community_id}<extra></extra>`,
         showlegend: false,
       });
     }
@@ -332,9 +349,11 @@ export function Landscape({
 
   function build3D(): any[] {
     const t: any[] = [];
-    const g = landscape.grid && selfAnchor
-      ? extendGridToAnchor(landscape.grid, 1)
-      : landscape.grid;
+    // Self-anchor: do NOT fill the empty gap between the origin and the
+    // community terrain — the surroundings genuinely have no data. The grid is
+    // left untouched (it only covers the community x-range); the anchor is a
+    // lone sharp peak drawn as a marker at the origin (see below).
+    const g = landscape.grid;
 
     // Surface — color on the plane (v1), normalized to the real data range.
     if (g) {
@@ -411,20 +430,45 @@ export function Landscape({
       }
       t.push(trace);
     } else if (anchorPoint) {
-      // No target community → mark the target itself at the origin (0,0,1).
+      // No target community → a LONE sharp peak at the origin: a thin red spike
+      // rising from the floor to z = 1, with nothing around it.
+      t.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: [anchorPoint.x, anchorPoint.x],
+        y: [anchorPoint.y, anchorPoint.y],
+        z: [0, anchorPoint.z],
+        line: { color: COLOR_SELF_ANCHOR, width: 6 },
+        hoverinfo: "none",
+        showlegend: false,
+      });
       t.push({
         type: "scatter3d",
         mode: "markers",
         x: [anchorPoint.x],
         y: [anchorPoint.y],
         z: [anchorPoint.z],
+        marker: { size: 6, color: COLOR_SELF_ANCHOR, symbol: "diamond" },
+        hovertemplate: `${selfAnchorLabel}<br>PCC=1 (self)<extra></extra>`,
+        showlegend: false,
+      });
+    }
+
+    // Protein-search highlight — ring on the found protein's community point.
+    if (foundNode) {
+      t.push({
+        type: "scatter3d",
+        mode: "markers",
+        x: [foundNode.x],
+        y: [foundNode.y],
+        z: [foundNode.z],
         marker: {
-          size: 13,
-          color: COLOR_TARGET_FILL,
-          symbol: "cross",
-          line: { width: 2, color: COLOR_TARGET_EDGE },
+          size: 9,
+          symbol: "circle-open",
+          color: "#D946EF",
+          line: { width: 3, color: "#D946EF" },
         },
-        hovertemplate: `${selfAnchorLabel}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
+        hovertemplate: `${foundNode.protein} · community ${foundNode.community_id}<extra></extra>`,
         showlegend: false,
       });
     }
@@ -625,6 +669,45 @@ export function Landscape({
           />
         </div>
 
+        {/* Protein search — locate a protein's community point + hops-from-hub */}
+        <form
+          className="flex items-center gap-1.5 rounded-md border border-line bg-surface-elevated px-2 py-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            runProteinSearch();
+          }}
+        >
+          <span className="whitespace-nowrap">🔍 {t("단백질", "protein")}</span>
+          <input
+            type="text"
+            value={proteinQuery}
+            onChange={(e) => setProteinQuery(e.target.value)}
+            placeholder={t("예: BRD4", "e.g. BRD4")}
+            className="w-28 rounded border border-line bg-transparent px-1.5 py-0.5 text-ink-primary focus:outline-none focus:border-brand-primary"
+            aria-label={t("단백질 검색", "Protein search")}
+          />
+          <button
+            type="submit"
+            className="px-2 py-0.5 rounded bg-brand-primary text-white hover:opacity-90"
+          >
+            {t("찾기", "Find")}
+          </button>
+          {(foundNode || searchMiss) && (
+            <button
+              type="button"
+              onClick={() => {
+                setProteinQuery("");
+                setFoundNode(null);
+                setSearchMiss(false);
+              }}
+              className="px-1.5 py-0.5 rounded border border-line text-ink-secondary hover:text-ink-primary"
+              aria-label={t("검색 지우기", "Clear search")}
+            >
+              ✕
+            </button>
+          )}
+        </form>
+
         {visibleCount < totalPoints && (
           <span className="text-ink-muted whitespace-nowrap">
             ({visibleCount}/{totalPoints})
@@ -645,36 +728,91 @@ export function Landscape({
 
       {!dataHasTarget && landscape.scatter.length > 0 && (
         <div
-          className="mb-2 text-meta text-ink-muted"
+          className="mb-2 text-body font-semibold text-ink-secondary"
           title={t(
-            "on_target.json 의 PPI 데이터에 target 단백질 노드가 없어 target community(✚)를 표시할 수 없음",
-            "The PPI data in on_target.json has no target protein node, so the target community (✚) cannot be shown",
+            "타깃 단백질이 size>20 PPI 커뮤니티 중 어디에도 멤버로 들어가지 못해 target community(✚)가 없음 (self-anchor로 원점에 표시)",
+            "The target protein is not a member of any size>20 PPI community, so there is no target community (✚) — it is shown at the origin as a self-anchor",
           )}
         >
           {t(
-            "ⓘ target community 미표시 — 이 약물의 PPI 데이터에 target 단백질이 없습니다.",
-            "ⓘ Target community not shown — this drug's PPI data has no target protein.",
+            `ⓘ target community 미표시 — 현재 타겟 단백질 ${targetName ?? "?"}는 검출된 커뮤니티에 속한 곳이 없습니다.`,
+            `ⓘ Target community not shown — the target protein ${targetName ?? "?"} does not belong to any detected community.`,
           )}
         </div>
       )}
 
-      <Plot
-        data={traces}
-        layout={layout}
-        config={{
-          displaylogo: false,
-          responsive: true,
-          modeBarButtonsToRemove: ["toImage", "sendDataToCloud", "lasso2d", "select2d"],
-        }}
-        style={{ width: "100%", borderRadius: 6, overflow: "hidden" }}
-        onClick={(evt) => {
-          if (!onCommunityClick) return;
-          const hit = (evt.points ?? []).find(
-            (pp: any) => typeof pp?.customdata === "number",
-          ) as any;
-          if (hit) onCommunityClick(hit.customdata as number);
-        }}
-      />
+      <div className="relative">
+        {/* Protein-search result card — small opaque popup. */}
+        {foundNode && (
+          <div className="absolute left-2 top-2 z-10 w-56 rounded-md border border-line bg-surface-elevated/95 backdrop-blur px-3 py-2.5 shadow-lg text-meta">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono font-semibold text-ink-primary text-body">
+                {foundNode.protein}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFoundNode(null);
+                  setSearchMiss(false);
+                }}
+                className="text-ink-muted hover:text-ink-primary"
+                aria-label={t("닫기", "Close")}
+              >
+                ✕
+              </button>
+            </div>
+            <ul className="mt-1.5 space-y-1 text-ink-secondary">
+              <li>
+                {t("소속 community", "community")} ·{" "}
+                <span className="font-semibold text-ink-primary">{foundNode.community_id}</span>
+              </li>
+              <li
+                title={t(
+                  "hop = community 내부 PPI 엣지를 따라 hub(=최다연결 단백질)까지의 최단 경로 길이(엣지 수)",
+                  "hop = shortest-path length (edges) to the community hub (its highest-degree protein), along PPI edges inside the community",
+                )}
+              >
+                {foundNode.hops != null ? (
+                  <>
+                    {t("중심", "hub")}(<span className="font-mono">{foundNode.center}</span>){t("에서", " ·")}{" "}
+                    <span className="font-semibold text-ink-primary">{foundNode.hops}</span> hop
+                  </>
+                ) : (
+                  <span className="text-status-warning">
+                    {t(
+                      `중심(${foundNode.center})과 PPI 연결 없음`,
+                      `no PPI link to the hub (${foundNode.center})`,
+                    )}
+                  </span>
+                )}
+              </li>
+            </ul>
+          </div>
+        )}
+        {searchMiss && !foundNode && (
+          <div className="absolute left-2 top-2 z-10 rounded-md border border-line bg-surface-elevated/95 backdrop-blur px-3 py-2 text-meta text-status-warning shadow-lg">
+            {t(`"${proteinQuery}" — community에 없음`, `"${proteinQuery}" — not in any community`)}
+          </div>
+        )}
+
+        <Plot
+          data={traces}
+          layout={layout}
+          config={{
+            displaylogo: false,
+            responsive: true,
+            modeBarButtonsToRemove: ["toImage", "sendDataToCloud", "lasso2d", "select2d"],
+          }}
+          style={{ width: "100%", borderRadius: 6, overflow: "hidden" }}
+          onClick={(evt) => {
+            if (!onCommunityClick) return;
+            const hit = (evt.points ?? []).find(
+              (pp: any) => typeof pp?.customdata === "number",
+            ) as any;
+            if (hit) onCommunityClick(hit.customdata as number);
+          }}
+        />
+      </div>
     </div>
   );
 }

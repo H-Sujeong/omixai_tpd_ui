@@ -154,11 +154,19 @@ export interface LandscapePoint {
   x: number; y: number; z: number;
   community_id: number; size: number; is_target: boolean;
 }
+export interface LandscapeNode {
+  protein: string;
+  community_id: number;
+  hops: number | null;   // hops from the community hub; null if not connected
+  center: string | null; // community hub (highest-degree node)
+  x: number; y: number; z: number; // the protein's community point
+}
 export interface LandscapePanel {
   axes: Record<string, string>;
   grid: LandscapeGrid | null;
   scatter: LandscapePoint[];
-  target_point: { x: number; y: number; z: number } | null;
+  target_point: { x: number; y: number; z: number; source?: string } | null;
+  node_index?: LandscapeNode[];
 }
 
 export interface InteractomeGoCategoryItem { term: string; score: number; pvalue: number; }

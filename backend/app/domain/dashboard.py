@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from ..schemas import (
     InteractomeGoCategoryItem,
     KpiMetric,
     LandscapeGrid,
+    LandscapeNode,
     LandscapePanel,
     LandscapePoint,
     PhenomeTrackingPoint,
@@ -321,6 +323,66 @@ def _ppi_panel_for_community(payload: dict[str, Any], target: str, community_id:
     )
 
 
+def _build_landscape_node_index(on_target: dict[str, Any] | None) -> list[LandscapeNode]:
+    """protein -> {community, hops-from-hub, community point} index for search.
+
+    For each community we take the **hub** = the highest-degree node, then BFS
+    over the community's PPI edges to get each member's hop distance from the
+    hub (None when a member is not connected to the hub within the community,
+    e.g. an isolated co-clustered node). The protein's plotted position is its
+    community's landscape point (the landscape is community-level).
+    """
+    if not on_target:
+        return []
+    coords: dict[int, tuple[float, float, float]] = {}
+    for s in on_target.get("scatter", []) or []:
+        try:
+            coords[int(s.get("community_id", -1))] = (
+                float(s["x"]), float(s["y"]), float(s["z"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    out: list[LandscapeNode] = []
+    seen: set[str] = set()
+    for cid_str, c in (on_target.get("communities") or {}).items():
+        try:
+            cid = int(cid_str)
+        except (TypeError, ValueError):
+            continue
+        xyz = coords.get(cid)
+        if xyz is None:
+            continue
+        ppi = c.get("ppi", {}) or {}
+        nodes = ppi.get("nodes", []) or []
+        edges = ppi.get("edges", []) or []
+        if not nodes:
+            continue
+        hub = max(nodes, key=lambda n: n.get("degree", 0)).get("id")
+        adj: dict[str, set[str]] = defaultdict(set)
+        for e in edges:
+            s_, t_ = e.get("source"), e.get("target")
+            if s_ and t_:
+                adj[s_].add(t_)
+                adj[t_].add(s_)
+        hops: dict[str, int] = {hub: 0}
+        dq = deque([hub])
+        while dq:
+            u = dq.popleft()
+            for v in adj[u]:
+                if v not in hops:
+                    hops[v] = hops[u] + 1
+                    dq.append(v)
+        for n in nodes:
+            pid = n.get("id")
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            out.append(LandscapeNode(
+                protein=pid, community_id=cid, hops=hops.get(pid),
+                center=hub, x=xyz[0], y=xyz[1], z=xyz[2],
+            ))
+    return out
+
+
 def _landscape_panel_from_asset(
     payload: dict[str, Any],
     scatter_source: dict[str, Any] | None = None,
@@ -369,6 +431,7 @@ def _landscape_panel_from_asset(
         grid=grid,
         scatter=scatter,
         target_point=payload.get("target_point"),
+        node_index=_build_landscape_node_index(scatter_source),
     )
 
 
