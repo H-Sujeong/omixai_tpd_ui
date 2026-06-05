@@ -87,6 +87,7 @@ export interface ProteinInfo {
   protein_name: string | null;
   function: string | null;
   summary: string[];
+  summary_pending?: boolean;
   families: string[];
   length: number | null;
   mass_kda: number | null;

@@ -122,6 +122,7 @@ class ProteinInfo(BaseModel):
     protein_name: str | None = None
     function: str | None = None             # raw UniProt English text
     summary: list[str] = Field(default_factory=list)  # Korean 개조식 bullets (LLM)
+    summary_pending: bool = False           # LLM summary still generating (bg); bullets are provisional
     families: list[str] = Field(default_factory=list)
     length: int | None = None          # amino acids
     mass_kda: float | None = None      # molecular mass, kDa

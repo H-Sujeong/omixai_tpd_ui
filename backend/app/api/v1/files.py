@@ -48,15 +48,18 @@ def get_drug_timelapse(
     user: User = Depends(require_user),
     db: DbSession = Depends(get_db),
 ) -> FileResponse:
-    # Search only the user's owned plates (ownership scope).
+    # Search only the user's owned plates (ownership scope). A drug can live in
+    # several plates (e.g. D3_10 + D3_3); timelapse filenames embed the per-frame
+    # cell count, so they are plate-specific — fall through to the plate that
+    # actually HAS this file instead of 404-ing on the first plate we try.
     for plate in owned_plates(db, user):
         drug = plate.drugs.get(drug_id)
         if not drug or not drug.asset_dir:
             continue
-        tdir = drug.asset_dir / "timelapse"
-        if tdir.exists():
-            f = _resolve_safely(tdir, filename)
-            return FileResponse(f)
+        tdir = (drug.asset_dir / "timelapse").resolve()
+        cand = (tdir / filename).resolve()
+        if str(cand).startswith(str(tdir)) and cand.is_file():
+            return FileResponse(cand)
     raise HTTPException(status_code=404, detail=f"drug asset {drug_id} not found")
 
 
@@ -71,7 +74,8 @@ def get_drug_asset(
         drug = plate.drugs.get(drug_id)
         if not drug or not drug.asset_dir:
             continue
-        if (drug.asset_dir / filename).exists():
-            f = _resolve_safely(drug.asset_dir, filename)
-            return FileResponse(f)
+        base = drug.asset_dir.resolve()
+        cand = (base / filename).resolve()
+        if str(cand).startswith(str(base)) and cand.is_file():
+            return FileResponse(cand)
     raise HTTPException(status_code=404, detail=f"drug asset {drug_id} not found")

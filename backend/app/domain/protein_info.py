@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -37,6 +38,20 @@ _FIELDS = (
 
 # In-memory write-through cache (loaded once from disk).
 _cache: dict[str, dict[str, Any]] | None = None
+
+# Background LLM-summary jobs in flight (key = "GENE:lang"), so we never block
+# the request on the ~1-min local model and never double-run the same summary.
+_inflight: set[str] = set()
+_inflight_lock = threading.Lock()
+
+
+def _strip_md(text: str) -> str:
+    """Remove Markdown emphasis (**bold**, *italic*, __x__) — it leaks the LLM
+    origin; we render plain bullets."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    return text
 
 
 def _cache_path() -> Path:
@@ -202,8 +217,12 @@ def _to_bullets(text: str, anglicize: bool) -> list[str]:
     bullets: list[str] = []
     for ln in text.splitlines():
         ln = ln.strip()
-        if ln[:1] in ("-", "•", "*"):
+        # drop a leading list marker ("- ", "• ", "* ") — but not "**" emphasis
+        if ln[:2] in ("- ", "• ", "* "):
+            ln = ln[2:].strip()
+        elif ln[:1] in ("-", "•"):
             ln = ln[1:].strip()
+        ln = _strip_md(ln).strip()
         if ln:
             bullets.append(_anglicize_terms(ln) if anglicize else ln)
     return bullets[:6]
@@ -285,25 +304,59 @@ def _summary_field(lang: str) -> str:
     return "summary_en" if lang == "en" else "summary"
 
 
-def _ensure_summary(info: dict[str, Any], key: str, cache: dict[str, Any], lang: str) -> None:
-    """Lazily generate (and persist) the bullet summary for the requested language.
-    Korean → ``summary``; English → ``summary_en``. Both are cached separately so
-    switching language never re-translates — each is summarized from the English
-    UniProt function directly."""
+def _schedule_summary(key: str, lang: str) -> None:
+    """Run the slow local-LLM summary in a daemon thread and write it back to the
+    cache, so the HTTP request never blocks on it. Deduped per (gene, lang)."""
+    tag = f"{key}:{lang}"
+    with _inflight_lock:
+        if tag in _inflight:
+            return
+        _inflight.add(tag)
+
+    def _work() -> None:
+        try:
+            cache = _load()
+            info = cache.get(key)
+            if not (info and info.get("function")):
+                return
+            bullets = _summarize(
+                info.get("gene", key), info.get("protein_name"), info["function"], lang)
+            if bullets:
+                info[_summary_field(lang)] = bullets
+                cache[key] = info
+                _persist()
+        except Exception as exc:                                  # noqa: BLE001
+            log.info("background summary failed for %s: %s", tag, exc)
+        finally:
+            with _inflight_lock:
+                _inflight.discard(tag)
+
+    threading.Thread(target=_work, daemon=True).start()
+
+
+def _ensure_summary(info: dict[str, Any], key: str, cache: dict[str, Any], lang: str) -> bool:
+    """Ensure a bullet summary for `lang` (ko → ``summary``, en → ``summary_en``).
+
+    NON-BLOCKING: the slow local LLM never runs inline. If the polished summary is
+    missing we serve instant extractive bullets and kick off the LLM in the
+    background; the next fetch (the frontend re-polls while pending) gets the
+    polished version. Returns True when a background job is pending.
+    """
     if not (info.get("found") and info.get("function")):
-        return
+        return False
     info.setdefault("summary", [])
     info.setdefault("summary_en", [])
     field = _summary_field(lang)
     existing = info[field]
-    # Regenerate if missing, or (english) if a previous run cached Korean bullets.
+    # Stale if missing, or (english) a previous run cached Korean bullets.
     stale = not existing or (lang == "en" and any(_has_hangul(b) for b in existing))
-    if stale:
-        bullets = _summarize(info.get("gene", key), info.get("protein_name"), info["function"], lang)
-        if bullets:
-            info[field] = bullets
-            cache[key] = info
-            _persist()
+    if not stale:
+        return False
+    # Provisional instant bullets so the panel is never blank while the LLM runs.
+    if not existing:
+        info[field] = _extractive_en_bullets(info["function"])
+    _schedule_summary(key, lang)
+    return True
 
 
 def _shaped(info: dict[str, Any], lang: str) -> dict[str, Any]:
@@ -331,8 +384,10 @@ def get_protein_info(gene: str, lang: str = "ko") -> dict[str, Any]:
     key = gene.upper()
     info = cache.get(key)
     if info is not None:
-        _ensure_summary(info, key, cache, lang)
-        return _shaped(info, lang)
+        pending = _ensure_summary(info, key, cache, lang)
+        out = _shaped(info, lang)
+        out["summary_pending"] = pending
+        return out
 
     result = _empty(gene)
     try:
@@ -393,8 +448,11 @@ def get_protein_info(gene: str, lang: str = "ko") -> dict[str, Any]:
         return result
 
     # Only cache successful UniProt lookups so failures retry next time.
+    pending = False
     if result.get("found"):
         cache[key] = result
         _persist()
-        _ensure_summary(result, key, cache, lang)
-    return _shaped(result, lang)
+        pending = _ensure_summary(result, key, cache, lang)
+    out = _shaped(result, lang)
+    out["summary_pending"] = pending
+    return out

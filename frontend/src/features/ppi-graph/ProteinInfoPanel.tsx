@@ -63,6 +63,11 @@ export function ProteinInfoPanel({ gene, open, onClose }: Props) {
                   ) : (
                     data.function ?? "—"
                   )}
+                  {data.summary_pending && (
+                    <span className="mt-1 block text-meta text-ink-muted animate-pulse">
+                      {t("· 요약 다듬는 중…", "· refining summary…")}
+                    </span>
+                  )}
                 </Field>
                 <Field label={t("패밀리 / 도메인", "Family / domain")}>
                   {data.families.length ? data.families.join(" · ") : "—"}

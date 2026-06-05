@@ -20,6 +20,10 @@ export function useProtein(gene: string | null, lang: "ko" | "en" = "ko") {
     retry: false,
     queryFn: () =>
       apiGet<ProteinInfo>(`/api/v1/proteins/${encodeURIComponent(gene as string)}`, { lang }),
+    // The LLM bullet summary is generated in the background (instant extractive
+    // bullets are served meanwhile). While summary_pending, re-poll so the panel
+    // upgrades to the polished summary without a manual refresh.
+    refetchInterval: (q) => (q.state.data?.summary_pending ? 10_000 : false),
   });
 }
 
