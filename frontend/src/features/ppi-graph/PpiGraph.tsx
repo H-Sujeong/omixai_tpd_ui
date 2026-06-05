@@ -309,7 +309,10 @@ export function PpiGraph({
       const tgt = e.target().style("display");
       e.style("display", src === "none" || tgt === "none" ? "none" : "element");
     });
-  }, [filter]);
+    // `elements` is a dep so the active filter is re-applied after the graph
+    // rebuilds on a community switch — the filter carries over instead of
+    // resetting to "all".
+  }, [filter, elements]);
 
   const FilterChip = ({ mode, label, accent }: { mode: FilterMode; label: string; accent?: string }) => {
     const active = filter === mode;
