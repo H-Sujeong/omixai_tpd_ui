@@ -78,6 +78,35 @@ const SHOW_TARGET_GLYPH = false;
 // the target's self-correlation is 1, so it reads as a red peak).
 const COLOR_SELF_ANCHOR = "#DC2626";
 
+// Self-anchor: the RBF grid only covers the community x-range (starts at x.min >
+// 0), so the origin (where the lone target peak sits) is a bare white gap that
+// reads as "cut off" and tone-mismatched against the contour. Pad the grid down
+// to the origin with a FLAT z = 0 plain (neutral colour = "no value") so the
+// peak sits on a continuous plain rather than floating. Two extra columns/rows
+// keep the plain flat, then a thin transition into the real data edge.
+function extendGridFlat(
+  g: { xi: number[]; yi: number[]; z: number[][] },
+): { xi: number[]; yi: number[]; z: number[][] } {
+  const addX = g.xi.length > 0 && g.xi[0] > 0;
+  const addY = g.yi.length > 0 && g.yi[0] > 0;
+  if (!addX && !addY) return g;
+  let xi = g.xi.slice();
+  let yi = g.yi.slice();
+  let z = g.z.map((row) => row.slice());
+  if (addX) {
+    const xEdge = xi[0] * 0.98;
+    z = z.map((row) => [0, 0, ...row]);
+    xi = [0, xEdge, ...xi];
+  }
+  if (addY) {
+    const yEdge = yi[0] * 0.98;
+    const zeroRow = () => xi.map(() => 0);
+    z = [zeroRow(), zeroRow(), ...z];
+    yi = [0, yEdge, ...yi];
+  }
+  return { xi, yi, z };
+}
+
 export function Landscape({
   landscape,
   targetName,
@@ -214,11 +243,10 @@ export function Landscape({
 
   function build2D(): any[] {
     const t: any[] = [];
-    // Self-anchor: do NOT fill the empty gap between the origin and the
-    // community terrain — the surroundings genuinely have no data. The grid is
-    // left untouched (it only covers the community x-range); the anchor is a
-    // lone sharp peak drawn as a marker at the origin (see below).
-    const g = landscape.grid;
+    // Self-anchor: pad the grid to the origin with a FLAT z = 0 plain so the
+    // lone peak sits on a continuous "no-value" field (tone-matched to the
+    // contour) instead of floating over a bare white gap.
+    const g = landscape.grid && selfAnchor ? extendGridFlat(landscape.grid) : landscape.grid;
 
     // 1. Filled smooth contour — color on the plane (v1), normalized to the
     //    real data range (symmetric, 0 = neutral) so differences show.
@@ -349,11 +377,10 @@ export function Landscape({
 
   function build3D(): any[] {
     const t: any[] = [];
-    // Self-anchor: do NOT fill the empty gap between the origin and the
-    // community terrain — the surroundings genuinely have no data. The grid is
-    // left untouched (it only covers the community x-range); the anchor is a
-    // lone sharp peak drawn as a marker at the origin (see below).
-    const g = landscape.grid;
+    // Self-anchor: pad the grid to the origin with a FLAT z = 0 plain so the
+    // lone peak sits on a continuous "no-value" field (tone-matched to the
+    // contour) instead of floating over a bare white gap.
+    const g = landscape.grid && selfAnchor ? extendGridFlat(landscape.grid) : landscape.grid;
 
     // Surface — color on the plane (v1), normalized to the real data range.
     if (g) {
