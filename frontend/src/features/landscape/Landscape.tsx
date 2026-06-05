@@ -975,6 +975,14 @@ export function Landscape({
           }}
         />
       </div>
+
+      {/* Footnote: what the dashed reference line means. */}
+      <p className="mt-1.5 text-[10px] leading-tight text-ink-muted">
+        {t(
+          `점선 = p = ${SIG_P} 유의성 기준 (−log10 p ≈ ${SIG_Y.toFixed(2)})`,
+          `Dashed line = p = ${SIG_P} significance cutoff (−log10 p ≈ ${SIG_Y.toFixed(2)})`,
+        )}
+      </p>
     </div>
   );
 }
