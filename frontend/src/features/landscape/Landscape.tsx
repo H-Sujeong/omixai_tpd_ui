@@ -522,8 +522,20 @@ export function Landscape({
       });
     }
 
-    // Selected-community ring (from the dropdown / click) — amber.
+    // Selected-community marker (from the dropdown / click) — amber. A vertical
+    // stem from the floor pins the exact peak so it's unmistakable among
+    // clustered/overshooting spikes, and the marker is colour-coded by its PCC.
     if (selectedCommunityPoint) {
+      t.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: [selectedCommunityPoint.x, selectedCommunityPoint.x],
+        y: [selectedCommunityPoint.y, selectedCommunityPoint.y],
+        z: [0, selectedCommunityPoint.z],
+        line: { color: "#F59E0B", width: 6 },
+        hoverinfo: "none",
+        showlegend: false,
+      });
       t.push({
         type: "scatter3d",
         mode: "markers",
@@ -531,12 +543,12 @@ export function Landscape({
         y: [selectedCommunityPoint.y],
         z: [selectedCommunityPoint.z],
         marker: {
-          size: 13,
-          symbol: "circle-open",
+          size: 9,
+          symbol: "diamond",
           color: "#F59E0B",
-          line: { width: 3, color: "#F59E0B" },
+          line: { width: 2, color: "#92400E" },
         },
-        hovertemplate: `community ${selectedCommunityPoint.community_id} · selected<extra></extra>`,
+        hovertemplate: `community ${selectedCommunityPoint.community_id} · PCC ${selectedCommunityPoint.z.toFixed(2)}<extra></extra>`,
         showlegend: false,
       });
     }
@@ -572,7 +584,7 @@ export function Landscape({
         x: selectedCommunityPoint.x,
         y: selectedCommunityPoint.y,
         z: selectedCommunityPoint.z,
-        text: `community ${selectedCommunityPoint.community_id}`,
+        text: `community ${selectedCommunityPoint.community_id} · PCC ${selectedCommunityPoint.z.toFixed(2)}`,
         showarrow: true, arrowhead: 2, arrowsize: 1.3, arrowwidth: 2.5,
         arrowcolor: "#F59E0B", ax: 42, ay: -55, borderpad: 2,
         font: { color: "#B45309", size: 11 },
