@@ -41,7 +41,7 @@ from ..schemas import (
     TimeLapseViewer,
 )
 from . import drug_info as drug_info_mod
-from . import synthesize as synth
+from . import phenome
 
 log = logging.getLogger(__name__)
 
@@ -228,8 +228,11 @@ def _ppi_panel_from_on_target(payload: dict[str, Any], target: str, target_map: 
         category=g.get("category", "BP"),
     ) for g in go_raw if g.get("category") in ("BP", "MF", "CC")]
 
-    # Build node -> communities index (target community + any community where the node
-    # appears in another community's PPI subgraph).
+    # Build node -> communities index from CONSENSUS membership only (the nodes
+    # listed in each community's PPI subgraph). We deliberately do NOT augment via
+    # node_interactome ego edges: that tagged bridging proteins into communities
+    # the Louvain consensus never clustered them into (and disagreed with
+    # _ppi_panel_for_community). Membership = true consensus membership.
     node_community_index: dict[str, list[int]] = {}
     for cid_str, body in communities_raw.items():
         try:
@@ -238,21 +241,6 @@ def _ppi_panel_from_on_target(payload: dict[str, Any], target: str, target_map: 
             continue
         for n in body.get("ppi", {}).get("nodes", []):
             node_community_index.setdefault(n["id"], []).append(cid)
-
-    # Also pull cross-community neighbors via node_interactome
-    ni = payload.get("node_interactome", {})
-    ni_nodes = ni.get("nodes", {})
-    if isinstance(ni_nodes, dict):
-        for node_id, body in ni_nodes.items():
-            # Look at ego edges to discover bridging communities
-            for e in body.get("ego", {}).get("edges", []):
-                for endpoint in (e.get("source"), e.get("target")):
-                    if endpoint and endpoint != node_id:
-                        # We'll associate the neighbor with the node's community list
-                        if endpoint in node_community_index:
-                            for cid in node_community_index[endpoint]:
-                                if cid not in node_community_index.setdefault(node_id, []):
-                                    node_community_index[node_id].append(cid)
 
     return PpiPanel(
         target=target,
@@ -465,7 +453,7 @@ def _build_phenotypic(plate: PlateRecord, drug: DrugRecord) -> PhenotypicProfili
     if plate.gr_dmso:
         n = min(len(plate.gr_dmso), len(plate.gr_t_hours))
         gr_dmso = [GrCurvePoint(t_hours=float(plate.gr_t_hours[i]), grv=float(plate.gr_dmso[i])) for i in range(n)]
-    track_drug = synth.phenome_track_from_gr(
+    track_drug = phenome.phenome_track_from_gr(
         [v for _, v in well.gr_curve],
         plate.gr_dmso,
     )
@@ -612,15 +600,19 @@ def _compute_kpis(
         target_node = next((n for n in ppi.nodes if n.id == target or n.is_target), None)
         if target_node and abs(target_node.corr) > 0:
             conf = min(1.0, abs(target_node.corr))
+            conf_hint = "|PPI corr| (target node)"
         else:
+            # No target-node corr → fall back to a partner-based estimate, and say
+            # so honestly (do not present it as the target's own measurement).
             non_target_corrs = sorted((abs(n.corr) for n in ppi.nodes if not n.is_target), reverse=True)[:3]
             conf = sum(non_target_corrs) / len(non_target_corrs) if non_target_corrs else 0.0
+            conf_hint = "추정(파트너 기반) · estimated (partner-based)"
         out.append(KpiMetric(
             label="Target Confidence",
             value=f"{conf:.2f}",
             raw=conf,
             sentiment="positive" if conf >= 0.7 else "warning" if conf >= 0.4 else "negative",
-            hint="PPI corr (target node)",
+            hint=conf_hint,
         ))
     else:
         out.append(KpiMetric(label="Target Confidence", value="—", sentiment="neutral", hint="no PPI"))

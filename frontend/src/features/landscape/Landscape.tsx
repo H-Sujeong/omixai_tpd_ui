@@ -72,10 +72,10 @@ const SIG_Y = -Math.log10(SIG_P);
 // `landscape.grid`: RBF overshoots between data points (grid max ~1.09 vs real
 // community PCC max ~0.55), inventing tall spikes that are no community, and it
 // 0-fills outside the data hull. Instead we re-interpolate from the community
-// points with Nadaraya–Watson kernel smoothing — a weighted AVERAGE of the
-// data, so the result is mathematically bounded by the data range (no overshoot
-// ever). A small baseline weight W0 relaxes empty regions toward z=0, giving a
-// flat neutral plain away from communities (instead of a hard edge / fake fill).
+// points with pure Nadaraya–Watson kernel smoothing (z = Σwz / Σw) — a weighted
+// AVERAGE, so it is mathematically bounded by the data range (no overshoot) and,
+// with no baseline term, does NOT damp peaks. Cells with no nearby data return
+// null → the surface is blank there (honest: no data, no fabricated plain).
 function kernelSurface(
   pts: { x: number; y: number; z: number }[],
   xlo: number,
@@ -83,30 +83,32 @@ function kernelSurface(
   ylo: number,
   yhi: number,
   n = 60,
-): { xi: number[]; yi: number[]; z: number[][] } {
+): { xi: number[]; yi: number[]; z: (number | null)[][] } {
   const xi = Array.from({ length: n }, (_, i) => xlo + (i * (xhi - xlo)) / (n - 1));
   const yi = Array.from({ length: n }, (_, j) => ylo + (j * (yhi - ylo)) / (n - 1));
   const sx = (xhi - xlo) * 0.05 || 1;
   const sy = (yhi - ylo) * 0.05 || 1;
   const ax = 1 / (2 * sx * sx);
   const ay = 1 / (2 * sy * sy);
-  const W0 = 0.04; // baseline → empty regions relax to a flat z=0 plain
-  const z: number[][] = [];
+  const CUT = 0.05; // nearest-point weight below this ⇒ no data here ⇒ blank
+  const z: (number | null)[][] = [];
   for (let j = 0; j < n; j++) {
     const gy = yi[j];
-    const row: number[] = [];
+    const row: (number | null)[] = [];
     for (let i = 0; i < n; i++) {
       const gx = xi[i];
       let wsum = 0;
       let zsum = 0;
+      let wmax = 0;
       for (let k = 0; k < pts.length; k++) {
         const dx = gx - pts[k].x;
         const dy = gy - pts[k].y;
         const w = Math.exp(-(dx * dx * ax + dy * dy * ay));
         wsum += w;
         zsum += w * pts[k].z;
+        if (w > wmax) wmax = w;
       }
-      row.push(zsum / (wsum + W0));
+      row.push(wmax < CUT ? null : zsum / wsum);
     }
     z.push(row);
   }
@@ -245,13 +247,20 @@ export function Landscape({
     "target (self-anchor · distance 0 · self-corr 1)",
   );
   // When there is NO target community in the scatter (the target protein isn't
-  // anchored in a PPI module — isolated_in_ppi OR absent_from_ppi), we can still
-  // plot the TARGET ITSELF: distance 0 from itself, self-correlation 1 → the
-  // origin (0,0,1), NOT (0,0,0). The grid is extended down to it (build2D/3D) so
-  // the surface stays connected, and the marker is drawn unconditionally — the
-  // PCC / distance sliders never remove it.
+  // anchored in a PPI module), still plot the TARGET ITSELF: distance 0 from
+  // itself (x=0), self-correlation 1 (z=1). For y (−log10 p) we use the
+  // pipeline's `target_point` when it is the real self-anchor
+  // (source="target_node_self", y=−log10(self_p), a HIGH-significance value) —
+  // NOT y=0, which would wrongly drop the most-significant point below the line.
+  // Falls back to y=0 only for the placeholder/absent case.
   const selfAnchor = scTarget.length === 0;
-  const anchorPoint = selfAnchor ? { x: 0, y: 0, z: 1 } : null;
+  const anchorPoint = useMemo(() => {
+    if (!selfAnchor) return null;
+    const tp = landscape.target_point;
+    const y =
+      tp && tp.source === "target_node_self" && Number.isFinite(tp.y) ? Number(tp.y) : 0;
+    return { x: 0, y, z: 1 };
+  }, [selfAnchor, landscape.target_point]);
 
   // -log10(p) outlier clip. Degenerate p≈0 communities (p underflowed to 0 →
   // -log10(p) capped at ~300) blow the y-axis out and squash every real point
@@ -280,7 +289,8 @@ export function Landscape({
 
   // Re-interpolated surface (Nadaraya–Watson) from the real community points,
   // replacing the overshooting pipeline RBF grid. Domain = data hull, extended
-  // to the origin for the self-anchor case so the flat plain reaches the peak.
+  // to the origin for the self-anchor case so the axis reaches the lone peak
+  // (cells with no nearby data render blank, not a fabricated plain).
   const surfaceGrid = useMemo(() => {
     const pts = landscape.scatter.filter(
       (p) => Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z),
@@ -337,14 +347,14 @@ export function Landscape({
         hovertemplate: "x=%{x:.2f}  y=%{y:.2f}<br>PCC=%{z:.3f}<extra></extra>",
       });
 
-      // 2. significance cutoff reference line at p = 0.05 (−log10 p ≈ 1.30)
+      // 2. p = 0.05 reference line (−log10 p ≈ 1.30) — empirical, uncorrected
       t.push({
         type: "scatter",
         mode: "lines",
         x: [g.xi[0], g.xi[g.xi.length - 1]],
         y: [SIG_Y, SIG_Y],
         line: { color: REF_LINE_COLOR, width: 1.5, dash: "dash" },
-        hovertemplate: `p = ${SIG_P} (−log10 p = ${SIG_Y.toFixed(2)})<extra></extra>`,
+        hovertemplate: `p = ${SIG_P} reference (−log10 p = ${SIG_Y.toFixed(2)})<extra></extra>`,
         showlegend: false,
       });
     }
@@ -477,7 +487,7 @@ export function Landscape({
         hoverinfo: "none",
       });
 
-      // significance cutoff reference line at p = 0.05 (−log10 p ≈ 1.30), z=0
+      // p = 0.05 reference line (−log10 p ≈ 1.30), z=0 — empirical, uncorrected
       const xMin = g.xi[0];
       const xMax = g.xi[g.xi.length - 1];
       const xL: number[] = [];
@@ -684,14 +694,14 @@ export function Landscape({
           // Preserve the user's camera across slider/community updates; the
           // explicit camera below is only the initial fixed-start view.
           // (bumped to -v2 so the new lower-left orientation actually applies.)
-          uirevision: "landscape-3d-v2",
+          uirevision: "landscape-3d-v3",
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
-              // Reversed so low Distance-from-anchor — where the target sits —
-              // lands at the front-LEFT with the original camera (normal put it
-              // on the right).
-              autorange: "reversed" as const,
+              // Normal — SAME direction as the 2D x-axis (low distance at the
+              // front-left), so toggling 2D↔3D no longer mirrors the plot. The
+              // reversed framing is now achieved via the camera eye.x flip below.
+              autorange: true as const,
               gridcolor: sceneGridColor,
               tickfont: { color: axisTextColor },
               backgroundcolor: sceneBgColor,
@@ -715,10 +725,11 @@ export function Landscape({
               backgroundcolor: sceneBgColor,
               showbackground: true,
             },
-            // Low grazing start view (original framing — a mirrored eye.x
-            // cropped the scene). Target lands front-left via the reversed
-            // Distance axis below, not via the camera.
-            camera: { eye: { x: 1.35, y: -1.35, z: 0.32 } },
+            // Initial view: all 3 axes visible, looking slightly down (~10°
+            // elevation: z 0.34 over a ~1.9 horizontal radius). eye.x is now
+            // NEGATIVE to keep the previous "reversed" framing (target front-
+            // left) while the x-axis itself runs in the normal 2D direction.
+            camera: { eye: { x: -1.45, y: -1.35, z: 0.34 } },
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
             annotations: scene3dAnnotations,
@@ -1060,8 +1071,8 @@ export function Landscape({
       {/* Footnote: what the dashed reference line means. */}
       <p className="mt-1.5 text-[10px] leading-tight text-ink-muted">
         {t(
-          `점선 = p = ${SIG_P} 유의성 기준 (−log10 p ≈ ${SIG_Y.toFixed(2)})`,
-          `Dashed line = p = ${SIG_P} significance cutoff (−log10 p ≈ ${SIG_Y.toFixed(2)})`,
+          `점선 = p = ${SIG_P} 참고선 (−log10 p ≈ ${SIG_Y.toFixed(2)}; 경험분포·다중검정 미보정)`,
+          `Dashed line = p = ${SIG_P} reference line (−log10 p ≈ ${SIG_Y.toFixed(2)}; empirical, not multiple-testing corrected)`,
         )}
       </p>
     </div>

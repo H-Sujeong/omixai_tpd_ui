@@ -97,6 +97,37 @@ const SECTIONS: Record<Section, { img: string; notes: Note[]; titleKo: string; t
   },
 };
 
+// Community-formation explainer notes (shown under the dashboard section).
+// Mirrors the pipeline logic in tpd_prot_pipeline/tpd_export
+// (weights.py build_W · community.py louvain+consensus · config.py defaults).
+const COMMUNITY: Note[] = [
+  {
+    n: 1,
+    ko: "입력 — 세 조건을 모두 만족하는 단백질 쌍만 연결됩니다. P = STRING PPI(신뢰도 ≥400) · R = 유의한 발현 상관(p<0.10) · g = 발현 변동성 가중. 셋을 원소별 곱(⊙)해 가중 그래프 W를 만듭니다(W = P ⊙ R ⊙ g). → 의미: “물리적으로 알려진 관계(P)” ∩ “이 실험에서 실제로 같이 움직임(R)”을 동시에 만족해야 엣지가 생기므로, W는 조건 특이적인 반응 네트워크입니다.",
+    en: "Inputs — only protein pairs satisfying all three are linked. P = STRING PPI (confidence ≥400) · R = significant co-expression (p<0.10) · g = expression-variability weight. Their element-wise product (⊙) builds the weighted graph W (W = P ⊙ R ⊙ g). → Meaning: an edge requires both a known physical relationship (P) and actually moving together in this experiment (R), so W is a condition-specific response network.",
+  },
+  {
+    n: 2,
+    ko: "Louvain ×1000 — W 위에서 서로 다른 seed로 Louvain 군집화를 1000번 반복합니다(resolution 2.0). → 의미: Louvain은 seed에 따라 경계가 흔들리는 알고리즘이라, 한 번 결과를 그대로 믿으면 우연한 분할일 수 있습니다. 1000번은 그 불안정성을 측정하기 위한 것입니다.",
+    en: "Louvain ×1000 — run Louvain community detection 1000× on W with different seeds (resolution 2.0). → Meaning: Louvain's boundaries shift with the random seed, so a single run may be an accidental split; the 1000 runs exist to measure that instability.",
+  },
+  {
+    n: 3,
+    ko: "Consensus — 두 단백질이 1000번 중 함께 묶인 빈도(co-association)로 거리를 만들고 average-linkage 군집화 후 거리 0.2에서 컷. → 의미: “거의 매번 같이 묶인” 단백질만 한 community로 인정합니다. 운 좋게 한두 번 같이 묶인 쌍은 걸러지므로, 남는 경계는 신뢰할 수 있는 모듈입니다.",
+    en: "Consensus — turn how often two proteins co-clustered across the 1000 runs into a distance, average-linkage cluster it, then cut at 0.2. → Meaning: only proteins that grouped together nearly every time count as one community; pairs that co-clustered by luck are filtered out, so the surviving boundaries are trustworthy modules.",
+  },
+  {
+    n: 4,
+    ko: "Size 필터 — 멤버 20개 이하의 community는 제외합니다. → 의미: 통계적으로 경로 농축이나 평균 상관을 논하기 어려운 작은 조각·외톨이를 버려, Landscape에 해석 가치가 있는 모듈만 남깁니다.",
+    en: "Size filter — communities with ≤20 members are dropped. → Meaning: tiny fragments and singletons (too small to support pathway enrichment or a meaningful average correlation) are discarded, leaving only interpretable modules on the Landscape.",
+  },
+  {
+    n: 5,
+    ko: "결과 — 남은 community가 Landscape의 점이 되고, 타깃이 속한 community가 anchor(✚)입니다. → 의미: anchor는 “약물 타깃이 사는 기능 모듈”이고, 다른 점들은 그 모듈과 얼마나 함께 조절되는지로 배치됩니다. 단, 화면 PPI는 STRING 엣지(≥400)만 그리므로 상관 R로만 묶인 멤버는 내부 엣지 없이 한쪽에 떠 보일 수 있습니다(누락이 아니라 ‘발현은 같이 움직이나 물리적 연결은 다른 모듈에 있음’).",
+    en: "Result — surviving communities become the Landscape dots; the target's community is the anchor (✚). → Meaning: the anchor is the functional module the drug target lives in, and the other dots are placed by how strongly they co-regulate with it. Note the on-screen PPI draws only STRING edges (≥400), so a member grouped purely by correlation R can sit off to the side with no internal edge — not a bug, but “co-moves in expression while its physical links live in another module.”",
+  },
+];
+
 export function GuidePage() {
   const t = useT();
   const [section, setSection] = useState<Section>("sidebar");
@@ -182,6 +213,214 @@ export function GuidePage() {
           "※ Figures are illustrative examples (placeholder data); actual screens and numbers may differ.",
         )}
       </p>
+
+      {section === "dashboard" && <CommunityDefinition />}
     </div>
+  );
+}
+
+/**
+ * CommunityDefinition — bottom-of-dashboard explainer for what a "community"
+ * is on the Target Landscape / PPI panels. Pairs a language-neutral SVG flow
+ * diagram (P ⊙ R ⊙ g → Louvain ×1000 → consensus → size>20 → landscape) with a
+ * bilingual numbered walkthrough, matching the page's mockup+notes pattern.
+ * The pipeline mirrors tpd_prot_pipeline/tpd_export (weights.py / community.py).
+ */
+function CommunityDefinition() {
+  const t = useT();
+  return (
+    <section className="mt-10 pt-8 border-t border-line">
+      <h2 className="text-ink-primary text-card font-semibold">
+        {t("커뮤니티(community)는 어떻게 만들어지나", "How a community is formed")}
+      </h2>
+      <div className="mt-1 mb-4 flex flex-col gap-2 text-ink-secondary text-body" style={{ lineHeight: 1.6 }}>
+        <p>
+          {t(
+            "Landscape의 점과 PPI 패널의 단위인 community는 PPI 연결만으로 정해지지 않습니다. PPI·발현 상관·노드 가중을 모두 곱한 그래프 위에서 Louvain을 1000번 돌려 합의(consensus)로 묶인 모듈입니다.",
+            "A community — the unit behind each Landscape dot and the PPI panel — is not defined by PPI links alone. It is a module agreed upon by running Louvain 1000× over a graph that multiplies PPI, expression correlation, and node weight together.",
+          )}
+        </p>
+        <p>
+          {t(
+            "의미상으로 community는 “이 약물 처리에서 실제로 함께 반응하는 기능 모듈”입니다. PPI만 쓰면 어떤 약물에서나 똑같이 나오는 일반 상호작용 지도가 되지만, 여기에 이 실험의 발현 상관(R)을 곱하기 때문에 같이 움직인 단백질만 묶입니다 — 즉 같은 타깃이라도 약물·데이터셋마다 community 구성이 달라집니다.",
+            "Conceptually a community is “a functional module that actually responds together under this treatment.” PPI alone yields a generic interaction map that looks the same for any drug; multiplying in this experiment’s expression correlation (R) keeps only proteins that move together — so the same target can land in different communities across drugs and datasets.",
+          )}
+        </p>
+        <p>
+          {t(
+            "그래서 Landscape에서 한 점(community)에 가까운지·높은지는 “타깃이 속한 기능 모듈과 얼마나 직접적으로 함께 조절되는가”를 읽는 것이고, 그 모듈의 단백질 구성·경로 농축이 곧 약물 기전 해석의 후보가 됩니다.",
+            "So how close / high a dot (community) sits on the Landscape reads as “how directly it is co-regulated with the module the target lives in,” and that module’s protein membership and pathway enrichment become the candidate reading of the drug’s mechanism.",
+          )}
+        </p>
+      </div>
+
+      <figure className="rounded-lg border border-line bg-surface-card overflow-hidden">
+        <CommunityFlowSvg />
+      </figure>
+
+      <ol className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-2.5">
+        {COMMUNITY.map((note) => (
+          <li key={note.n} className="flex gap-2.5 items-start">
+            <span
+              className="shrink-0 mt-0.5 inline-flex items-center justify-center rounded-full text-caption font-bold"
+              style={{ width: 20, height: 20, background: "var(--color-brand-primary)", color: "#fff" }}
+            >
+              {note.n}
+            </span>
+            <span className="text-ink-secondary text-body" style={{ lineHeight: 1.5 }}>
+              {t(note.ko, note.en)}
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className="mt-4 text-meta text-ink-muted" style={{ lineHeight: 1.6 }}>
+        {t(
+          "⊙ = 원소별 곱(세 조건의 AND). 기본값: STRING confid_score 400 · corr p<0.10 · Louvain resolution 2.0 · seeds 1000 · consensus cut 0.2 · community size>20.",
+          "⊙ = element-wise product (the AND of all three). Defaults: STRING confid_score 400 · corr p<0.10 · Louvain resolution 2.0 · 1000 seeds · consensus cut 0.2 · community size>20.",
+        )}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * Language-neutral flow diagram, drawn on the same dark canvas as the other
+ * guide figures (bg #0b1220, cards #131c33, brand #A855F7). Five stages:
+ * three inputs (P/R/g) converge into W, then Louvain → consensus → result.
+ */
+function CommunityFlowSvg() {
+  // shared palette (matches public/guide/*.svg)
+  const C = {
+    card: "#131c33",
+    line: "#27324d",
+    brand: "#A855F7",
+    ink: "#E2E8F0",
+    sec: "#aeb9cb",
+    mut: "#8a97ad",
+    up: "#F59E0B",
+    down: "#185FA5",
+    wire: "#64748b",
+  };
+  const box = (x: number, y: number, w: number, h: number) => (
+    <rect x={x} y={y} width={w} height={h} rx={10} fill={C.card} stroke={C.line} strokeWidth={1} />
+  );
+  // arrow: horizontal connector with a small triangle head
+  const arrow = (x1: number, x2: number, y: number) => (
+    <g stroke={C.wire} fill={C.wire}>
+      <line x1={x1} y1={y} x2={x2 - 6} y2={y} strokeWidth={1.6} />
+      <polygon points={`${x2},${y} ${x2 - 7},${y - 4} ${x2 - 7},${y + 4}`} stroke="none" />
+    </g>
+  );
+  // input chip: big letter + two-line description
+  const chip = (x: number, y: number, letter: string, l1: string, l2: string, color: string) => (
+    <g>
+      <rect x={x} y={y} width={150} height={44} rx={9} fill="#16203a" stroke={C.line} strokeWidth={1} />
+      <text x={x + 18} y={y + 28} fontSize={17} fontWeight={700} fill={color} textAnchor="middle">
+        {letter}
+      </text>
+      <text x={x + 40} y={y + 19} fontSize={9.5} fill={C.sec} textAnchor="start">{l1}</text>
+      <text x={x + 40} y={y + 33} fontSize={9.5} fill={C.mut} textAnchor="start">{l2}</text>
+    </g>
+  );
+
+  return (
+    <svg
+      viewBox="0 0 980 270"
+      width="100%"
+      style={{ display: "block", background: "#0b1220" }}
+      fontFamily="Malgun Gothic, Segoe UI, sans-serif"
+      role="img"
+      aria-label="Community formation pipeline: P, R and g combine into the weighted graph W, then Louvain x1000, consensus clustering, a size>20 filter, and the resulting landscape communities."
+    >
+      {/* ── Stage 1: three inputs ───────────────────────────────── */}
+      {chip(14, 60, "P", "PPI adjacency", "STRING ≥ 400", C.ink)}
+      {chip(14, 112, "R", "co-expression", "p < 0.10", C.up)}
+      {chip(14, 164, "g", "node weight", "variability", C.down)}
+      <text x={182} y={104} fontSize={15} fontWeight={700} fill={C.brand} textAnchor="middle">⊙</text>
+      <text x={182} y={156} fontSize={15} fontWeight={700} fill={C.brand} textAnchor="middle">⊙</text>
+      {/* converging wires into W */}
+      <g stroke={C.wire} strokeWidth={1.2} fill="none">
+        <line x1={164} y1={82} x2={206} y2={124} />
+        <line x1={164} y1={134} x2={206} y2={124} />
+        <line x1={164} y1={186} x2={206} y2={124} />
+      </g>
+
+      {/* ── Stage 2: W weighted graph ───────────────────────────── */}
+      {box(210, 64, 150, 120)}
+      <text x={285} y={88} fontSize={17} fontWeight={700} fill={C.ink} textAnchor="middle">W</text>
+      <text x={285} y={104} fontSize={10} fill={C.brand} textAnchor="middle">= P ⊙ R ⊙ g</text>
+      {/* tiny weighted-graph glyph */}
+      <g stroke={C.wire} strokeWidth={1}>
+        <line x1={258} y1={150} x2={300} y2={132} />
+        <line x1={300} y1={132} x2={322} y2={158} />
+        <line x1={258} y1={150} x2={285} y2={168} />
+        <line x1={285} y1={168} x2={322} y2={158} />
+      </g>
+      {[[258, 150, C.up], [300, 132, C.down], [322, 158, C.down], [285, 168, C.up]].map(
+        ([cx, cy, f], i) => (
+          <circle key={i} cx={cx as number} cy={cy as number} r={4} fill={f as string} />
+        ),
+      )}
+
+      {arrow(360, 396, 124)}
+
+      {/* ── Stage 3: Louvain ×1000 ──────────────────────────────── */}
+      {box(398, 64, 176, 120)}
+      <text x={486} y={88} fontSize={13} fontWeight={700} fill={C.ink} textAnchor="middle">Louvain</text>
+      <text x={486} y={103} fontSize={10} fill={C.mut} textAnchor="middle">×1000 seeds · res 2.0</text>
+      {/* three mini partitions with different groupings */}
+      {[
+        { x: 410, groups: [C.up, C.up, C.down, C.down] },
+        { x: 470, groups: [C.up, C.down, C.up, C.down] },
+        { x: 530, groups: [C.down, C.up, C.up, C.up] },
+      ].map((p, gi) => (
+        <g key={gi}>
+          <rect x={p.x} y={120} width={48} height={50} rx={6} fill="#0f1830" stroke={C.line} strokeWidth={1} />
+          {[
+            [14, 14], [34, 16], [16, 36], [34, 36],
+          ].map(([dx, dy], di) => (
+            <circle key={di} cx={p.x + dx} cy={120 + dy} r={3.4} fill={p.groups[di]} />
+          ))}
+        </g>
+      ))}
+
+      {arrow(574, 610, 124)}
+
+      {/* ── Stage 4: consensus + size filter ────────────────────── */}
+      {box(612, 64, 176, 120)}
+      <text x={700} y={88} fontSize={13} fontWeight={700} fill={C.ink} textAnchor="middle">Consensus</text>
+      <text x={700} y={103} fontSize={9.5} fill={C.mut} textAnchor="middle">co-assoc · avg-linkage</text>
+      {/* mini dendrogram + cut line at 0.2 */}
+      <g stroke={C.sec} strokeWidth={1.1} fill="none">
+        <path d="M636 150 V138 H654 V150" />
+        <path d="M672 150 V142 H690 V150" />
+        <path d="M645 138 V126 H681 V142" />
+      </g>
+      <line x1={624} y1={131} x2={764} y2={131} stroke={C.brand} strokeWidth={1} strokeDasharray="3 3" />
+      <text x={768} y={134} fontSize={9} fill={C.brand} textAnchor="start">cut 0.2</text>
+      {/* size filter chip */}
+      <rect x={648} y={158} width={104} height={18} rx={9} fill="#231b3a" stroke={C.line} strokeWidth={1} />
+      <text x={700} y={170} fontSize={10} fontWeight={600} fill={C.brand} textAnchor="middle">size &gt; 20</text>
+
+      {arrow(788, 824, 124)}
+
+      {/* ── Stage 5: resulting communities on landscape ─────────── */}
+      {box(826, 64, 140, 120)}
+      <text x={896} y={88} fontSize={12.5} fontWeight={700} fill={C.ink} textAnchor="middle">Communities</text>
+      <text x={896} y={103} fontSize={9.5} fill={C.mut} textAnchor="middle">Landscape · ✚ target</text>
+      {[
+        [852, 150, C.up], [884, 128, C.down], [912, 158, C.down],
+        [940, 138, C.down], [922, 118, C.up], [864, 168, C.down],
+      ].map(([cx, cy, f], i) => (
+        <circle key={i} cx={cx as number} cy={cy as number} r={3.6} fill={f as string} />
+      ))}
+      <text x={852} y={154} fontSize={12} fontWeight={700} fill={C.up} textAnchor="middle">✚</text>
+
+      {/* footnote inside canvas */}
+      <text x={89} y={236} fontSize={9.5} fill={C.mut} textAnchor="start">
+        measured proteins = nodes · only pairs passing P AND R (and weighted by g) get an edge
+      </text>
+    </svg>
   );
 }
