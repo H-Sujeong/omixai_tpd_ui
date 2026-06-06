@@ -290,8 +290,8 @@ export function DashboardPage() {
             <PanelCard
               title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
               tooltip={t(
-                "• 노드 = 단백질 (크기 = 연결 수)\n• 색 = 타깃과의 발현 상관(PCC):\n   · 상향(빨강) = 함께 ↑ 증가(activated)\n   · 하향(파랑) = 반대 ↓ 감소(suppressed)\n   · 중립(회색) = 뚜렷한 변화 없음\n   · 보라 = 타깃 유전자(is_target)\n• 엣지 = STRING 상호작용 (두께 = 신뢰도)\n• 노드 클릭 = 단백질 정보\n• 엣지 클릭 = 관련 community 안내\n• community 전환은 landscape에서",
-                "• Nodes = proteins (size = degree)\n• Color = expression correlation (PCC) with target:\n   · Up (red) = increases with target (activated)\n   · Down (blue) = opposite ↓ (suppressed)\n   · Neutral (grey) = no clear change\n   · Purple = target gene (is_target)\n• Edges = STRING interactions (width = confidence)\n• Node click = protein info\n• Edge click = related community\n• Switch communities from the landscape",
+                "• 노드 = 단백질 (크기 = 연결 수)\n• 색 = 타깃과의 발현 상관(corr) — 부호로 방향, 진하기로 크기:\n   · 빨강 = 상향(corr>0, 강할수록 진함)\n   · 파랑 = 하향(corr<0, 강할수록 진함)\n   · 흰색에 가까움 = 상관 약함 (임의 임계값 없음)\n   · 보라 = 타깃 유전자(is_target)\n• |corr| 슬라이더로 약한 상관 숨김\n• 엣지 = STRING 상호작용 (두께 = 신뢰도)\n• 노드 클릭 = 단백질 정보 · 엣지 클릭 = 관련 community\n• community 전환은 landscape에서",
+                "• Nodes = proteins (size = degree)\n• Color = correlation (corr) with target — hue = sign, depth = magnitude:\n   · Red = up (corr>0, deeper = stronger)\n   · Blue = down (corr<0, deeper = stronger)\n   · Near-white = weak correlation (no arbitrary cutoff)\n   · Purple = target gene (is_target)\n• |corr| slider hides weak correlations\n• Edges = STRING interactions (width = confidence)\n• Node click = protein info · Edge click = related community\n• Switch communities from the landscape",
               )}
               accent
               status={d.status_flags.ppi}

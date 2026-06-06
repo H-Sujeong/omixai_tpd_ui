@@ -51,15 +51,16 @@ log = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 def _classify_role(corr: float, is_target: bool) -> str:
-    """Map raw PPI metrics → semantic role for node coloring."""
+    """Direction by the SIGN of corr — the pipeline's only directional rule (W is
+    split into positive/negative). The old ±0.5/−0.3/0.1 cutoffs were arbitrary
+    UI thresholds with no pipeline basis; magnitude is conveyed by colour depth
+    in the graph, not by a hard category."""
     if is_target:
         return "target"
-    if corr >= 0.5:
+    if corr > 0:
         return "activated"
-    if corr <= -0.3:
+    if corr < 0:
         return "suppressed"
-    if abs(corr) >= 0.1:
-        return "info"
     return "unknown"
 
 

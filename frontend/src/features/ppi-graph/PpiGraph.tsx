@@ -12,7 +12,7 @@ function ensureRegistered() {
   }
 }
 
-type FilterMode = "all" | "target" | "pos" | "neg" | "neutral";
+type FilterMode = "all" | "target" | "up" | "down";
 
 interface Props {
   nodes: PpiNode[];
@@ -32,30 +32,35 @@ interface Props {
  * On-Target PPI network — test_viz visual ruleset.
  * Step 13 (2026-05-21).
  *
- * Node colors (corr-based, not role-based):
+ * Node colors (continuous, by signed correlation with the target):
  *   - Primary target (n.id === targetName)  → amber #F59E0B + thick border, ✚ prefix
  *   - is_target = true                       → purple #7C3AED (target gene)
- *   - corr >  0.2                            → red  #DC2626  (up-regulated / activated)
- *   - corr < -0.2                            → blue #2563EB  (down-regulated / suppressed)
- *   - else                                   → grey #9CA3AF  (neutral)
+ *   - else → diverging blue↔white↔red by corr SIGN, depth ∝ |corr|.
  *
- * Up = warm red, down = cool blue — the standard expression-heatmap
- * convention, so direction of regulation reads at a glance. (Target genes
- * moved to purple to free red for up-regulation.)
+ * This follows the pipeline's only directional rule — the SIGN of corr (W is
+ * split into positive/negative). There is no hard ±threshold (the old ±0.2 was
+ * an arbitrary UI cutoff): magnitude shows as colour depth, and weak partners
+ * read as faint tints instead of a fabricated "neutral" grey. A |corr| slider
+ * lets the user hide weak correlations.
  *
- * Node size scales with degree (test_viz: 18-60px).
- * Plot panel uses a LIGHT background (#FAFAF7) for legibility against the
- * dark dashboard cards — same treatment as Landscape.
- *
- * Filter chips above the graph let the user isolate {target / pos / neg / neutral}.
+ * Node size scales with degree (18-60px). Plot panel uses a LIGHT background
+ * (#FAFAF7) for legibility against the dark dashboard cards (same as Landscape).
  */
+
+// Diverging colour by signed correlation: near-white at corr≈0 → red (up) /
+// blue (down), depth ∝ |corr|. Weak tints stay visible (floor 0.18).
+function corrColor(corr: number): string {
+  const e = 0.18 + 0.82 * Math.min(1, Math.abs(corr));
+  const base = [244, 246, 248];
+  const hi = corr >= 0 ? [220, 38, 38] : [37, 99, 235];
+  const m = (a: number, b: number) => Math.round(a + (b - a) * e);
+  return `rgb(${m(base[0], hi[0])},${m(base[1], hi[1])},${m(base[2], hi[2])})`;
+}
 
 function nodeColor(n: PpiNode, isMain: boolean): string {
   if (isMain) return "#F59E0B";
   if (n.is_target) return "#7C3AED";
-  if (n.corr > 0.2) return "#DC2626"; // up-regulated (warm red)
-  if (n.corr < -0.2) return "#2563EB"; // down-regulated (cool blue)
-  return "#9CA3AF";
+  return corrColor(n.corr);
 }
 function nodeBorder(n: PpiNode, isMain: boolean): string {
   if (isMain) return "#92400E";
@@ -86,6 +91,8 @@ export function PpiGraph({
   const ref = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
   const [filter, setFilter] = useState<FilterMode>("all");
+  // Hide weak correlations: show only |corr| >= minCorr (target always kept).
+  const [minCorr, setMinCorr] = useState<number>(0);
 
   const elements = useMemo<ElementDefinition[]>(() => {
     const els: ElementDefinition[] = [];
@@ -284,22 +291,20 @@ export function PpiGraph({
       const isMain = n.data("is_main") === "yes";
       const isTarget = n.data("is_target") === "yes";
       const corr = (n.data("corr") as number) ?? 0;
-      let show = true;
-      switch (filter) {
-        case "target":
-          show = isMain || isTarget;
-          break;
-        case "pos":
-          show = isMain || corr > 0.2;
-          break;
-        case "neg":
-          show = isMain || corr < -0.2;
-          break;
-        case "neutral":
-          show = isMain || (corr >= -0.2 && corr <= 0.2 && !isTarget);
-          break;
-        default:
-          show = true;
+      // direction by SIGN; magnitude gate via the |corr| slider
+      let show: boolean;
+      if (isMain || isTarget) {
+        show = true; // target always kept
+      } else if (Math.abs(corr) < minCorr) {
+        show = false; // weak correlation hidden
+      } else if (filter === "up") {
+        show = corr > 0;
+      } else if (filter === "down") {
+        show = corr < 0;
+      } else if (filter === "target") {
+        show = false; // only target/main (handled above)
+      } else {
+        show = true; // "all"
       }
       n.style("display", show ? "element" : "none");
     });
@@ -312,7 +317,7 @@ export function PpiGraph({
     // `elements` is a dep so the active filter is re-applied after the graph
     // rebuilds on a community switch — the filter carries over instead of
     // resetting to "all".
-  }, [filter, elements]);
+  }, [filter, minCorr, elements]);
 
   const FilterChip = ({ mode, label, accent }: { mode: FilterMode; label: string; accent?: string }) => {
     const active = filter === mode;
@@ -349,9 +354,22 @@ export function PpiGraph({
         <span className="mr-1">{t("필터:", "Filter:")}</span>
         <FilterChip mode="all" label={t("전체", "All")} />
         <FilterChip mode="target" label={t("타깃", "Target")} accent="#F59E0B" />
-        <FilterChip mode="pos" label={t("상향 ↑", "Up ↑")} accent="#DC2626" />
-        <FilterChip mode="neg" label={t("하향 ↓", "Down ↓")} accent="#2563EB" />
-        <FilterChip mode="neutral" label={t("중립", "Neutral")} />
+        <FilterChip mode="up" label={t("상향 ↑", "Up ↑")} accent="#DC2626" />
+        <FilterChip mode="down" label={t("하향 ↓", "Down ↓")} accent="#2563EB" />
+        {/* |corr| strength gate — hide weak correlations */}
+        <span className="ml-1 inline-flex items-center gap-1 whitespace-nowrap">
+          |corr| ≥ <span className="tabular text-ink-secondary">{minCorr.toFixed(2)}</span>
+          <input
+            type="range"
+            min={0}
+            max={0.8}
+            step={0.05}
+            value={minCorr}
+            onChange={(e) => setMinCorr(parseFloat(e.target.value))}
+            className="w-24 accent-brand-primary"
+            aria-label={t("|corr| 세기 임계값", "|corr| strength threshold")}
+          />
+        </span>
         <span className="mx-1 text-line">|</span>
         <button
           type="button"
@@ -393,18 +411,22 @@ export function PpiGraph({
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#7C3AED", border: "1.5px solid #5B21B6" }} />
           is_target
         </span>
-        <span className="flex items-center gap-1.5" title={t("타깃과 양의 상관 → 상향 조절(activated)", "Positively correlated with target → up-regulated (activated)")}>
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#DC2626" }} />
-          {t("상향 ↑ (up)", "Up ↑")} corr &gt; 0.2
+        {/* Continuous corr legend: blue (down) ↔ white (0) ↔ red (up), depth = |corr| */}
+        <span
+          className="flex items-center gap-1.5"
+          title={t(
+            "타깃과의 상관(corr): 색=부호(빨강 상향/파랑 하향), 진하기=|corr|",
+            "Correlation with target: hue = sign (red up / blue down), depth = |corr|",
+          )}
+        >
+          {t("하향 ↓", "Down ↓")}
+          <span
+            className="h-2.5 w-24 rounded-sm border border-line"
+            style={{ background: `linear-gradient(to right, ${corrColor(-0.85)}, ${corrColor(0)}, ${corrColor(0.85)})` }}
+          />
+          {t("↑ 상향", "Up ↑")}
         </span>
-        <span className="flex items-center gap-1.5" title={t("타깃과 음의 상관 → 하향 조절(suppressed)", "Negatively correlated with target → down-regulated (suppressed)")}>
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#2563EB" }} />
-          {t("하향 ↓ (down)", "Down ↓")} corr &lt; −0.2
-        </span>
-        <span className="flex items-center gap-1.5" title={t("뚜렷한 변화 없음", "No clear change")}>
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#9CA3AF" }} />
-          {t("중립", "Neutral")}
-        </span>
+        <span className="opacity-70">{t("진하기 = |corr|", "depth = |corr|")}</span>
         <span className="ml-auto opacity-70">
           {t("노드 크기 = degree · 엣지 두께 = STRING 신뢰도", "Node size = degree · Edge width = STRING confidence")}
         </span>
