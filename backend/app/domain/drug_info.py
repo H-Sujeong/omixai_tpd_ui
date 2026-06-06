@@ -49,12 +49,10 @@ _PATHWAY_BY_GROUP = {
     "Other_kinase_misc": "Mixed kinase signaling",
 }
 
-_MOA_TEMPLATE = (
-    "{drug} is a heterobifunctional PROTAC degrader designed to induce ubiquitin "
-    "proteasome-mediated degradation of {targets}. By recruiting an E3 ligase to "
-    "the target, it depletes endogenous protein levels rather than blocking activity, "
-    "producing a sustained loss-of-function pharmacology."
-)
+# Shown when there is no curated MoA annotation for this compound. We do NOT
+# fabricate a generic "PROTAC degrader" sentence (it was asserted for every drug,
+# including non-PROTAC compounds) — flag the absence honestly instead.
+_MOA_NOT_RECEIVED = "MoA 데이터 미수신 (no curated MoA annotation received)"
 
 
 def get_drug_info(
@@ -68,10 +66,7 @@ def get_drug_info(
     cache = _load_cache()
     cached = cache.get(hy_code or drug_name)
     pathway = (cached or {}).get("pathway") or _PATHWAY_BY_GROUP.get(drug_group or "", "Targeted protein degradation")
-    moa = (cached or {}).get("moa") or _MOA_TEMPLATE.format(
-        drug=drug_name,
-        targets="/".join(targets) if targets else "the indicated target",
-    )
+    moa = (cached or {}).get("moa") or _MOA_NOT_RECEIVED
     references_url = (cached or {}).get("references") or {}
     return {
         "pathway": pathway,

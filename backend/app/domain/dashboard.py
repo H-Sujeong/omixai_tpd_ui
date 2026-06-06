@@ -736,7 +736,9 @@ def _compute_insight(
     notes: list[str] = []
     if drug_group:
         notes.append(f"Drug group: {drug_group}")
-    notes.append("Cell line: U2OS · 48h treatment · 4h imaging cadence")
+    # Removed the hardcoded "U2OS · 48h treatment · 4h imaging cadence" note —
+    # the "4h imaging cadence" contradicted the real 0.5h time-lapse, and the
+    # rest was unverified hardcoding asserted as fact.
 
     return InsightSummary(
         mechanism=moa_summary,
