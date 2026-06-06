@@ -7,8 +7,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session as DbSession
 
 from ...auth import hash_password, initial_password_for, require_admin
-from ...data_loader import get_registry
+from ...data_loader import get_registry, reload_registry
 from ...db import get_db
+from ...domain import drug_info
 from ...models import Plate, User
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -138,6 +139,35 @@ def reset_user_password(user_id: int, db: DbSession = Depends(get_db)) -> ResetP
     u.must_change_password = True
     db.commit()
     return ResetPwOut(password=pw)
+
+
+class ReloadOut(BaseModel):
+    ok: bool = True
+    n_plates: int
+    plate_ids: list[str] = []
+
+
+@router.post("/reload", response_model=ReloadOut)
+def reload_data() -> ReloadOut:
+    """Re-read all plate data from disk without restarting the process.
+
+    The registry and drug-info lookups are cached (``lru_cache``) and loaded
+    eagerly into memory on first access, so on-disk data changes are otherwise
+    invisible until restart. This clears those caches and rebuilds the registry.
+
+    Both cleared caches just re-read JSON files from disk — there is NO re-crawl
+    of UniProt/LLM here, so reload is cheap.
+
+    DELIBERATELY NOT touched: the protein-info cache (``protein_info._cache`` /
+    ``var/protein_info_cache.json``). That cache is write-through to disk and the
+    expensive part to rebuild (UniProt REST + LLM summaries), and it is keyed by
+    gene — independent of plate data. Clearing it would force slow re-fetches and
+    transiently blank protein descriptions for no benefit. Leave it alone.
+    """
+    drug_info.reload_cache()
+    reg = reload_registry()
+    pids = sorted(p.plate_id for p in reg.list_plates())
+    return ReloadOut(n_plates=len(pids), plate_ids=pids)
 
 
 @router.get("/plates", response_model=list[PlateOption])

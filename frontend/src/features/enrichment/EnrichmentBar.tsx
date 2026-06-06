@@ -31,15 +31,28 @@ const FALLBACK_COLOR = "148 163 184"; // slate
 const ALPHA_STEP = 0.05;   // 5% drop per rank
 const ALPHA_FLOOR = 0.35;  // never below 35% — guarantees readability
 
+// Bars are ranked & scaled by SIGNIFICANCE: −log10(adjusted p-value).
+//
+// We deliberately do NOT use the Enrichr Combined Score (the `score` field).
+// Per the data team, recent Enrichr API responses omit the Z-score, so gseapy's
+// `Combined Score = log(p)·z` collapses to `inf` for ~1/0.8 terms per CSV — a
+// numerical artifact (small set / small overlap), not real signal, which the
+// pipeline caps to 1e10. Sorting by it surfaces artifacts and its unbounded
+// magnitude breaks bar comparison. Adjusted p (BH-corrected for the many GO
+// terms tested per community) is always finite (~0–30) and is what we want.
+function negLog10(pvalue: number): number {
+  return -Math.log10(Math.max(pvalue, 1e-300)); // floor avoids −log10(0)=∞
+}
+
 export function EnrichmentBar({ terms, height }: Props) {
   const t = useT();
   if (!terms.length)
     return <EmptyBlock label={t("Enrichment 결과가 없습니다.", "No enrichment results.")} />;
 
-  // Global sort by score (highest first); also pre-compute rank within
-  // each category so alpha can step down per-category from #1 = 100%.
-  const sorted = [...terms].sort((a, b) => b.score - a.score);
-  const maxScore = sorted[0]?.score ?? 1;
+  // Sort by significance (most significant first = smallest adjusted p); also
+  // pre-compute rank within each category so alpha can step down per-category.
+  const sorted = [...terms].sort((a, b) => a.pvalue - b.pvalue);
+  const maxNL = Math.max(...sorted.map((t) => negLog10(t.pvalue)), 1);
 
   const rankInCategory = new Map<GoTerm, number>();
   const categoryRunCount: Record<string, number> = {};
@@ -55,23 +68,32 @@ export function EnrichmentBar({ terms, height }: Props) {
       style={height !== undefined ? { height, overflowY: "auto" } : undefined}
     >
       {sorted.map((g) => {
-        const widthPct = Math.max(8, (g.score / maxScore) * 100);
+        const nl = negLog10(g.pvalue);
+        const widthPct = Math.max(8, (nl / maxNL) * 100);
         const rgb = CATEGORY_COLOR[g.category] ?? FALLBACK_COLOR;
         const rank = rankInCategory.get(g) ?? 1;
         const alpha = Math.max(ALPHA_FLOOR, 1 - (rank - 1) * ALPHA_STEP);
         const truncated = g.term.length > 64 ? g.term.slice(0, 61) + "…" : g.term;
         return (
-          <div key={g.term} className="grid grid-cols-[1fr_auto] items-center gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline justify-between gap-2 mb-1">
-                <span className="text-body text-ink-secondary truncate" title={g.term}>
-                  {truncated}
-                </span>
-                <span className="text-meta text-ink-muted font-mono tabular shrink-0">
-                  {g.category} · p={g.pvalue.toExponential(1)}
-                </span>
-              </div>
-              <div className="relative h-2.5 rounded-full bg-surface-soft overflow-hidden">
+          <div key={g.term} className="min-w-0">
+            {/* Term on its own line. */}
+            <div className="text-body-strong text-ink-secondary truncate mb-1" title={g.term}>
+              {truncated}
+            </div>
+            {/* Badge + bar + p_adj + −log10 share one row, vertically centered on
+                the bar so the numbers line up with the bar's mid-height. The
+                category badge (solid color, black bold letters) sits at the bar's
+                start; p_adj and −log10 are pushed right (ml-auto) to align across
+                rows. */}
+            <div className="flex items-center gap-2">
+              <span
+                className="shrink-0 w-7 text-center rounded-sm px-1 py-0.5 text-caption font-bold leading-none text-black"
+                style={{ background: `rgb(${rgb})` }}
+                title={g.category}
+              >
+                {g.category}
+              </span>
+              <div className="relative h-2 w-[42%] rounded-full bg-surface-soft overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-base"
                   style={{
@@ -80,10 +102,16 @@ export function EnrichmentBar({ terms, height }: Props) {
                   }}
                 />
               </div>
+              <span className="ml-auto shrink-0 text-body text-ink-muted font-mono tabular">
+                p<sub>adj</sub>={g.pvalue.toExponential(1)}
+              </span>
+              <span
+                className="shrink-0 w-12 text-right text-body text-ink-secondary font-mono tabular"
+                title={`−log10(adjusted p) = ${nl.toFixed(2)}`}
+              >
+                {nl.toFixed(1)}
+              </span>
             </div>
-            <span className="text-meta text-ink-muted font-mono tabular w-10 text-right">
-              {g.score.toFixed(1)}
-            </span>
           </div>
         );
       })}
@@ -100,6 +128,7 @@ export function EnrichmentBar({ terms, height }: Props) {
           <span className="w-3 h-2 rounded-sm" style={{ background: `rgb(${CATEGORY_COLOR.CC})` }} />
           CC — Cellular Component
         </span>
+        <span className="font-mono">{t("막대·숫자 = −log10(보정 p)", "bar · number = −log10(adj p)")}</span>
       </div>
     </div>
   );

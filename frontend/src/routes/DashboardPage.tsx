@@ -203,6 +203,18 @@ export function DashboardPage() {
   const exportMeta = { plate: d.plate_id, drug: d.drug_name, drugId: d.drug_id, target: activeTarget };
   const exportBase = `${d.drug_id}_${activeTarget}`.replace(/[^A-Za-z0-9._-]+/g, "_");
 
+  // Enrichment follows the active community. Navigating to another community in
+  // the landscape swaps activePpi to that community's panel, whose go_terms is
+  // its own GO set; mirror that here so the Pathway Enrichment panel re-renders
+  // with it. Fall back to d.enrichment if ppi is null.
+  //
+  // Ranked by significance (smallest adjusted p first), NOT by the Enrichr
+  // Combined Score (`score`): that field goes ∞ for ~1 term/CSV when the API
+  // omits the Z-score (artifact) and is unbounded — see EnrichmentBar.
+  const enrichmentTerms = [...(activePpi?.go_terms ?? d.enrichment)]
+    .sort((a, b) => a.pvalue - b.pvalue)
+    .slice(0, 12);
+
   return (
     <div className="flex-1 flex flex-col">
       <DashboardHeader
@@ -349,19 +361,19 @@ export function DashboardPage() {
             <PanelCard
               title="Pathway Enrichment"
               tooltip={t(
-                "• 현재 community 단백질의 GO 기능 농축\n• 막대 길이 = enrichment score (길수록 강함)\n• 색 = 카테고리 (BP/MF/CC)\n• p = 유의확률\n→ 이 community가 어떤 기능에 모여 있는지",
-                "• GO functional enrichment of this community\n• Bar length = enrichment score (longer = stronger)\n• Color = category (BP/MF/CC)\n• p = significance\n→ which functions this community is concentrated in",
+                "• 현재 community 단백질의 GO 기능 농축\n• 막대 길이 = −log10(보정 p) (길수록 유의)\n• 색 = 카테고리 (BP/MF/CC)\n• p_adj = Benjamini–Hochberg(FDR) 보정 — gene-set 라이브러리별 다중검정 보정\n• 배경 universe = 측정된 단백질 전체(~9천), Fisher exact 검정\n→ 이 community가 어떤 기능에 모여 있는지",
+                "• GO functional enrichment of this community\n• Bar length = −log10(adjusted p) (longer = more significant)\n• Color = category (BP/MF/CC)\n• p_adj = Benjamini–Hochberg (FDR) — corrected per gene-set library\n• Background universe = all measured proteins (~9k), Fisher exact test\n→ which functions this community is concentrated in",
               )}
               actions={
-                d.enrichment?.length ? (
+                enrichmentTerms.length ? (
                   <CsvExportButton
                     filename={`${exportBase}_enrichment.csv`}
-                    build={() => buildEnrichmentCsv(d.enrichment, exportMeta)}
+                    build={() => buildEnrichmentCsv(enrichmentTerms, exportMeta)}
                   />
                 ) : undefined
               }
             >
-              <EnrichmentBar terms={d.enrichment} />
+              <EnrichmentBar terms={enrichmentTerms} />
             </PanelCard>
           </section>
 
@@ -488,10 +500,17 @@ function DashboardHeader({
   const c = d.compound;
   const activeSection = useActiveSection(SECTION_NAV.map((s) => s.id));
 
+  // Keep enrichment in lock-step with the active community (same as the
+  // Pathway Enrichment panel) so the bulk export matches what's on screen.
+  // Ranked by significance (adjusted p), not the artifact-prone Combined Score.
+  const enrichmentTerms = [...(activePpi?.go_terms ?? d.enrichment)]
+    .sort((a, b) => a.pvalue - b.pvalue)
+    .slice(0, 12);
+
   const exportCtx = {
     ppi: activePpi,
     landscape: d.landscape,
-    enrichment: d.enrichment,
+    enrichment: enrichmentTerms,
     phenotypic: d.phenotypic,
     timeLapse: d.time_lapse,
     drugName: d.drug_name,
