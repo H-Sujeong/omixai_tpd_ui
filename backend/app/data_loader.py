@@ -106,6 +106,21 @@ class PlateRecord:
     drug_group_summary: list[dict[str, Any]]
     target_map: dict[str, list[str]]                   # group -> targets
     is_mock: bool = False                              # legacy seeded/mock plate
+    # === Timecourse / multi-dose extensions (2026-06-06) ===
+    # `baseline_dir` is <data_dir>/_baseline/ when the pipeline ships a 0h
+    # baseline for this plate (built from untreated wells, shared by all drugs
+    # at this plate's dose). Per-target subfolders: {TARGET}/0h/{landscape,on_target}.json
+    baseline_dir: Path | None = None
+    # `normalization_group` ties together plates that were batch-normalized
+    # against the same reference. Multi-dose plates (kind="multi_dose") fuse the
+    # members whose group ID matches — see plate_meta.json.
+    normalization_group: str | None = None
+    # "single_dose" (default — has its own gr/slope csvs) vs "multi_dose"
+    # (manifest-only virtual plate aggregating member plates).
+    kind: str = "single_dose"
+    # For multi_dose plates: member single-dose plate_ids and their doses.
+    members: list[str] = field(default_factory=list)
+    member_doses: dict[str, float] = field(default_factory=dict)
 
 
 # -----------------------------------------------------------------------------
@@ -225,6 +240,43 @@ class PlateFileSet:
     drug_group_summary: Path | None
     target_map: Path | None
     is_mock: bool = False
+
+
+@dataclass(frozen=True)
+class MultiDoseFileSet:
+    """Manifest-only plate that aggregates several single-dose plates batch-
+    normalized against the same reference. No GR/slope/target CSVs of its own
+    (those come from the member plates)."""
+    plate_id: str
+    data_dir: Path
+    plate_meta: dict[str, Any]
+
+
+def _discover_multi_dose_plates(data_root: Path) -> list[MultiDoseFileSet]:
+    """Find virtual multi-dose plates — directories that carry only a
+    `plate_meta.json` with `kind: "multi_dose"` (no D{N}_{dose}_gr.csv of their
+    own). They aggregate member single-dose plates that share a normalization
+    group, exposing a dose toggle in the UI."""
+    out: list[MultiDoseFileSet] = []
+    if not data_root.is_dir():
+        return out
+    for child in data_root.iterdir():
+        if not child.is_dir():
+            continue
+        meta_path = child / "plate_meta.json"
+        if not meta_path.exists():
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception as exc:                                    # noqa: BLE001
+            log.warning("plate_meta.json load failed (%s): %s", meta_path, exc)
+            continue
+        if meta.get("kind") != "multi_dose":
+            continue
+        folder = child.name
+        plate_id = folder[len("plate_"):] if folder.startswith("plate_") else folder
+        out.append(MultiDoseFileSet(plate_id=plate_id, data_dir=child, plate_meta=meta))
+    return out
 
 
 def _discover_plate_filesets(data_root: Path) -> list[PlateFileSet]:
@@ -472,11 +524,27 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
                 tps.add(int(m.group(3)))
         mosaic_timepoints = sorted(tps)
 
+    # Optional plate-level metadata (normalization group, pipeline version, etc.)
+    # Falls back to None silently if the file isn't shipped yet.
+    plate_dir = fs.gr_csv.parent
+    norm_group: str | None = None
+    meta_path = plate_dir / "plate_meta.json"
+    if meta_path.exists():
+        try:
+            pm = json.loads(meta_path.read_text(encoding="utf-8"))
+            norm_group = pm.get("normalization_group")
+        except Exception as exc:                                # noqa: BLE001
+            log.warning("plate_meta load failed (%s): %s", meta_path, exc)
+
+    baseline_dir = plate_dir / "_baseline"
+    if not baseline_dir.exists():
+        baseline_dir = None
+
     return PlateRecord(
         plate_id=fs.plate_id,
         plate_code=fs.plate_code,
         dose_um=fs.dose_um,
-        data_dir=fs.gr_csv.parent,
+        data_dir=plate_dir,
         drugs=drugs,
         gr_t_hours=gr_t_hours,
         gr_dmso=[float(v) for v in gr_dmso] if gr_dmso else [],
@@ -485,6 +553,60 @@ def _load_plate(fs: PlateFileSet) -> PlateRecord:
         drug_group_summary=dg_summary,
         target_map=target_map,
         is_mock=fs.is_mock,
+        baseline_dir=baseline_dir,
+        normalization_group=norm_group,
+        kind="single_dose",
+    )
+
+
+def _load_multi_dose_plate(fs: MultiDoseFileSet,
+                            single_plates: dict[str, PlateRecord]) -> PlateRecord | None:
+    """Build a virtual multi-dose PlateRecord from member single-dose plates.
+
+    The manifest names the members and their doses. All members must share the
+    same normalization_group (the whole point — they were normalized together).
+    drugs/target_map/drug_group_summary are taken from the first available
+    member (members are batch-normalized siblings, so they share the layout);
+    per-dose data is resolved at request time via PlateRecord.members.
+    """
+    meta = fs.plate_meta
+    members = list(meta.get("members") or [])
+    member_doses = dict(meta.get("member_doses") or {})
+    norm_group = meta.get("normalization_group")
+
+    resolved = [single_plates[mid] for mid in members if mid in single_plates]
+    if not resolved:
+        log.warning("multi-dose %s: no member plates loaded (%s)", fs.plate_id, members)
+        return None
+    if norm_group:
+        bad = [p.plate_id for p in resolved
+               if p.normalization_group and p.normalization_group != norm_group]
+        if bad:
+            log.warning("multi-dose %s: members %s have a different normalization_group",
+                        fs.plate_id, bad)
+
+    base = resolved[0]
+    # GR/mosaic from the first member as a placeholder — the UI's dose toggle
+    # will pick the appropriate member's per-drug data; aggregate panels (GR
+    # curves, mosaic) currently follow the primary member.
+    return PlateRecord(
+        plate_id=fs.plate_id,
+        plate_code=base.plate_code,
+        dose_um=None,                             # multi-dose has no single dose
+        data_dir=fs.data_dir,
+        drugs=base.drugs,
+        gr_t_hours=base.gr_t_hours,
+        gr_dmso=base.gr_dmso,
+        mosaic_dir=base.mosaic_dir,
+        mosaic_timepoints=base.mosaic_timepoints,
+        drug_group_summary=base.drug_group_summary,
+        target_map=base.target_map,
+        is_mock=False,
+        baseline_dir=base.baseline_dir,
+        normalization_group=norm_group,
+        kind="multi_dose",
+        members=members,
+        member_doses=member_doses,
     )
 
 
@@ -525,6 +647,14 @@ class PlateRegistry:
     def list_plates(self) -> list[PlateRecord]:
         return list(self.plates.values())
 
+    def plates_in_group(self, normalization_group: str | None) -> list[PlateRecord]:
+        """All single-dose plates that share a normalization_group. Empty when
+        the group is None (no batch-norm signal — nothing safe to fuse)."""
+        if not normalization_group:
+            return []
+        return [p for p in self.plates.values()
+                if p.kind == "single_dose" and p.normalization_group == normalization_group]
+
 
 @lru_cache(maxsize=1)
 def get_registry() -> PlateRegistry:
@@ -533,6 +663,7 @@ def get_registry() -> PlateRegistry:
         log.warning("data_root %s does not exist", s.data_root)
         return PlateRegistry(plates={})
     plates: dict[str, PlateRecord] = {}
+    # Single-dose plates first — multi-dose virtuals reference these by id.
     for fs in _discover_plate_filesets(s.data_root):
         try:
             rec = _load_plate(fs)
@@ -540,6 +671,15 @@ def get_registry() -> PlateRegistry:
             log.info("loaded plate %s (%d drugs)", rec.plate_id, len(rec.drugs))
         except Exception as exc:                                # noqa: BLE001
             log.exception("failed to load plate %s: %s", fs.plate_id, exc)
+    # Multi-dose virtuals (manifest-only, aggregate members above).
+    for mfs in _discover_multi_dose_plates(s.data_root):
+        try:
+            rec = _load_multi_dose_plate(mfs, plates)
+            if rec is not None:
+                plates[rec.plate_id] = rec
+                log.info("loaded multi-dose plate %s (members=%s)", rec.plate_id, rec.members)
+        except Exception as exc:                                # noqa: BLE001
+            log.exception("failed to load multi-dose plate %s: %s", mfs.plate_id, exc)
     return PlateRegistry(plates=plates)
 
 

@@ -288,6 +288,47 @@ class InsightSummary(BaseModel):
     experimental_notes: list[str] = Field(default_factory=list)
 
 
+class TimepointSnapshot(BaseModel):
+    """One timepoint's swap payload — what changes when the user clicks 0h/4h/24h.
+
+    Per design `time-comparison-4h-24h-design.md` §3 (B안): the 24h map is fixed
+    (community layout + scatter positions stay put); the time toggle only updates
+    height/color. So we ship just the time-varying bits: per-gene corr (PPI node
+    color), per-community avg PCC (landscape height), and the target_meta state.
+    """
+    time: Literal["0h", "4h", "24h"]
+    # Gene symbol -> PCC (signed corr with target). Used to paint PPI nodes.
+    nodes_corr: dict[str, float] = Field(default_factory=dict)
+    # community_id (str) -> avg PCC for that community at this time. Lets the
+    # landscape keep its (x,y) positions and lift only the z dimension.
+    scatter_z: dict[str, float] = Field(default_factory=dict)
+    # {label, in_main_community, ppi_present} — see baseline_0h_for_ui.md §6
+    target_meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class TimepointsPanel(BaseModel):
+    """Time-toggle availability + snapshots for the current (drug, target, dose)."""
+    available: list[Literal["0h", "4h", "24h"]] = Field(default_factory=list)
+    missing: list[Literal["0h", "4h", "24h"]] = Field(default_factory=list)
+    # The timepoint the rest of the dashboard payload was built against (the
+    # "fixed frame" — typically 24h).
+    primary: Literal["0h", "4h", "24h"] = "24h"
+    by_time: dict[str, TimepointSnapshot] = Field(default_factory=dict)
+
+
+class DoseOption(BaseModel):
+    plate_id: str            # the single-dose plate this dose lives on
+    dose_um: float
+
+
+class DosesPanel(BaseModel):
+    """Dose-toggle availability when the active plate is multi-dose. Empty on
+    single-dose plates (the toggle is hidden)."""
+    available: list[DoseOption] = Field(default_factory=list)
+    current_dose: float | None = None         # selected dose for the active payload
+    normalization_group: str | None = None    # only same-group doses are exposed
+
+
 class DashboardResponse(BaseModel):
     plate_id: str
     drug_id: str
@@ -309,6 +350,9 @@ class DashboardResponse(BaseModel):
     provenance: ProvenancePanel
     kpis: list[KpiMetric] = Field(default_factory=list)
     insight: InsightSummary | None = None
+    # 2026-06-07 — time/dose toggles for the Target Module Dynamics view.
+    timepoints: TimepointsPanel | None = None
+    doses: DosesPanel | None = None
 
 
 class InteractomeNodeResponse(BaseModel):
