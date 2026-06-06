@@ -60,7 +60,6 @@ const COLORSCALE_3D_JET: Array<[number, string]> = [
 
 const COLOR_TARGET_FILL = "#F59E0B";
 const COLOR_TARGET_EDGE = "#92400E";
-const COLOR_OTHER_FILL  = "rgba(80,80,80,0.7)";
 const COLOR_OTHER_EDGE  = "#FFFFFF";
 const REF_LINE_COLOR    = "#1F2937";
 // Significance cutoff drawn as the dashed reference line: p = 0.05 →
@@ -330,14 +329,16 @@ export function Landscape({
         zmin: -zlim,
         zmax: zlim,
         contours: {
-          coloring: "heatmap",
+          // Discrete bands (not a continuous heatmap) so each PCC level reads as
+          // a distinct layer and communities separate visually. ~12 bands.
+          coloring: "fill",
           showlabels: false,
           start: -zlim,
           end: zlim,
-          size: (2 * zlim) / 100 || 0.001,
+          size: (2 * zlim) / 12 || 0.05,
         },
-        line: { width: 0, smoothing: 1.5 },
-        ncontours: 100,
+        // Thin contour lines between bands sharpen the layering (was width:0).
+        line: { width: 0.6, color: "rgba(40,40,40,0.3)", smoothing: 1.3 },
         colorbar: {
           title: { text: "avg(PCC)", side: "right" },
           len: 0.85,
@@ -359,7 +360,9 @@ export function Landscape({
       });
     }
 
-    // 3. Other community scatter — grey circles
+    // 3. Other community scatter — small dots colored by PCC (red/blue), same
+    //    scale as the surface, with a white ring so they stay legible on top of
+    //    the filled bands. This restores the "find the community by color" cue.
     if (scOther.length > 0) {
       t.push({
         type: "scatter",
@@ -370,7 +373,11 @@ export function Landscape({
         marker: {
           size: 9,
           symbol: "circle",
-          color: COLOR_OTHER_FILL,
+          color: scOther.map((p) => p.z),
+          colorscale: COLORSCALE_2D,
+          cmin: -zlim,
+          cmax: zlim,
+          showscale: false,
           line: { width: 1.5, color: COLOR_OTHER_EDGE },
         },
         hovertemplate:
@@ -694,7 +701,7 @@ export function Landscape({
           // Preserve the user's camera across slider/community updates; the
           // explicit camera below is only the initial fixed-start view.
           // (bumped to -v2 so the new lower-left orientation actually applies.)
-          uirevision: "landscape-3d-v3",
+          uirevision: "landscape-3d-v5",
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
@@ -725,11 +732,18 @@ export function Landscape({
               backgroundcolor: sceneBgColor,
               showbackground: true,
             },
-            // Initial view: all 3 axes visible, looking slightly down (~10°
-            // elevation: z 0.34 over a ~1.9 horizontal radius). eye.x is now
-            // NEGATIVE to keep the previous "reversed" framing (target front-
-            // left) while the x-axis itself runs in the normal 2D direction.
-            camera: { eye: { x: -1.45, y: -1.35, z: 0.34 } },
+            // Initial view: distance (x) increases LEFT→RIGHT, −log10 p (y) runs
+            // into the screen (depth), height (z) up. We look mostly along +y from
+            // the front (−y) so screen-right ≈ +x, tilted 23° above horizontal
+            // looking down (elevation = atan(0.78/1.84) ≈ 23°). camera.center is
+            // nudged toward the far-x / high-significance corner so that extreme
+            // peak sits near screen centre — increase center.x/center.y to push it
+            // further toward dead-centre; raise eye.z (keep z = 0.424·|eye_xy| for
+            // 23°) to look down more steeply.
+            camera: {
+              eye: { x: -0.48, y: -1.78, z: 0.78 },
+              center: { x: 0.2, y: 0.3, z: 0 },
+            },
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
             annotations: scene3dAnnotations,

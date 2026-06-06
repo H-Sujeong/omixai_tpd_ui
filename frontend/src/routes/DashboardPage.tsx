@@ -84,10 +84,23 @@ export function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Initial community pick: prefer the target community (the anchor — its PPI
+  // is what current_community_id already points at). When the target isn't in
+  // any detected community (self-anchor: a lone peak with no scatter point
+  // flagged is_target), fall back to the highest-avg-PCC community so the user
+  // lands on the most strongly co-varying module instead of an empty seed.
   useEffect(() => {
-    if (dash.data?.ppi && selectedCommunity === null) {
-      setSelectedCommunity(dash.data.ppi.current_community_id);
+    if (selectedCommunity !== null) return;
+    const ppi = dash.data?.ppi;
+    if (!ppi) return;
+    const scatter = dash.data?.landscape?.scatter ?? [];
+    const hasTarget = scatter.some((p) => p.is_target);
+    if (hasTarget || scatter.length === 0) {
+      setSelectedCommunity(ppi.current_community_id);
+      return;
     }
+    const best = scatter.reduce((a, b) => (b.z > a.z ? b : a));
+    setSelectedCommunity(best.community_id);
   }, [dash.data, selectedCommunity]);
 
   const communityQuery = useCommunityPanel(
