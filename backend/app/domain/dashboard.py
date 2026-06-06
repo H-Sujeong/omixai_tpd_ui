@@ -818,12 +818,10 @@ def build_dashboard(
         well = _pick_representative_well(drug)
         well_id = well.well_label if well else None
 
-    # Prefer the real count parsed from the earliest frame's filename
-    # (frames are sorted by t_hours, so frames[0] is t=0). Fall back to the
-    # legacy placeholder only when the filename carries no cell count.
-    n_cells_t0 = None
-    if frames:
-        n_cells_t0 = frames[0].n_cells if frames[0].n_cells is not None else 2915
+    # Real count parsed from the earliest frame's filename (frames sorted by
+    # t_hours → frames[0] is t=0). None when the filename carries no count — the
+    # UI then shows no number rather than a fabricated placeholder.
+    n_cells_t0 = frames[0].n_cells if frames else None
 
     time_lapse = TimeLapseViewer(
         frames=frames,
