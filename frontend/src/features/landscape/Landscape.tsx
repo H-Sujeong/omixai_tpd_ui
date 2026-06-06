@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Plot from "react-plotly.js";
 import { useTheme } from "@/hooks/useTheme";
 import { useT } from "@/store/uiLang";
@@ -165,6 +165,25 @@ export function Landscape({
   const [listOpen, setListOpen] = useState<boolean>(false);
   const [listQuery, setListQuery] = useState<string>("");
   const [foundNode, setFoundNode] = useState<LandscapeNode | null>(null);
+
+  // Drag-mode toggle (both 2D and 3D): default = pan (translate); holding
+  // Shift switches to the secondary action — orbit (rotate) in 3D, box zoom
+  // in 2D. Plotly locks the drag handler in at mousedown, so the change takes
+  // effect on the NEXT drag, not the current one.
+  const [isShiftHeld, setIsShiftHeld] = useState(false);
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => { if (e.key === "Shift") setIsShiftHeld(true); };
+    const onUp = (e: KeyboardEvent) => { if (e.key === "Shift") setIsShiftHeld(false); };
+    const onBlur = () => setIsShiftHeld(false);
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
   const proteinList = useMemo(
     () => [...(landscape.node_index ?? [])].sort((a, b) =>
       a.protein.localeCompare(b.protein)),
@@ -673,8 +692,11 @@ export function Landscape({
           // "first click works, later clicks ignored"). Force pure event mode.
           clickmode: "event" as const,
           // Keep the user's zoom/pan across community-click / slider updates.
-          uirevision: "landscape-2d",
-          dragmode: "zoom" as const,
+          // v2: switched default dragmode to pan (Shift+drag = box zoom) — the
+          // bump resets any sticky modebar dragmode from earlier sessions so the
+          // new default actually applies.
+          uirevision: "landscape-2d-v2",
+          dragmode: isShiftHeld ? "zoom" : "pan",
           xaxis: {
             title: { text: landscape.axes.x ?? "Distance from anchor", font: { size: 11, color: axisTextColor } },
             // Normal (not reversed): low Distance-from-anchor — where the target
@@ -701,7 +723,7 @@ export function Landscape({
           // Preserve the user's camera across slider/community updates; the
           // explicit camera below is only the initial fixed-start view.
           // (bumped to -v2 so the new lower-left orientation actually applies.)
-          uirevision: "landscape-3d-v5",
+          uirevision: "landscape-3d-v6",
           scene: {
             xaxis: {
               title: { text: landscape.axes.x ?? "x", font: { size: 10, color: axisTextColor } },
@@ -747,6 +769,13 @@ export function Landscape({
             aspectmode: "manual" as const,
             aspectratio: { x: 1.2, y: 1, z: 0.8 },
             annotations: scene3dAnnotations,
+            // Default pointer drag = pan (translate); holding Shift switches
+            // to orbit (rotate) — see the isShiftHeld effect above. Plotly 3D
+            // only honors one dragmode per render and locks the drag handler at
+            // mousedown, so the mode applies to the NEXT drag, not the current
+            // one. Modebar (zoom/pan/orbit/turntable) is still available as a
+            // sticky toggle.
+            dragmode: isShiftHeld ? "orbit" : "pan",
           },
         };
 
@@ -944,6 +973,20 @@ export function Landscape({
         </div>
       )}
 
+      {/* 조작 가이드 — 그래프 바로 위. 2D/3D 동일 패턴(기본 이동, Shift+드래그가
+          모드별 보조 동작). Shift 누른 상태면 그 부분을 강조. */}
+      <div className="mb-1.5 text-meta text-ink-muted font-mono">
+        {t("드래그=이동", "drag = pan")}
+        {" · "}
+        <span className={isShiftHeld ? "text-ink-primary font-semibold" : ""}>
+          {mode === "3d"
+            ? t("Shift+드래그=회전", "Shift+drag = rotate")
+            : t("Shift+드래그=영역 확대", "Shift+drag = box zoom")}
+        </span>
+        {" · "}
+        {t("휠=확대/축소", "wheel = zoom")}
+      </div>
+
       <div className="relative overflow-hidden">
         {/* Protein-search result card — small opaque popup. */}
         {foundNode && (
@@ -1069,6 +1112,14 @@ export function Landscape({
           config={{
             displaylogo: false,
             responsive: true,
+            // Always-on modebar so users can spot the pan / rotate / zoom toggle
+            // (3D defaults to pan; click the orbit/turntable icon to rotate).
+            // Default 'hover' surfaced these buttons only when the cursor was on
+            // the plot, which made the controls feel hidden.
+            displayModeBar: true,
+            // Wheel-to-zoom in both 2D and 3D (Plotly 2D ships this OFF by
+            // default; the guide text promises wheel zoom in both modes).
+            scrollZoom: true,
             modeBarButtonsToRemove: ["toImage", "sendDataToCloud", "lasso2d", "select2d"],
           }}
           style={{ width: "100%", borderRadius: 6, overflow: "hidden" }}
