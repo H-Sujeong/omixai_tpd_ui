@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="300" viewBox="0 0 920 300" font-family="Malgun Gothic, Segoe UI, sans-serif">
+<rect width="920" height="300" fill="#0b1220"/>
+<text x="34" y="40" font-size="17" font-weight="700" fill="#E2E8F0">대시보드를 읽는 3가지 기준</text>
+<text x="34" y="60" font-size="11" fill="#8a97ad">분자 구조 → 시간 변화 → 세포 결과 순으로 한 화합물을 이해합니다</text>
+<rect x="34" y="84" width="276" height="170" rx="10" fill="#131c33" stroke="#27324d"/>
+<rect x="34" y="84" width="276" height="3" rx="1.5" fill="#A855F7"/>
+<text x="52" y="110" font-size="9" fill="#A855F7" font-weight="700" letter-spacing="0.5">WHAT · 분자 구조</text>
+<text x="52" y="132" font-size="13" font-weight="700" fill="#E2E8F0">Target Module Dynamics</text>
+<path d="M244 148 Q 258 122 272 144 T 296 148 Z" fill="#185FA5" opacity="0.5"/>
+<circle cx="252" cy="144" r="3" fill="#F59E0B"/>
+<circle cx="268" cy="138" r="3" fill="#185FA5"/>
+<circle cx="284" cy="144" r="3" fill="#185FA5"/>
+<text x="52" y="168" font-size="11" fill="#aeb9cb">약물이 타깃 단백질 모듈을</text>
+<text x="52" y="186" font-size="11" fill="#aeb9cb">어떻게 바꾸나 (한 시점 지도)</text>
+<text x="52" y="238" font-size="9" fill="#8a97ad">Landscape + PPI · 시점 0/4/24</text>
+<text x="321.0" y="175.0" font-size="20" fill="#A855F7" text-anchor="middle">›</text>
+<rect x="332" y="84" width="276" height="170" rx="10" fill="#131c33" stroke="#27324d"/>
+<rect x="332" y="84" width="276" height="3" rx="1.5" fill="#A855F7"/>
+<text x="350" y="110" font-size="9" fill="#A855F7" font-weight="700" letter-spacing="0.5">HOW · 시간 변화</text>
+<text x="350" y="132" font-size="13" font-weight="700" fill="#E2E8F0">Timecourse</text>
+<rect x="542" y="120" width="13" height="11" rx="2" fill="#262649"/>
+<rect x="558" y="120" width="13" height="11" rx="2" fill="#443171"/>
+<rect x="574" y="120" width="13" height="11" rx="2" fill="#663d9f"/>
+<rect x="542" y="134" width="13" height="11" rx="2" fill="#2b284e"/>
+<rect x="558" y="134" width="13" height="11" rx="2" fill="#523684"/>
+<rect x="574" y="134" width="13" height="11" rx="2" fill="#8046c1"/>
+<rect x="542" y="148" width="13" height="11" rx="2" fill="#2f2954"/>
+<rect x="558" y="148" width="13" height="11" rx="2" fill="#613b97"/>
+<rect x="574" y="148" width="13" height="11" rx="2" fill="#994fe3"/>
+<text x="350" y="168" font-size="11" fill="#aeb9cb">그 모듈이 시간에 따라</text>
+<text x="350" y="186" font-size="11" fill="#aeb9cb">어떻게 변했나</text>
+<text x="350" y="238" font-size="9" fill="#8a97ad">모듈×시점 · 형성·강화·반전·해체 · opt-in</text>
+<text x="619.0" y="175.0" font-size="20" fill="#A855F7" text-anchor="middle">›</text>
+<rect x="630" y="84" width="276" height="170" rx="10" fill="#131c33" stroke="#27324d"/>
+<rect x="630" y="84" width="276" height="3" rx="1.5" fill="#A855F7"/>
+<text x="648" y="110" font-size="9" fill="#A855F7" font-weight="700" letter-spacing="0.5">SO WHAT · 세포 결과</text>
+<text x="648" y="132" font-size="13" font-weight="700" fill="#E2E8F0">Phenome</text>
+<polyline points="840,124 854,126 870,140 890,148" fill="none" stroke="#A855F7" stroke-width="2"/>
+<line x1="840" y1="124" x2="890" y2="124" stroke="#64748b" stroke-dasharray="2 2" stroke-width="1"/>
+<text x="648" y="168" font-size="11" fill="#aeb9cb">세포가 실제로</text>
+<text x="648" y="186" font-size="11" fill="#aeb9cb">어떻게 반응했나</text>
+<text x="648" y="238" font-size="9" fill="#8a97ad">GR(t) 성장곡선 + 표현형 이탈 + 이미지</text>
+</svg>

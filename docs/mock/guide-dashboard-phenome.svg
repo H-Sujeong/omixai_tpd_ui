@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="300" viewBox="0 0 620 300" font-family="Malgun Gothic, Segoe UI, sans-serif">
+<rect width="620" height="300" fill="#0b1220"/>
+<rect x="14" y="14" width="592" height="272" rx="10" fill="#131c33" stroke="#27324d"/>
+<text x="34" y="44" font-size="14" font-weight="700" fill="#E2E8F0">③ Phenome</text>
+<text x="250" y="44" font-size="9.5" fill="#8a97ad">세포가 실제로 어떻게 반응했나 (성장 · 표현형 이탈)</text>
+<rect x="34" y="64" width="260" height="180" rx="8" fill="#0f1830" stroke="#27324d"/>
+<text x="46" y="84" font-size="10.5" fill="#aeb9cb">Growth Rate · GR(t)</text>
+<line x1="68" y1="128.0" x2="280" y2="128.0" stroke="#64748b" stroke-dasharray="2 3" stroke-width="1"/>
+<text x="278" y="124.0" font-size="8" fill="#8a97ad" text-anchor="end">DMSO=1</text>
+<line x1="68" y1="188.0" x2="280" y2="188.0" stroke="#64748b" stroke-dasharray="1 4" stroke-width="0.8" opacity="0.6"/>
+<text x="278" y="185.0" font-size="8" fill="#8a97ad" text-anchor="end">0=정지</text>
+<polyline points="68,131 87,133 107,137 126,140 145,145 164,149 184,154 203,159 222,165 241,170 261,176 280,182" fill="none" stroke="#A855F7" stroke-width="2"/>
+<text x="46" y="236" font-size="8.5" fill="#8a97ad">1=DMSO수준 · 0=정지 · &lt;0=사멸</text>
+<rect x="308" y="64" width="260" height="180" rx="8" fill="#0f1830" stroke="#27324d"/>
+<text x="320" y="84" font-size="10.5" fill="#aeb9cb">Phenome Tracking</text>
+<line x1="338" y1="218" x2="554" y2="218" stroke="#64748b" stroke-width="1"/>
+<polyline points="338,212 374,211 410,211 446,212 482,213 518,214 554,212" fill="none" stroke="#64748b" stroke-width="1.5"/>
+<circle cx="338" cy="212" r="3" fill="#64748b"/>
+<circle cx="374" cy="211" r="3" fill="#64748b"/>
+<circle cx="410" cy="211" r="3" fill="#64748b"/>
+<circle cx="446" cy="212" r="3" fill="#64748b"/>
+<circle cx="482" cy="213" r="3" fill="#64748b"/>
+<circle cx="518" cy="214" r="3" fill="#64748b"/>
+<circle cx="554" cy="212" r="3" fill="#64748b"/>
+<polyline points="338,212 374,205 410,192 446,177 482,160 518,141 554,120" fill="none" stroke="#A855F7" stroke-width="2"/>
+<circle cx="338" cy="212" r="3.5" fill="#A855F7"/>
+<circle cx="374" cy="205" r="3.5" fill="#A855F7"/>
+<circle cx="410" cy="192" r="3.5" fill="#A855F7"/>
+<circle cx="446" cy="177" r="3.5" fill="#A855F7"/>
+<circle cx="482" cy="160" r="3.5" fill="#A855F7"/>
+<circle cx="518" cy="141" r="3.5" fill="#A855F7"/>
+<circle cx="554" cy="120" r="3.5" fill="#A855F7"/>
+<text x="554" y="108" font-size="8.5" fill="#A855F7" text-anchor="end">Drug</text>
+<text x="554" y="208" font-size="8.5" fill="#8a97ad" text-anchor="end">DMSO</text>
+<text x="320" y="236" font-size="8.5" fill="#8a97ad">vehicle 궤적에서 벗어난 정도</text>
+<text x="34" y="280" font-size="10.5" fill="#aeb9cb">+ Time-lapse 이미지(0–48h)로 세포 형태·수 변화를 직접 확인</text>
+</svg>
