@@ -8,6 +8,7 @@ import type {
   PlateSummary,
   PpiPanel,
   ProteinInfo,
+  TimecourseResponse,
 } from "@/types/api";
 
 // Protein info. lang="ko" includes the local-LLM Korean summary (slow first
@@ -39,6 +40,26 @@ export function useDrugSummary(plateId: string | undefined) {
     queryKey: ["drugs", plateId],
     enabled: !!plateId,
     queryFn: () => apiGet<DrugSummaryRow[]>(`/api/v1/plates/${plateId}/drugs`),
+  });
+}
+
+/** Tier 1 timecourse (opt-in v2) — lazy: only enabled when the drawer is open. */
+export function useTimecourse(
+  plateId: string | undefined,
+  drugId: string | undefined,
+  target: string | undefined,
+  dose: string | undefined,
+  enabled: boolean,
+  threshold = 0.2,
+) {
+  return useQuery<TimecourseResponse>({
+    queryKey: ["timecourse", plateId, drugId, target ?? "default", dose ?? "default", threshold],
+    enabled: enabled && !!plateId && !!drugId,
+    queryFn: () =>
+      apiGet<TimecourseResponse>(
+        `/api/v1/plates/${plateId}/drugs/${drugId}/timecourse`,
+        { target, dose, threshold },
+      ),
   });
 }
 

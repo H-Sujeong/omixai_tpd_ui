@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Fragment, useMemo } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import { useDrugSummary, usePlates } from "@/api/queries";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/LoadingBlock";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -25,8 +25,10 @@ export function DrugSummaryPage() {
 
   // Filter/sort state lives in a store so it survives navigating into a drug
   // and back (the page unmounts on route change).
-  const { search, filterGroup, filterEffect, assetsOnly, sortKey, sortDir, set, clearFilters } =
-    useDrugListFilters();
+  const {
+    search, filterGroup, filterEffect, assetsOnly, sortKey, sortDir,
+    set, toggleGroup, toggleEffect, clearFilters,
+  } = useDrugListFilters();
 
   const groups = useMemo(() => {
     const s = new Set<string>();
@@ -34,17 +36,33 @@ export function DrugSummaryPage() {
     return Array.from(s).sort();
   }, [data]);
 
+  // Effect (growth_class) options — collected from both the top-level field
+  // and every by_dose entry, so multi-dose plates surface every distinct class
+  // they hold (e.g. Strong cytotoxic at 10µM + Cytostatic at 3µM = two chips).
   const effects = useMemo(() => {
     const s = new Set<string>();
-    data?.forEach((d) => d.growth_class && s.add(d.growth_class));
-    return Array.from(s).sort();
+    data?.forEach((d) => {
+      if (d.growth_class) s.add(d.growth_class);
+      d.by_dose.forEach((bd) => bd.growth_class && s.add(bd.growth_class));
+    });
+    return Array.from(s).sort(
+      (a, b) => severityRank(b) - severityRank(a) || a.localeCompare(b),
+    );
   }, [data]);
 
   const rows = useMemo(() => {
     if (!data) return [];
     let r = data.filter((d) => {
-      if (filterGroup && d.drug_group !== filterGroup) return false;
-      if (filterEffect && d.growth_class !== filterEffect) return false;
+      if (filterGroup.length > 0 && !(d.drug_group && filterGroup.includes(d.drug_group))) return false;
+      if (filterEffect.length > 0) {
+        // Multi-dose: match if ANY by_dose growth_class is in the filter set;
+        // single-dose: check the top-level field. Reads as "drug shows this
+        // effect at some concentration."
+        const classes = d.by_dose.length > 0
+          ? d.by_dose.map((bd) => bd.growth_class)
+          : [d.growth_class];
+        if (!classes.some((c) => c && filterEffect.includes(c))) return false;
+      }
       if (assetsOnly && !d.has_dashboard_assets) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -60,8 +78,8 @@ export function DrugSummaryPage() {
       return true;
     });
     r = [...r].sort((a, b) => {
-      const va = (a[sortKey] ?? "") as string | number;
-      const vb = (b[sortKey] ?? "") as string | number;
+      const va = sortValue(a, sortKey);
+      const vb = sortValue(b, sortKey);
       if (va === vb) return 0;
       const cmp = va < vb ? -1 : 1;
       return sortDir === "asc" ? cmp : -cmp;
@@ -156,30 +174,20 @@ export function DrugSummaryPage() {
           placeholder={t("약물 이름 · code · target 검색", "Search drug name · code · target")}
           className="flex-1 min-w-[260px] border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary placeholder:text-ink-muted focus:border-brand-primary outline-none transition-colors duration-fast"
         />
-        <select
-          value={filterGroup}
-          onChange={(e) => set({ filterGroup: e.target.value })}
-          className="border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary outline-none focus:border-brand-primary"
-        >
-          <option value="">All groups</option>
-          {groups.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterEffect}
-          onChange={(e) => set({ filterEffect: e.target.value })}
-          className="border border-line rounded-md px-3 py-2 text-body bg-surface-card text-ink-primary outline-none focus:border-brand-primary"
-        >
-          <option value="">All effects</option>
-          {effects.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
+        <MultiSelectFilter
+          label={t("Groups", "Groups")}
+          options={groups}
+          selected={filterGroup}
+          onToggle={toggleGroup}
+          onClear={() => set({ filterGroup: [] })}
+        />
+        <MultiSelectFilter
+          label={t("Effects", "Effects")}
+          options={effects}
+          selected={filterEffect}
+          onToggle={toggleEffect}
+          onClear={() => set({ filterEffect: [] })}
+        />
         <button
           type="button"
           role="switch"
@@ -200,7 +208,7 @@ export function DrugSummaryPage() {
           <span aria-hidden>{assetsOnly ? "✓" : "○"}</span>
           Assets only
         </button>
-        {(search || filterGroup || filterEffect || assetsOnly) && (
+        {(search || filterGroup.length > 0 || filterEffect.length > 0 || assetsOnly) && (
           <button
             className="btn btn--ghost text-meta"
             onClick={() => clearFilters()}
@@ -368,6 +376,128 @@ export function DrugSummaryPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Severity ranking for backend `_classify_growth` outputs (dashboard.py:658).
+ * High = more cytotoxic. Used both for sort tiebreakers and effect-option order.
+ */
+function severityRank(cls: string | null | undefined): number {
+  if (!cls) return 0;
+  const v = cls.toLowerCase();
+  if (v.includes("strong") && v.includes("cytotoxic")) return 4;
+  if (v.includes("cytotoxic")) return 3;
+  if (v.includes("cytostatic")) return 2;
+  if (v.includes("permissive")) return 1;
+  return 0;
+}
+
+/**
+ * Sort-key projection. On multi-dose plates we collapse by_dose to the drug's
+ * worst-case across concentrations — min GR · max severity — so the user reads
+ * "this drug shows X effect at SOME dose" rather than an arbitrary aggregate.
+ * Missing values sink to the bottom of an asc sort via +Infinity / -1 rank.
+ */
+function sortValue(d: DrugSummaryRow, key: SortKey): number | string {
+  if (key === "gr_score") {
+    const pool = d.by_dose.length > 0
+      ? d.by_dose.map((bd) => bd.gr_score).filter((v): v is number => v != null)
+      : d.gr_score != null ? [d.gr_score] : [];
+    return pool.length ? Math.min(...pool) : Number.POSITIVE_INFINITY;
+  }
+  if (key === "growth_class") {
+    const ranks = d.by_dose.length > 0
+      ? d.by_dose.map((bd) => severityRank(bd.growth_class))
+      : [severityRank(d.growth_class)];
+    return ranks.length ? Math.max(...ranks) : 0;
+  }
+  return (d[key] ?? "") as string;
+}
+
+function MultiSelectFilter({
+  label,
+  options,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  onClear: () => void;
+}) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  // Click-outside / Escape closes the popover. <details> manages its own open
+  // state, so we just flip `open` to false when the user clicks elsewhere.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const el = ref.current;
+      if (el && el.open && !el.contains(e.target as Node)) el.open = false;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const el = ref.current;
+      if (el && el.open && e.key === "Escape") el.open = false;
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  const hasActive = selected.length > 0;
+  return (
+    <details ref={ref} className="relative">
+      <summary
+        className={`list-none cursor-pointer border rounded-md px-3 py-2 text-body select-none inline-flex items-center gap-1.5 ${
+          hasActive
+            ? "border-brand-primary text-brand-primary font-medium"
+            : "border-line bg-surface-card text-ink-secondary hover:text-ink-primary"
+        }`}
+        style={hasActive ? { background: "rgb(var(--color-brand-primary-rgb) / 0.10)" } : undefined}
+      >
+        <span>{label}</span>
+        <span className="text-meta text-ink-muted">
+          {hasActive ? `· ${selected.length}` : ""}
+        </span>
+        <span aria-hidden className="text-meta">▾</span>
+      </summary>
+      <div
+        className="absolute top-full left-0 mt-1 z-30 min-w-[200px] max-h-72 overflow-y-auto rounded-md border border-line bg-surface-elevated shadow-xl py-1"
+      >
+        {options.length === 0 && (
+          <div className="px-3 py-2 text-meta text-ink-muted">No options</div>
+        )}
+        {options.map((opt) => {
+          const checked = selected.includes(opt);
+          return (
+            <label
+              key={opt}
+              className="flex items-center gap-2 px-3 py-1.5 text-body text-ink-secondary hover:bg-surface-soft cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onToggle(opt)}
+                className="accent-brand-primary"
+              />
+              <span className={checked ? "text-ink-primary font-medium" : ""}>{opt}</span>
+            </label>
+          );
+        })}
+        {hasActive && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="mt-1 w-full text-left px-3 py-1.5 text-meta text-ink-muted hover:bg-surface-soft border-t border-line"
+          >
+            Clear selection
+          </button>
+        )}
+      </div>
+    </details>
   );
 }
 

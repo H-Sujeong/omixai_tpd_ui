@@ -19,6 +19,9 @@ from ..schemas import (
     DashboardResponse,
     DoseOption,
     DosesPanel,
+    ModuleTimeCell,
+    ModuleTimecourse,
+    TimecourseResponse,
     GoTerm,
     GrCurvePoint,
     InsightFinding,
@@ -218,13 +221,14 @@ def _dose_label_for(dose_um: float) -> str:
 def _resolve_dose(plate: PlateRecord, requested: str | None) -> str | None:
     """Pick the effective dose label for asset loads. Single-dose plates return
     None (legacy path). Multi-dose plates honor the requested dose if it maps to
-    a known member; otherwise fall back to the highest dose."""
+    a known member; otherwise fall back to the LOWEST dose — the default landing
+    view starts at the gentlest concentration per spec (2026-06-07)."""
     if plate.kind != "multi_dose" or not plate.member_doses:
         return None
     valid = {_dose_label_for(v) for v in plate.member_doses.values()}
     if requested and requested in valid:
         return requested
-    return _dose_label_for(max(plate.member_doses.values()))
+    return _dose_label_for(min(plate.member_doses.values()))
 
 
 def _build_timepoints_panel(plate: PlateRecord, drug: DrugRecord,
@@ -244,7 +248,16 @@ def _build_timepoints_panel(plate: PlateRecord, drug: DrugRecord,
 
     primary = next((t for t in (_PRIMARY_TIME, "4h", "0h") if payloads.get(t)), None)
     if primary is None:
-        return None
+        # No assets at any timepoint (e.g. AZ-3137 / AR — proteomics-undetected
+        # target). Send back an empty panel instead of None so the UI can
+        # surface a disabled toggle ("데이터 미수신") for the visual
+        # consistency users asked for in the timecourse drawer.
+        return TimepointsPanel(
+            available=[],                                  # type: ignore[arg-type]
+            missing=list(_ALL_TIMES),                      # type: ignore[arg-type]
+            primary=_PRIMARY_TIME,                         # type: ignore[arg-type]
+            by_time={},
+        )
 
     by_time: dict[str, TimepointSnapshot] = {}
     available: list[str] = []
@@ -297,13 +310,13 @@ def _build_doses_panel(plate: PlateRecord, drug: DrugRecord, target: str) -> "Do
         available.append(DoseOption(plate_id=mid, dose_um=float(dose)))
     if not available:
         return None
-    # Ascending — low dose first so the header chip row reads "3μM | 10μM"
-    # (per user spec). current_dose stays high — see _resolve_dose's default
-    # (max dose) — only the listing order flips.
+    # Ascending — low dose first so the header chip row reads "3μM | 10μM".
+    # Default landing dose = LOWEST (matches _resolve_dose's fallback per the
+    # 2026-06-07 spec: "다농도 초기 화면 저농도로 시작 고정").
     available.sort(key=lambda d: d.dose_um)
     return DosesPanel(
         available=available,
-        current_dose=available[-1].dose_um,
+        current_dose=available[0].dose_um,
         normalization_group=plate.normalization_group,
     )
 
@@ -1109,6 +1122,148 @@ def build_dashboard(
         insight=insight,
         timepoints=timepoints,
         doses=doses,
+    )
+
+
+def build_timecourse(
+    plate: PlateRecord,
+    drug: DrugRecord,
+    target: str,
+    *,
+    dose: str | None = None,
+    participation_threshold: float = 0.2,
+) -> TimecourseResponse:
+    """Module × time heatmap data — Tier 1 (opt-in v2) per `time-comparison-
+    4h-24h-design.md` §3.5.
+
+    Frame membership is locked at the latest available timepoint (primary,
+    24h by default — falls back to 4h, then 0h). For each frame module, we
+    pull the gene members and then, at every available timepoint, fetch each
+    gene's per-time corr and compute:
+      - avg_pcc  = mean of the available corrs (skipping unmeasured genes)
+      - participation_rate = fraction of available members whose |corr|
+                              ≥ participation_threshold
+    Empty cells (whole module unmeasured at that time) return None so the UI
+    can render them as "no data" instead of zero.
+    """
+    effective_dose = _resolve_dose(plate, dose)
+
+    # Resolve dose-scoped plate/drug just like build_dashboard, so 0h pulls from
+    # the baseline and 4h/24h pull from the right member plate's assets.
+    plate_for_dose = plate
+    if plate.kind == "multi_dose" and effective_dose:
+        from ..data_loader import get_registry
+        reg = get_registry()
+        for mid, dv in plate.member_doses.items():
+            if _dose_label_for(dv) == effective_dose:
+                m = reg.get_plate(mid)
+                if m is not None:
+                    plate_for_dose = m
+                break
+    drug_for_dose = plate_for_dose.drugs.get(drug.drug_id) or drug
+    # After picking the member plate, asset loads use ITS layout (single-dose
+    # path: no dose folder). Passing the original dose label here would make
+    # _load_asset hunt for a non-existent {tw}/{dose}/{time}/ subfolder and
+    # return None for 4h/24h. Re-resolve against the resolved plate.
+    asset_dose = _resolve_dose(plate_for_dose, dose)
+
+    # Load per-timepoint payloads (None for missing).
+    payloads: dict[str, dict[str, Any] | None] = {}
+    for tl in _ALL_TIMES:
+        payloads[tl] = (_load_baseline_asset(plate_for_dose, target, "on_target") if tl == "0h"
+                        else _load_asset(drug_for_dose, target, "on_target", time=tl, dose=asset_dose))
+
+    primary = next((tl for tl in (_PRIMARY_TIME, "4h", "0h") if payloads.get(tl)), None)
+    if primary is None:
+        return TimecourseResponse(
+            plate_id=plate.plate_id,
+            drug_id=drug.drug_id,
+            target_id=target,
+            dose_um=(plate_for_dose.dose_um if plate_for_dose.kind == "single_dose"
+                     else (max(plate.member_doses.values()) if plate.member_doses else None)),
+            participation_threshold=participation_threshold,
+        )
+
+    primary_payload = payloads[primary] or {}
+    target_cid = primary_payload.get("target_community")
+    # Per-time nodes_corr lookups (gene → corr at that time).
+    corr_by_time: dict[str, dict[str, float]] = {
+        tl: _nodes_corr_from_payload(p or {}) for tl, p in payloads.items() if p
+    }
+
+    modules: list[ModuleTimecourse] = []
+    for cid_str, c in (primary_payload.get("communities") or {}).items():
+        try:
+            cid = int(cid_str)
+        except ValueError:
+            continue
+        members: list[str] = [n.get("id") for n in (c.get("ppi", {}).get("nodes") or [])
+                              if isinstance(n.get("id"), str)]
+        if not members:
+            continue
+
+        by_time: dict[str, ModuleTimeCell] = {}
+        for tl in _ALL_TIMES:
+            ct = corr_by_time.get(tl)
+            if ct is None:
+                continue
+            measured = [ct[g] for g in members if g in ct]
+            if measured:
+                avg = sum(measured) / len(measured)
+                rate = sum(1 for v in measured if abs(v) >= participation_threshold) / len(measured)
+            else:
+                avg, rate = None, None
+            by_time[tl] = ModuleTimeCell(
+                avg_pcc=avg,
+                participation_rate=rate,
+                n_measured=len(measured),
+                n_total=len(members),
+            )
+
+        # Top GO terms (already pre-sorted by score in on_target.json). We
+        # surface the headline name + p_adj + category for the first three so
+        # the UI can render p-value alongside the label and reveal the next two
+        # as supporting context. Same BP/MF/CC filter as the Enrichment panel
+        # (KEGG comes through with category="KEGG" but GoTerm only models GO).
+        top_go_raw = [g for g in (c.get("go_terms") or [])
+                      if isinstance(g.get("term"), str)
+                      and g.get("category") in ("BP", "MF", "CC")][:3]
+        top_go = [GoTerm(
+            term=g["term"],
+            score=float(g.get("score", 0.0)),
+            pvalue=max(float(g.get("pvalue", 1.0)), 1e-300),
+            category=g.get("category", "BP"),
+        ) for g in top_go_raw]
+        top_terms = [g.term for g in top_go]
+        label = top_terms[0] if top_terms else f"community {cid}"
+
+        modules.append(ModuleTimecourse(
+            community_id=cid,
+            label=label,
+            size=len(members),
+            is_target=(target_cid is not None and cid == target_cid),
+            by_time=by_time,
+            top_terms=top_terms,
+            top_go=top_go,
+        ))
+
+    # Sort: target community first, then by 24h-frame avg PCC magnitude desc.
+    def _sort_key(m: ModuleTimecourse) -> tuple[int, float]:
+        primary_cell = m.by_time.get(primary)
+        v = primary_cell.avg_pcc if primary_cell and primary_cell.avg_pcc is not None else 0.0
+        return (0 if m.is_target else 1, -abs(v))
+    modules.sort(key=_sort_key)
+
+    return TimecourseResponse(
+        plate_id=plate.plate_id,
+        drug_id=drug.drug_id,
+        target_id=target,
+        dose_um=(plate_for_dose.dose_um if plate_for_dose.kind == "single_dose"
+                 else (max(plate.member_doses.values()) if plate.member_doses else None)),
+        primary_time=primary,                                  # type: ignore[arg-type]
+        available_times=[t for t in _ALL_TIMES if payloads.get(t)],  # type: ignore[arg-type]
+        participation_threshold=participation_threshold,
+        modules=modules,
     )
 
 

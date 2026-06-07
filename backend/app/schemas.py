@@ -344,6 +344,45 @@ class DosesPanel(BaseModel):
     normalization_group: str | None = None    # only same-group doses are exposed
 
 
+class ModuleTimeCell(BaseModel):
+    """One module's signal at one timepoint. Both values are optional — when the
+    module's 24h members are entirely unmeasured at this time we leave them None
+    rather than fabricating zero (per `feedback_no_synthetic_data`)."""
+    avg_pcc: float | None = None
+    participation_rate: float | None = None
+    n_measured: int = 0     # # of 24h members that have corr at this timepoint
+    n_total: int = 0        # # of members in the 24h frame community
+
+
+class ModuleTimecourse(BaseModel):
+    """One row in the module×time heatmap. The module is fixed at the 24h frame
+    membership (per design §3.5 "24h 모듈 = 변하지 않는 그릇"); the by_time cells
+    show how that fixed cohort behaves at 0h/4h/24h."""
+    community_id: int
+    label: str                            # short human-readable (top GO term)
+    size: int                             # # members in 24h frame
+    is_target: bool = False
+    by_time: dict[str, ModuleTimeCell] = Field(default_factory=dict)
+    # Legacy short tooltip — kept for back-compat. Prefer `top_go` below.
+    top_terms: list[str] = Field(default_factory=list)
+    # Top 3 GO terms with their adjusted p-values + categories. The first entry
+    # is the headline label; the rest support the "multi-functional module"
+    # case (a community can enrich several GO terms, top 1 alone undersells).
+    top_go: list[GoTerm] = Field(default_factory=list)
+
+
+class TimecourseResponse(BaseModel):
+    """Payload for the v2 "⊕ 시간축 분석" drawer — Tier 1 (opt-in) per §3.8."""
+    plate_id: str
+    drug_id: str
+    target_id: str
+    dose_um: float | None = None
+    primary_time: Literal["0h", "4h", "24h"] = "24h"
+    available_times: list[Literal["0h", "4h", "24h"]] = Field(default_factory=list)
+    participation_threshold: float = 0.2  # |corr| cutoff for the participation rate
+    modules: list[ModuleTimecourse] = Field(default_factory=list)
+
+
 class DashboardResponse(BaseModel):
     plate_id: str
     drug_id: str

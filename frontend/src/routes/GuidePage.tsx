@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useT } from "@/store/uiLang";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useT, useUiLang } from "@/store/uiLang";
 
 /**
  * User guide. Three sections (Plate / Drug / Dashboard) each pairing an
@@ -8,7 +9,25 @@ import { useT } from "@/store/uiLang";
  * navigating back → exporting data. Bilingual via useT.
  */
 
-type Section = "sidebar" | "plate" | "drug" | "dashboard";
+type Section =
+  | "sidebar"
+  | "plate"
+  | "drug"
+  | "dashboard"
+  | "dashboard-dynamics"
+  | "dashboard-timecourse"
+  | "dashboard-phenome";
+
+// Hash slug ↔ Section. Sidebar flyout uses these slugs (Sidebar.tsx::GUIDE_SECTIONS).
+const HASH_TO_SECTION: Record<string, Section> = {
+  "sidebar":              "sidebar",
+  "plate":                "plate",
+  "drug":                 "drug",
+  "dashboard":            "dashboard",
+  "dashboard-dynamics":   "dashboard-dynamics",
+  "dashboard-timecourse": "dashboard-timecourse",
+  "dashboard-phenome":    "dashboard-phenome",
+};
 
 interface Note {
   n: number;
@@ -95,7 +114,84 @@ const SECTIONS: Record<Section, { img: string; notes: Note[]; titleKo: string; t
     descKo: "한 화합물·타깃의 전체 분석. KPI와 각 박스(Landscape·PPI·Enrichment·Time-lapse·Phenotypic·Signatures)를 보고, 타깃을 전환하거나 데이터를 export합니다.",
     descEn: "Full analysis for one compound × target. Read the KPIs and each box (landscape, PPI, enrichment, time-lapse, phenotypic, signatures), switch target, or export data.",
   },
+  // ── Dashboard sub-sections — content from docs/guide_dashboard.md (planning). ──
+  // Images come from /guide/guide-dashboard-<key>(-en).png, swapped at render
+  // time. Tight 3-bullet notes per the spec (KO|EN side-by-side, no numbers).
+  "dashboard-dynamics": {
+    img: "/guide/guide-dashboard-dynamics.png",
+    notes: [
+      { n: 1,
+        ko: "✚ = 타깃, 점·노드 = 함께 묶이는 단백질(community/모듈).",
+        en: "✚ = target; dots/nodes = proteins grouped together (community/module)." },
+      { n: 2,
+        ko: "노드 색 = 타깃과 함께 ↑증가(주황) / ↓감소(파랑).",
+        en: "Node color = moves with the target ↑up (orange) / ↓down (blue)." },
+      { n: 3,
+        ko: "상단 0h/4h/24h 버튼 = 그 시점 데이터 그대로(raw). ⊕ 시간축 분석으로 시간 비교 열기.",
+        en: "Top 0h/4h/24h = that timepoint's raw data. ⊕ Timecourse opens the time comparison." },
+    ],
+    titleKo: "Target Module Dynamics",
+    titleEn: "Target Module Dynamics",
+    descKo: "약물이 타깃 단백질 모듈을 어떻게 바꾸는지 보는 한 시점의 지도입니다. 왼쪽 Landscape(지형도) + 오른쪽 PPI(회로도)가 한 몸.",
+    descEn: "A one-timepoint map of how the drug reshapes the target's protein module — Landscape (left) and PPI network (right) as one unit.",
+  },
+  "dashboard-timecourse": {
+    img: "/guide/guide-dashboard-timecourse.png",
+    notes: [
+      { n: 1,
+        ko: "행 = 모듈(top GO 이름), 열 = 0h/4h/24h, 칸 색 = 신호 세기 (파랑 −, 빨강 +).",
+        en: "Row = module (top GO label), col = 0h/4h/24h, cell color = signal (blue −, red +)." },
+      { n: 2,
+        ko: "오른쪽 패턴 칩이 자동으로 판정 (아래 5종).",
+        en: "The pattern chip on the right is an automatic verdict (5 types below)." },
+      { n: 3,
+        ko: "★ = 타깃 community(타깃이 속한 모듈) · 지표 참여율 / 평균 PCC 토글.",
+        en: "★ = target community (the module the target belongs to) · metric participation / avg PCC." },
+    ],
+    titleKo: "Timecourse — 모듈 × 시점 히트맵 (opt-in)",
+    titleEn: "Timecourse — Module × time heatmap (opt-in)",
+    descKo: "각 모듈이 시간(0h→24h)에 따라 어떻게 변했나를 한 표로. 0h = 약물 처리 전, 24h 모듈을 기준 칸으로 고정해 비교합니다. (원하는 사람만 — opt-in)",
+    descEn: "One table of how each module changed over time (0h→24h). 0h = pre-treatment; 24h modules are the fixed reference bins. (opt-in — only if you want it)",
+  },
+  "dashboard-phenome": {
+    img: "/guide/guide-dashboard-phenome.png",
+    notes: [
+      { n: 1,
+        ko: "GR(t): 1 = DMSO 수준 · 0 = 정지 · <0 = 사멸 (보라 = 약물, 점선 = DMSO).",
+        en: "GR(t): 1 = DMSO rate · 0 = stasis · <0 = death (purple = drug, dashed = DMSO)." },
+      { n: 2,
+        ko: "Phenome Tracking: vehicle(대조) 궤적에서 벗어난 정도 = 표현형 이탈.",
+        en: "Phenome Tracking: deviation from the vehicle trajectory = phenotype drift." },
+      { n: 3,
+        ko: "Time-lapse 이미지(0–48h)로 세포 형태·수 변화를 직접 확인.",
+        en: "Time-lapse imaging (0–48h) shows morphology/count change directly." },
+    ],
+    titleKo: "Phenome — Time-lapse · Phenotypic Profiling",
+    titleEn: "Phenome — Time-lapse · Phenotypic Profiling",
+    descKo: "분자 변화의 결과 — 세포가 실제로 어떻게 반응했나. 성장 속도(GR)와 표현형 이탈, 그리고 실제 이미지로 확인.",
+    descEn: "The outcome of the molecular changes — how the cells actually responded: growth rate (GR), phenotype drift, and the real images.",
+  },
 };
+
+// Five-pattern verdict table for the Timecourse sub-section. Labels match
+// TimecourseDrawer's PATTERN_BADGES so the guide stays in lockstep.
+const TIMECOURSE_PATTERNS: Array<{ ko: string; en: string; descKo: string; descEn: string; chip: string; }> = [
+  { chip: "🟣", ko: "관계 반전 −→+", en: "Flipped −→+",
+    descKo: "baseline 음(−) → 24h 양(+). 강한 약물 신호.",
+    descEn: "negative at baseline → positive by 24h; strong signal." },
+  { chip: "🔴", ko: "관계 강화", en: "Amplified",
+    descKo: "원래 있던 동변동을 약물이 강화.",
+    descEn: "drug strengthened an existing co-variation." },
+  { chip: "🔴", ko: "관계 형성", en: "Formed",
+    descKo: "baseline 약함 → 24h 새 관계 형성.",
+    descEn: "weak at baseline → new relationship by 24h." },
+  { chip: "🔵", ko: "관계 해체", en: "Dissolved",
+    descKo: "baseline 강한 모듈이 24h에 약화.",
+    descEn: "strong baseline module weakened by 24h." },
+  { chip: "⚪", ko: "관계 유지", en: "Stable",
+    descKo: "거의 안 변함 — 약물 효과 미약.",
+    descEn: "barely changes — weak drug effect." },
+];
 
 // Community-formation explainer notes (shown under the dashboard section).
 // Mirrors the pipeline logic in tpd_prot_pipeline/tpd_export
@@ -130,14 +226,40 @@ const COMMUNITY: Note[] = [
 
 export function GuidePage() {
   const t = useT();
+  const lang = useUiLang((s) => s.lang);
+  const location = useLocation();
   const [section, setSection] = useState<Section>("sidebar");
+  // Communities explainer collapse (under Dynamics). Deep content — hidden by
+  // default per the 2026-06-07 design call ("내용 너무 딥해").
+  const [communitiesOpen, setCommunitiesOpen] = useState(false);
   const s = SECTIONS[section];
 
-  const tabs: Array<{ k: Section; label: string }> = [
-    { k: "sidebar", label: t("사이드바", "Sidebar") },
-    { k: "plate", label: t("플레이트", "Plate") },
-    { k: "drug", label: t("약물", "Drug") },
-    { k: "dashboard", label: t("대시보드", "Dashboard") },
+  // Cross-link from the Timecourse isolated-case callout to the community
+  // exception note, which lives behind a collapse on the Dynamics sub-section.
+  const goToCommunityException = () => {
+    setSection("dashboard-dynamics");
+    setCommunitiesOpen(true);
+    requestAnimationFrame(() => {
+      document.getElementById("community-exception")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  // Anchor sync — the sidebar flyout navigates with /guide#dashboard-dynamics
+  // etc.; pick up the hash and jump to that section on mount + on hash change.
+  useEffect(() => {
+    const hash = location.hash.replace(/^#/, "");
+    const mapped = HASH_TO_SECTION[hash];
+    if (mapped) setSection(mapped);
+  }, [location.hash]);
+
+  const tabs: Array<{ k: Section; label: string; indent?: boolean }> = [
+    { k: "sidebar",              label: t("사이드바", "Sidebar") },
+    { k: "plate",                label: t("플레이트", "Plate") },
+    { k: "drug",                 label: t("약물", "Drug") },
+    { k: "dashboard",            label: t("대시보드", "Dashboard") },
+    { k: "dashboard-dynamics",   label: "Dynamics",   indent: true },
+    { k: "dashboard-timecourse", label: "Timecourse", indent: true },
+    { k: "dashboard-phenome",    label: "Phenome",    indent: true },
   ];
 
   return (
@@ -154,19 +276,21 @@ export function GuidePage() {
         </p>
       </header>
 
-      {/* Section tabs */}
-      <div className="mb-5 flex gap-1 rounded-md overflow-hidden border border-line bg-surface-elevated w-fit">
+      {/* Section tabs — Dashboard sub-sections (Dynamics / Timecourse /
+          Phenome) are visually nested via the indent prefix. */}
+      <div className="mb-5 flex flex-wrap gap-1 rounded-md border border-line bg-surface-elevated w-fit p-1">
         {tabs.map((tab) => (
           <button
             key={tab.k}
             type="button"
             onClick={() => setSection(tab.k)}
-            className={`px-4 py-1.5 text-body transition-colors ${
+            className={`px-3 py-1.5 text-body rounded transition-colors ${
               section === tab.k
                 ? "bg-brand-primary/15 text-brand-primary font-medium"
                 : "text-ink-secondary hover:text-ink-primary"
-            }`}
+            } ${tab.indent ? "ml-3" : ""}`}
           >
+            {tab.indent ? <span className="text-ink-muted mr-1.5">○</span> : null}
             {tab.label}
           </button>
         ))}
@@ -178,11 +302,17 @@ export function GuidePage() {
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-5 items-start">
-        {/* Annotated mockup */}
+        {/* Annotated mockup — Dashboard sub-sections (Dynamics/Timecourse/
+            Phenome) have a localized -en.png; legacy sections fall back to the
+            single image they ship with. */}
         <figure className="rounded-lg border border-line bg-surface-card overflow-hidden">
           <img
-            key={section}
-            src={s.img}
+            key={`${section}-${lang}`}
+            src={
+              section.startsWith("dashboard-") && lang === "en"
+                ? s.img.replace(/\.png$/, "-en.png")
+                : s.img
+            }
             alt={t(s.titleKo, s.titleEn)}
             className="w-full block"
             style={{ background: "#0b1220" }}
@@ -207,6 +337,51 @@ export function GuidePage() {
         </ol>
       </div>
 
+      {/* Isolated-target callout — Timecourse only. Shown right under the
+          notes so readers learn what "no ★ row" means before they study the
+          heatmap, with a one-tap link into the deeper exception note. */}
+      {section === "dashboard-timecourse" && (
+        <div className="mt-5 rounded-lg border border-status-warning/30 bg-status-warning/5 px-4 py-3 text-body text-ink-secondary" style={{ lineHeight: 1.55 }}>
+          <span className="text-status-warning font-semibold mr-1.5" aria-hidden="true">⚠</span>
+          {t(
+            "타깃이 어느 모듈에도 속하지 않으면(isolated) ★ 행이 없고 \"타깃 community 없음\"으로 표시됩니다.",
+            "If the target belongs to no module (isolated), the ★ row is absent and the heatmap shows \"no target community\".",
+          )}{" "}
+          <button
+            type="button"
+            onClick={goToCommunityException}
+            className="text-brand-primary hover:underline font-medium"
+          >
+            {t("→ 커뮤니티 예외 안내 보기", "→ See the community exception note")}
+          </button>
+        </div>
+      )}
+
+      {/* Five-pattern verdict table — shown only on the Timecourse sub-section.
+          Labels mirror TimecourseDrawer's PATTERN_BADGES (관계 형성/강화/반전/해체/유지). */}
+      {section === "dashboard-timecourse" && (
+        <section className="mt-8 pt-6 border-t border-line">
+          <h3 className="text-ink-primary text-body-strong font-semibold mb-3">
+            {t("패턴 5종 — 자동 판정", "Five patterns — automatic verdict")}
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {TIMECOURSE_PATTERNS.map((p) => (
+              <li
+                key={p.en}
+                className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 items-start text-body"
+              >
+                <span className="font-semibold text-ink-primary whitespace-nowrap">
+                  {p.chip} {t(p.ko, p.en)}
+                </span>
+                <span className="text-ink-secondary" style={{ lineHeight: 1.5 }}>
+                  {t(p.descKo, p.descEn)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <p className="mt-6 text-meta text-ink-muted">
         {t(
           "※ 그림은 이해를 돕기 위한 예시(임의 데이터)이며 실제 화면과 세부 수치는 다를 수 있습니다.",
@@ -214,7 +389,30 @@ export function GuidePage() {
         )}
       </p>
 
-      {section === "dashboard" && <CommunityDefinition />}
+      {/* Communities explainer — deep content, kept under Dynamics and behind
+          a collapse so it doesn't dominate the sub-section. */}
+      {section === "dashboard-dynamics" && (
+        <section className="mt-10 pt-8 border-t border-line">
+          <button
+            type="button"
+            onClick={() => setCommunitiesOpen((o) => !o)}
+            aria-expanded={communitiesOpen}
+            className="w-full text-left flex items-center gap-3 hover:bg-surface-soft rounded-md px-2 py-2"
+          >
+            <span
+              className="text-ink-primary font-bold leading-none"
+              style={{ fontSize: "1.1em" }}
+              aria-hidden="true"
+            >
+              {communitiesOpen ? "▼" : "▶"}
+            </span>
+            <h2 className="text-ink-primary text-card font-semibold">
+              {t("커뮤니티(community)는 어떻게 만들어지나?", "How a community is formed?")}
+            </h2>
+          </button>
+          {communitiesOpen && <CommunityDefinition />}
+        </section>
+      )}
     </div>
   );
 }
@@ -229,10 +427,7 @@ export function GuidePage() {
 function CommunityDefinition() {
   const t = useT();
   return (
-    <section className="mt-10 pt-8 border-t border-line">
-      <h2 className="text-ink-primary text-card font-semibold">
-        {t("커뮤니티(community)는 어떻게 만들어지나", "How a community is formed")}
-      </h2>
+    <div className="mt-4">
       <div className="mt-1 mb-4 flex flex-col gap-2 text-ink-secondary text-body" style={{ lineHeight: 1.6 }}>
         <p>
           {t(
@@ -280,7 +475,128 @@ function CommunityDefinition() {
           "⊙ = element-wise product (the AND of all three). Defaults: STRING confid_score 400 · corr p<0.10 · Louvain resolution 2.0 · 1000 seeds · consensus cut 0.2 · community size>20.",
         )}
       </p>
-    </section>
+
+      <TargetNotInCommunity />
+    </div>
+  );
+}
+
+/**
+ * Exception callout for the dashboard guide: "What if the target (✚) isn't in
+ * any community?" Plain-language summary for guide readers — 4 causes, then the
+ * two readings of the biologically meaningful case, then how to tell them apart.
+ */
+function TargetNotInCommunity() {
+  const t = useT();
+  const causes: { n: number; ko: string; en: string; tagKo: string; tagEn: string; signal: boolean }[] = [
+    {
+      n: 1,
+      ko: "측정이 안 됨 — 질량분석에서 타깃이 검출되지 않음(발현량이 너무 낮거나 세포 특이적).",
+      en: "Not measured — the target wasn't detected by mass-spec (too low-abundance or cell-specific).",
+      tagKo: "데이터 한계", tagEn: "data limit", signal: false,
+    },
+    {
+      n: 2,
+      ko: "DB에 정보 없음 — 상호작용 DB(STRING)에 타깃 정보가 부족(연구가 적은 단백질).",
+      en: "No DB info — the interaction DB (STRING) lacks data for the target (a poorly-studied protein).",
+      tagKo: "DB 한계", tagEn: "DB limit", signal: false,
+    },
+    {
+      n: 3,
+      ko: "함께 변하는 이웃이 없음 — 측정·DB엔 있는데, 타깃과 같이 움직이는 단백질 그룹이 안 생김.",
+      en: "No co-moving neighbors — present in both, but no group of proteins moves together with the target.",
+      tagKo: "진짜 신호 ★", tagEn: "real signal ★", signal: true,
+    },
+    {
+      n: 4,
+      ko: "모듈이 너무 작음 — 작게 뭉치긴 했지만 멤버 20개 이하라 noise로 보고 제외됨.",
+      en: "Module too small — it did group, but with ≤20 members it's treated as noise and dropped.",
+      tagKo: "회색지대", tagEn: "grey zone", signal: false,
+    },
+  ];
+
+  return (
+    <div id="community-exception" className="mt-6 rounded-lg border border-line bg-surface-card p-4 scroll-mt-24">
+      <h3 className="text-ink-primary text-body-strong font-semibold inline-flex items-center gap-2">
+        <span
+          className="inline-flex items-center justify-center rounded-full text-caption font-bold"
+          style={{ width: 20, height: 20, background: "var(--color-brand-primary)", color: "#fff" }}
+        >
+          ?
+        </span>
+        {t("타깃(✚)이 community에 안 묶였다면?", "What if the target (✚) isn't in any community?")}
+      </h3>
+
+      <p className="mt-2 text-ink-secondary text-body" style={{ lineHeight: 1.6 }}>
+        {t(
+          "데이터 오류가 아닙니다. 타깃은 있는데 타깃과 “함께 변하는 단백질 그룹”이 안 만들어진 상태입니다. 원인은 4가지:",
+          "Not a data error. The target is there, but no “group of proteins that move together with it” formed. Four causes:",
+        )}
+      </p>
+
+      <ol className="mt-2.5 flex flex-col gap-2">
+        {causes.map((c) => (
+          <li key={c.n} className="flex gap-2.5 items-start">
+            <span
+              className="shrink-0 mt-0.5 inline-flex items-center justify-center rounded-full text-caption font-bold"
+              style={{
+                width: 20, height: 20,
+                background: c.signal ? "var(--color-brand-primary)" : "rgb(var(--color-loc-low-rgb) / 0.18)",
+                color: c.signal ? "#fff" : "var(--color-text-muted)",
+              }}
+            >
+              {c.n}
+            </span>
+            <span className="text-ink-secondary text-body" style={{ lineHeight: 1.5 }}>
+              {t(c.ko, c.en)}{" "}
+              <span
+                className="ml-1 align-middle rounded px-1.5 py-0.5 text-caption font-medium"
+                style={{
+                  background: c.signal ? "rgb(var(--color-brand-primary-rgb) / 0.15)" : "rgb(var(--color-loc-low-rgb) / 0.10)",
+                  color: c.signal ? "var(--color-brand-primary)" : "var(--color-text-muted)",
+                }}
+              >
+                {t(c.tagKo, c.tagEn)}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className="mt-3 text-ink-secondary text-body" style={{ lineHeight: 1.6 }}>
+        {t(
+          "특히 ③(가장 흔하고 의미 있음)은 두 가지로 읽힐 수 있습니다:",
+          "Case ③ in particular (the most common and meaningful) can be read two ways:",
+        )}
+      </p>
+      <ul className="mt-1.5 flex flex-col gap-1.5">
+        <li className="flex gap-2 text-body text-ink-secondary" style={{ lineHeight: 1.5 }}>
+          <span className="text-brand-primary shrink-0 mt-0.5" aria-hidden>›</span>
+          <span>
+            {t(
+              "좋은 신호 (선택적 분해): 약이 타깃만 깔끔히 분해 → 같이 떨어지는 단백질이 없음. 선택성 좋은 분해제의 정상 모습.",
+              "Good signal (selective degradation): the drug cleanly degrades only the target → nothing co-drops with it. The normal look of a selective degrader.",
+            )}
+          </span>
+        </li>
+        <li className="flex gap-2 text-body text-ink-secondary" style={{ lineHeight: 1.5 }}>
+          <span className="text-brand-primary shrink-0 mt-0.5" aria-hidden>›</span>
+          <span>
+            {t(
+              "약한 신호 (효과 약함): 약이 그 시점에 타깃을 거의 못 건드림 → 변동 신호가 없어서 그룹이 안 생김.",
+              "Weak signal (low effect): the drug barely affected the target at that timepoint → no change signal, so no group forms.",
+            )}
+          </span>
+        </li>
+      </ul>
+
+      <p className="mt-3 text-meta text-ink-muted" style={{ lineHeight: 1.6 }}>
+        {t(
+          "어떻게 구별하나: PAC 점수가 높고 타깃 변동성이 크면 “좋은 신호”, 둘 다 낮으면 “약한 신호”. 4h→24h 비교도 도움(24h에 모듈이 생기면 효과가 늦게 나온 것).",
+          "How to tell: high PAC score + high target variability → “good signal”; both low → “weak signal”. Comparing 4h→24h also helps (if a module forms by 24h, the effect simply came later).",
+        )}
+      </p>
+    </div>
   );
 }
 

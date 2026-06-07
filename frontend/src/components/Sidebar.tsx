@@ -1,8 +1,107 @@
+import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LangToggle } from "@/components/LangToggle";
 import { useMe, useLogout } from "@/api/auth";
+import { usePlates } from "@/api/queries";
 import { useT } from "@/store/uiLang";
+
+type Flyout = "plates" | "guide" | null;
+
+interface GuideEntry {
+  id: string;
+  ko: string;
+  en: string;
+  indent?: boolean;        // sub-section under Dashboard
+}
+
+const GUIDE_SECTIONS: GuideEntry[] = [
+  { id: "sidebar",            ko: "사이드바",        en: "Sidebar" },
+  { id: "plate",              ko: "플레이트 목록",   en: "Plate list" },
+  { id: "drug",               ko: "약물 목록",       en: "Drug list" },
+  { id: "dashboard",          ko: "대시보드",        en: "Dashboard" },
+  { id: "dashboard-dynamics", ko: "Dynamics",       en: "Dynamics",   indent: true },
+  { id: "dashboard-timecourse", ko: "Timecourse",   en: "Timecourse", indent: true },
+  { id: "dashboard-phenome",  ko: "Phenome",        en: "Phenome",    indent: true },
+];
+
+function PlatesFlyout({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  const plates = usePlates();
+  return (
+    <div className="flex flex-col h-full">
+      <header className="px-4 py-3 border-b border-line">
+        <h3 className="text-body-strong text-ink-primary">
+          {t("플레이트", "Plates")}
+        </h3>
+        <p className="text-meta text-ink-muted mt-0.5">
+          {t("내가 볼 수 있는 플레이트", "Plates you can open")}
+        </p>
+      </header>
+      <ul className="flex-1 overflow-y-auto py-1">
+        {plates.isLoading && (
+          <li className="px-4 py-2 text-meta text-ink-muted">
+            {t("불러오는 중…", "Loading…")}
+          </li>
+        )}
+        {!plates.isLoading && !plates.data?.length && (
+          <li className="px-4 py-2 text-meta text-ink-muted">
+            {t("이용 가능한 플레이트가 없습니다", "No accessible plates")}
+          </li>
+        )}
+        {plates.data?.map((p) => (
+          <li key={p.plate_id}>
+            <Link
+              to={`/plates/${p.plate_id}`}
+              onClick={onClose}
+              className="block px-4 py-2 hover:bg-surface-soft text-body text-ink-secondary"
+            >
+              <div className="font-medium text-ink-primary">{p.plate_id}</div>
+              <div className="text-meta text-ink-muted">
+                {p.dose_um != null ? `${p.dose_um} μM · ` : ""}
+                {p.n_drugs} {t("약물", "drugs")}
+                {p.is_mock ? " · mock" : ""}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function GuideFlyout({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col h-full">
+      <header className="px-4 py-3 border-b border-line">
+        <h3 className="text-body-strong text-ink-primary">
+          {t("가이드", "Guide")}
+        </h3>
+        <p className="text-meta text-ink-muted mt-0.5">
+          {t("섹션을 클릭하면 이동합니다", "Click a section to jump")}
+        </p>
+      </header>
+      <ul className="flex-1 overflow-y-auto py-1">
+        {GUIDE_SECTIONS.map((s) => (
+          <li key={s.id}>
+            <Link
+              to={`/guide#${s.id}`}
+              onClick={onClose}
+              className={
+                "block py-2 hover:bg-surface-soft text-body text-ink-secondary " +
+                (s.indent ? "pl-9 pr-4" : "px-4")
+              }
+            >
+              <span className="text-ink-muted mr-2">{s.indent ? "○" : "●"}</span>
+              {t(s.ko, s.en)}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const SignOutButton = () => {
   const t = useT();
@@ -103,8 +202,14 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
   const onPlatesIndex = location.pathname === "/plates";
   const onGuide = location.pathname === "/guide";
   const onAdmin = location.pathname === "/admin";
+  const [flyout, setFlyout] = useState<Flyout>(null);
+  const close = () => setFlyout(null);
 
   return (
+    <div
+      className="relative"
+      onMouseLeave={close}
+    >
     <aside
       className={`
         app-sidebar
@@ -121,7 +226,8 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
       <Link
         to="/plates"
         className="sidebar-brand"
-        onClick={onCloseMobile}
+        onClick={() => { onCloseMobile?.(); close(); }}
+        onMouseEnter={close}
         title="OmixAI-TPD · Workspace"
       >
         <div className="sidebar-brand__logo">TPD</div>
@@ -131,7 +237,8 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         <Link
           to="/plates"
           className={`sidebar-item ${onPlatesIndex ? "sidebar-item--active" : ""}`}
-          onClick={onCloseMobile}
+          onClick={() => { onCloseMobile?.(); close(); }}
+          onMouseEnter={() => setFlyout("plates")}
           title="Plates"
           aria-label="Plates"
         >
@@ -142,7 +249,8 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         <Link
           to="/guide"
           className={`sidebar-item ${onGuide ? "sidebar-item--active" : ""}`}
-          onClick={onCloseMobile}
+          onClick={() => { onCloseMobile?.(); close(); }}
+          onMouseEnter={() => setFlyout("guide")}
           title="Guide"
           aria-label="Guide"
         >
@@ -154,7 +262,8 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
           <Link
             to="/admin"
             className={`sidebar-item ${onAdmin ? "sidebar-item--active" : ""}`}
-            onClick={onCloseMobile}
+            onClick={() => { onCloseMobile?.(); close(); }}
+            onMouseEnter={close}
             title="Admin"
             aria-label="Admin"
           >
@@ -165,12 +274,28 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         )}
       </nav>
 
-      <div className="sidebar-footer mt-auto flex flex-col items-center gap-1">
+      <div className="sidebar-footer mt-auto flex flex-col items-center gap-1" onMouseEnter={close}>
         <LangToggle />
         <ThemeToggle />
         <SignOutButton />
       </div>
     </aside>
+    {/* Flyout panel — sits to the right of the icon rail. The wrapper div's
+        onMouseLeave (above) closes it; staying inside the rail OR the flyout
+        keeps it open since both are children of the same wrapper. Hidden on
+        screens narrower than lg so the mobile drawer stays simple. */}
+    {flyout && (
+      <div
+        className="hidden lg:block absolute top-0 left-full h-screen w-[240px] z-40 bg-surface-elevated border-r border-line shadow-xl"
+      >
+        {flyout === "plates" ? (
+          <PlatesFlyout onClose={close} />
+        ) : (
+          <GuideFlyout onClose={close} />
+        )}
+      </div>
+    )}
+    </div>
   );
 }
 

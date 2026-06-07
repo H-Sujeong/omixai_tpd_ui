@@ -279,6 +279,35 @@ export interface TimepointsPanel {
   by_time: Partial<Record<TimeLabel, TimepointSnapshot>>;
 }
 
+export interface ModuleTimeCell {
+  avg_pcc: number | null;
+  participation_rate: number | null;
+  n_measured: number;
+  n_total: number;
+}
+
+export interface ModuleTimecourse {
+  community_id: number;
+  label: string;
+  size: number;
+  is_target: boolean;
+  by_time: Partial<Record<TimeLabel, ModuleTimeCell>>;
+  /** @deprecated use top_go for label + p_adj together */
+  top_terms: string[];
+  top_go: GoTerm[];
+}
+
+export interface TimecourseResponse {
+  plate_id: string;
+  drug_id: string;
+  target_id: string;
+  dose_um: number | null;
+  primary_time: TimeLabel;
+  available_times: TimeLabel[];
+  participation_threshold: number;
+  modules: ModuleTimecourse[];
+}
+
 export interface DoseOption {
   plate_id: string;
   dose_um: number;

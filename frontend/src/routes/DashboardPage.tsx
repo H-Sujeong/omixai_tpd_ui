@@ -12,6 +12,7 @@ import { Landscape } from "@/features/landscape/Landscape";
 import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfilingPanel";
 import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel";
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
+import { TimecourseDrawer } from "@/features/timecourse/TimecourseDrawer";
 import { CsvExportButton } from "@/features/export/CsvExportButton";
 import { buildEnrichmentCsv, buildLandscapeCsv, buildProfilingCsv } from "@/features/export/tableExports";
 import { DashboardExportMenu } from "@/features/export/DashboardExportMenu";
@@ -46,6 +47,8 @@ export function DashboardPage() {
   // Panel visibility is decoupled from selectedNode: closing (✕) hides the
   // panel but keeps the node highlighted in the graph.
   const [proteinPanelOpen, setProteinPanelOpen] = useState(false);
+  const [tcOpen, setTcOpen] = useState(false);     // Tier 1 fetch enabled
+  const [tcCollapsed, setTcCollapsed] = useState(true);  // section header-only by default
   const [bridgeNotice, setBridgeNotice] = useState<{
     text: string;
     direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump";
@@ -332,7 +335,7 @@ export function DashboardPage() {
          *  height (Landscape z) and node color (PPI corr). Dose toggle
          *  appears only when the active plate is multi_dose. */}
         <section id="dynamics" className="panel-card scroll-mt-[200px]">
-        {tp && tp.available.length > 0 && (
+        {tp && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-line">
             <div className="text-body-strong text-ink-secondary">
               {t("Target Module Dynamics", "Target Module Dynamics")}
@@ -342,9 +345,48 @@ export function DashboardPage() {
                 so it belongs to the page scope, not this container's. Only the
                 time toggle stays here — it's the within-frame swap. */}
             <div className="flex items-center gap-4">
+              {/* Tier 1 opt-in (v2) — always rendered; disabled when there
+                  isn't enough data to compare (per the "데이터 미수신" policy).
+                  AZ-3137-style drugs (proteomics-undetected target) still see
+                  the button as a faded ghost so the affordance is consistent
+                  across drugs. */}
+              {(() => {
+                const tcDisabled = tp.available.length < 2;
+                return (
+                  <button
+                    type="button"
+                    disabled={tcDisabled}
+                    onClick={() => {
+                      if (tcDisabled) return;
+                      setTcOpen(true);
+                      setTcCollapsed(false);
+                      const el = document.getElementById("timecourse");
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className={
+                      "inline-flex items-center gap-1 rounded-md border px-3 py-1 text-body font-semibold transition-colors duration-fast " +
+                      (tcDisabled
+                        ? "border-line bg-surface-soft text-ink-muted opacity-60 cursor-not-allowed"
+                        : "border-brand-primary bg-brand-primary/15 hover:bg-brand-primary/25 text-brand-primary")
+                    }
+                    title={tcDisabled
+                      ? t(
+                          "데이터 미수신 — 시점 2개 이상 필요",
+                          "Data unavailable — needs ≥2 timepoints",
+                        )
+                      : t(
+                          "24h 모듈을 고정 그릇으로 두고 0/4/24h 변화를 한 장에 — opt-in (v2)",
+                          "Module × time heatmap (24h frame) — opt-in (v2)",
+                        )}
+                  >
+                    <span aria-hidden>⊕</span>
+                    {t("시간축 분석", "Timecourse")}
+                  </button>
+                );
+              })()}
               <div className="flex items-center gap-1.5" role="tablist" aria-label="time">
-                <span className="text-meta text-ink-muted font-mono">
-                  {t("시점", "time")}
+                <span className="text-body font-semibold text-ink-secondary">
+                  {t("시점", "Time")}
                 </span>
                 {(["0h", "4h", "24h"] as TimeLabel[]).map((tl) => {
                   const isAvail = tp.available.includes(tl);
@@ -385,7 +427,7 @@ export function DashboardPage() {
             </div>
           </div>
         )}
-        {tp && tp.available.length > 0 && (
+        {tp && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-surface-soft px-4 py-2 text-meta border-b border-line">
             <span className="font-mono text-ink-muted shrink-0">
               {t("타깃 모듈 형성", "target module formation")}
@@ -417,7 +459,7 @@ export function DashboardPage() {
         )}
         <div className={
           "grid grid-cols-12 gap-5 " +
-          (tp && tp.available.length > 0 ? "p-4" : "")
+          (tp ? "p-4" : "")
         }>
           <section
             id="landscape"
@@ -551,6 +593,20 @@ export function DashboardPage() {
         </div>
         </section>
 
+        {/* === Timecourse section — Tier 1 (opt-in v2). Inline panel-card so the
+             heatmap has full page width to breathe; lazy fetches on ⊕ click. */}
+        <TimecourseDrawer
+          plateId={plateId}
+          drugId={drugId}
+          target={activeTarget}
+          dose={dose}
+          enabled={tcOpen}
+          onEnable={() => setTcOpen(true)}
+          collapsed={tcCollapsed}
+          onCollapsedChange={setTcCollapsed}
+          unavailable={!tp || tp.available.length < 2}
+        />
+
         {/* === Phenome container — Time-lapse + Phenotypic Profiling
              grouped under one card, matching Dynamics' visual weight. The
              section nav points at this id for the top-level "Phenome" tab. */}
@@ -637,6 +693,7 @@ function formatDrugGroup(raw: string): string {
 const SECTION_NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "dynamics", label: "Target Module Dynamics" },
+  { id: "timecourse", label: "Timecourse" },
   { id: "phenome", label: "Phenome" },
 ];
 

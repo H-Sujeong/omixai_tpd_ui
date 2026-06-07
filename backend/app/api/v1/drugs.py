@@ -7,13 +7,14 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...data_loader import get_registry
-from ...domain.dashboard import build_dashboard, interactome_node, switch_community
+from ...domain.dashboard import build_dashboard, build_timecourse, interactome_node, switch_community
 from ...ownership import require_owned_plate
 from ...schemas import (
     CommunitySwitchResponse,
     DashboardResponse,
     InteractomeNodeResponse,
     PpiPanel,
+    TimecourseResponse,
 )
 
 log = logging.getLogger(__name__)
@@ -41,6 +42,33 @@ def get_dashboard(
     if not drug:
         raise HTTPException(status_code=404, detail=f"drug {drug_id} not found in plate {plate_id}")
     return build_dashboard(plate, drug, target, _FILE_PREFIX, dose=dose, time=time)
+
+
+@router.get(
+    "/plates/{plate_id}/drugs/{drug_id}/timecourse",
+    response_model=TimecourseResponse,
+)
+def get_timecourse(
+    plate_id: str,
+    drug_id: str,
+    _owned: str = Depends(require_owned_plate),
+    target: str | None = Query(default=None, description="Target gene (default = drug's first)"),
+    dose: str | None = Query(default=None, description="Dose label (multi-dose plates, '10uM'/'3uM')"),
+    threshold: float = Query(default=0.2, ge=0.0, le=1.0,
+                              description="|corr| cutoff for the participation rate"),
+) -> TimecourseResponse:
+    """Module × time heatmap (Tier 1 / opt-in v2) — see §3.5 of the design doc.
+    Lazy-fetched only when the user opens the '⊕ 시간축 분석' drawer."""
+    plate = get_registry().get_plate(plate_id)
+    if not plate:
+        raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
+    drug = plate.drugs.get(drug_id)
+    if not drug:
+        raise HTTPException(status_code=404, detail=f"drug {drug_id} not found in plate {plate_id}")
+    tgt = target or (drug.targets[0].target if drug.targets else None)
+    if not tgt:
+        raise HTTPException(status_code=400, detail="no target available for this drug")
+    return build_timecourse(plate, drug, tgt, dose=dose, participation_threshold=threshold)
 
 
 @router.get(
