@@ -17,7 +17,7 @@ import { buildEnrichmentCsv, buildLandscapeCsv, buildProfilingCsv } from "@/feat
 import { DashboardExportMenu } from "@/features/export/DashboardExportMenu";
 import { KpiStrip } from "@/features/kpi/KpiStrip";
 import { useT } from "@/store/uiLang";
-import type { DashboardResponse, PpiPanel } from "@/types/api";
+import type { DashboardResponse, PpiPanel, TimeLabel } from "@/types/api";
 
 /**
  * Compound Dashboard — 2026-06-02 IA polish (P1+P2+P3 from feedback #3).
@@ -51,7 +51,9 @@ export function DashboardPage() {
     direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump";
   } | null>(null);
 
-  const dash = useDashboard(plateId, drugId, target);
+  const dose = search.get("dose") ?? undefined;
+  const time = search.get("time") ?? undefined;
+  const dash = useDashboard(plateId, drugId, target, dose, time);
 
   useEffect(() => {
     if (dash.data && !target) setTarget(dash.data.target_id);
@@ -179,8 +181,8 @@ export function DashboardPage() {
     setSelectedNode(null);
     setBridgeNotice({
       text: `Landscape peak → ${t(
-        `community ${cid} 선택 → PPI 재구성`,
-        `selected community ${cid} → PPI rebuilt`,
+        `community ${cid}@${primaryTime} 선택 → PPI 재구성`,
+        `selected community ${cid}@${primaryTime} → PPI rebuilt`,
       )}`,
       direction: "landscape-to-ppi",
     });
@@ -216,6 +218,53 @@ export function DashboardPage() {
   const exportMeta = { plate: d.plate_id, drug: d.drug_name, drugId: d.drug_id, target: activeTarget };
   const exportBase = `${d.drug_id}_${activeTarget}`.replace(/[^A-Za-z0-9._-]+/g, "_");
 
+  // Target-meta transition KPI helpers — see `time-comparison-4h-24h-design.md`
+  // §1.3: the strongest single signal is whether the target jumps from
+  // "흩어짐"(isolated) at early times to "모듈 형성"(in_community) by 24h.
+  const labelKo = (l?: string) =>
+    l === "in_community" ? t("모듈 형성", "in module")
+    : l === "isolated_in_ppi" ? t("흩어짐", "isolated")
+    : l === "absent_from_ppi" ? t("PPI 없음", "no PPI")
+    : "—";
+  const labelDotClass = (l?: string) =>
+    l === "in_community" ? "bg-emerald-500"
+    : l === "isolated_in_ppi" ? "bg-amber-500"
+    : l === "absent_from_ppi" ? "bg-zinc-400"
+    : "bg-zinc-300";
+  // One-line verdict on the transition pattern (target_meta.label across 0h→4h→24h)
+  // — design doc §1.3 says this is the strongest single signal. Plain const
+  // (not a hook) so it can live after the early-returns above.
+  const transitionVerdict = (() => {
+    const tp_ = d.timepoints;
+    if (!tp_) return null;
+    const lbl = (tl: TimeLabel) => tp_.by_time[tl]?.target_meta?.label as string | undefined;
+    const t24 = lbl("24h"), t4 = lbl("4h"), t0 = lbl("0h");
+    if (t24 === "in_community" && (t0 === "isolated_in_ppi" || t4 === "isolated_in_ppi")) {
+      return t("✓ 약물이 24h에 모듈 형성", "✓ drug formed module by 24h");
+    }
+    if (t24 === "in_community") {
+      return t("→ 24h까지 모듈 유지", "→ module sustained through 24h");
+    }
+    if (t24 === "isolated_in_ppi") {
+      return t("✕ 24h에도 모듈 미형성 (효과 약함)", "✕ no module by 24h (weak effect)");
+    }
+    if (t24 === "absent_from_ppi") {
+      return t("PPI 데이터 한계", "PPI data limit");
+    }
+    return null;
+  })();
+
+  // Active timepoint comes from ?time= now (or the payload's primary frame
+  // when the URL omits it). The 2026-06-07 spec moved per-timepoint rendering
+  // to the server: changing time refetches and the new payload's ppi /
+  // landscape are the raw data for that timepoint — no client-side projection.
+  const tp = d.timepoints;
+  const primaryTime: TimeLabel = tp?.primary ?? "24h";
+  const activeTime: TimeLabel =
+    (time as TimeLabel | undefined) && tp?.available.includes(time as TimeLabel)
+      ? (time as TimeLabel)
+      : primaryTime;
+
   // Enrichment follows the active community. Navigating to another community in
   // the landscape swaps activePpi to that community's panel, whose go_terms is
   // its own GO set; mirror that here so the Pathway Enrichment panel re-renders
@@ -242,6 +291,18 @@ export function DashboardPage() {
           setSelectedEdgeId(null);
           setBridgeNotice(null);
         }}
+        onDoseChange={(doseLabel) => {
+          // Same-page dose swap — only the ?dose= search param changes; the
+          // multi-dose plate route stays put and react-query refetches.
+          const sp = new URLSearchParams(search);
+          sp.set("dose", doseLabel);
+          setSearch(sp);
+          // Reset community/selection so the new dose's payload paints fresh.
+          setSelectedCommunity(null);
+          setSelectedNode(null);
+          setSelectedEdgeId(null);
+          setBridgeNotice(null);
+        }}
       />
 
       <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1 flex flex-col gap-6">
@@ -263,16 +324,107 @@ export function DashboardPage() {
           />
         )}
 
-        {/* === Row 1: Landscape 50% + PPI 50% ============================
-         *  (swapped 2026-06-02 — Landscape sits left as the primary
-         *  navigation surface; PPI panel updates on landscape clicks,
-         *  so left→right reading order = cause→effect.) */}
-        <div className="grid grid-cols-12 gap-5">
+        {/* === Target Module Dynamics — Landscape + PPI as one unit ====
+         *  Two subplots share one container with a top time toggle
+         *  (0h / 4h / 24h, missing times disabled). Per design
+         *  `time-comparison-4h-24h-design.md` §3 (B안): the 24h map (point
+         *  positions, layout) stays fixed; toggling time only swaps
+         *  height (Landscape z) and node color (PPI corr). Dose toggle
+         *  appears only when the active plate is multi_dose. */}
+        <section id="dynamics" className="panel-card scroll-mt-[200px]">
+        {tp && tp.available.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-line">
+            <div className="text-body-strong text-ink-secondary">
+              {t("Target Module Dynamics", "Target Module Dynamics")}
+            </div>
+            {/* Dose is selected in the main header (DashboardHeader): a dose
+                change re-fetches everything (KPIs, GR, MoA, this container),
+                so it belongs to the page scope, not this container's. Only the
+                time toggle stays here — it's the within-frame swap. */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5" role="tablist" aria-label="time">
+                <span className="text-meta text-ink-muted font-mono">
+                  {t("시점", "time")}
+                </span>
+                {(["0h", "4h", "24h"] as TimeLabel[]).map((tl) => {
+                  const isAvail = tp.available.includes(tl);
+                  const isActive = activeTime === tl;
+                  return (
+                    <button
+                      key={tl}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      disabled={!isAvail}
+                      onClick={() => {
+                        if (!isAvail) return;
+                        const sp = new URLSearchParams(search);
+                        if (tl === primaryTime) sp.delete("time");
+                        else sp.set("time", tl);
+                        setSearch(sp);
+                        // Selection resets so the new time's PPI paints fresh.
+                        setSelectedCommunity(null);
+                        setSelectedNode(null);
+                        setSelectedEdgeId(null);
+                      }}
+                      title={isAvail ? `${tl}` : t("데이터 미수신", "data not received")}
+                      className={
+                        "rounded-md border px-2.5 py-1 text-body font-mono tabular transition-colors duration-fast " +
+                        (isActive
+                          ? "border-brand-primary bg-brand-primary text-white"
+                          : isAvail
+                          ? "border-line bg-surface-soft hover:bg-surface-elevated text-ink-secondary"
+                          : "border-line bg-surface-soft text-ink-muted opacity-50 cursor-not-allowed")
+                      }
+                    >
+                      {tl}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+        {tp && tp.available.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-surface-soft px-4 py-2 text-meta border-b border-line">
+            <span className="font-mono text-ink-muted shrink-0">
+              {t("타깃 모듈 형성", "target module formation")}
+            </span>
+            {(["0h", "4h", "24h"] as TimeLabel[]).map((tl, i) => {
+              const snap = tp.by_time[tl];
+              const isAvail = tp.available.includes(tl);
+              const label = snap?.target_meta?.label as string | undefined;
+              return (
+                <span key={tl} className="flex items-center gap-1.5">
+                  {i > 0 && <span className="text-ink-muted">→</span>}
+                  <span
+                    className={
+                      "inline-block w-2 h-2 rounded-full " +
+                      (isAvail ? labelDotClass(label) : "bg-zinc-300")
+                    }
+                  />
+                  <span className="font-mono text-ink-muted">{tl}</span>
+                  <span className="text-ink-secondary">
+                    {isAvail ? labelKo(label) : t("미수신", "—")}
+                  </span>
+                </span>
+              );
+            })}
+            {transitionVerdict && (
+              <span className="ml-auto text-body-strong text-ink-primary">{transitionVerdict}</span>
+            )}
+          </div>
+        )}
+        <div className={
+          "grid grid-cols-12 gap-5 " +
+          (tp && tp.available.length > 0 ? "p-4" : "")
+        }>
           <section
             id="landscape"
             className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
           >
             <PanelCard
+              flat
               title="Target Landscape"
               tooltip={t(
                 "단백질 community 지형도 — 타깃과의 연관 구조:\n• x = 타깃 community로부터 거리 (가까울수록 직접 연관)\n• y = −log10(p) (높을수록 연관이 유의)\n• z/색 = 모듈 평균 상관(PCC)\n→ 좌측 하단·고지대 = 타깃과 강하게 직접 연결\n• 점 = community, ✚ = 타깃 community\n• 점 클릭 → 해당 PPI 재구성\n• 2D contour 기본 · 3D 토글 · PCC 슬라이더로 임계값 필터",
@@ -299,6 +451,7 @@ export function DashboardPage() {
                   highlightCommunity={selectedCommunity}
                   onCommunityClick={handleLandscapeClick}
                   height={554}
+                  frameTime={tp ? activeTime : null}
                 />
               ) : (
                 <div className="h-[554px] flex items-center justify-center">
@@ -313,7 +466,10 @@ export function DashboardPage() {
             className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
           >
             <PanelCard
-              title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}`}
+              flat
+              title={`PPI Network · community ${activePpi?.current_community_id ?? "—"}${
+                tp ? `@${activeTime}` : ""
+              }`}
               tooltip={t(
                 "• 노드 = 단백질 (크기 = 연결 수)\n• 색 = 타깃과의 발현 상관(corr) — 부호로 방향, 진하기로 크기:\n   · 빨강 = 상향(corr>0, 강할수록 진함)\n   · 파랑 = 하향(corr<0, 강할수록 진함)\n   · 흰색에 가까움 = 상관 약함 (임의 임계값 없음)\n   · 보라 = 타깃 유전자(is_target)\n• |corr| 슬라이더로 약한 상관 숨김\n• 엣지 = STRING 상호작용 (두께 = 신뢰도)\n• 노드 클릭 = 단백질 정보 · 엣지 클릭 = 관련 community\n• community 전환은 landscape에서",
                 "• Nodes = proteins (size = degree)\n• Color = correlation (corr) with target — hue = sign, depth = magnitude:\n   · Red = up (corr>0, deeper = stronger)\n   · Blue = down (corr<0, deeper = stronger)\n   · Near-white = weak correlation (no arbitrary cutoff)\n   · Purple = target gene (is_target)\n• |corr| slider hides weak correlations\n• Edges = STRING interactions (width = confidence)\n• Node click = protein info · Edge click = related community\n• Switch communities from the landscape",
@@ -337,7 +493,7 @@ export function DashboardPage() {
             >
               <div className="relative overflow-hidden">
                 {!activePpi ? (
-                  <div className="h-[520px] flex items-center justify-center">
+                  <div className="h-[554px] flex items-center justify-center">
                     <EmptyBlock label={t("PPI 데이터 없음", "No PPI data")} />
                   </div>
                 ) : (
@@ -350,7 +506,7 @@ export function DashboardPage() {
                     onNodeClick={handleNodeClick}
                     onEdgeClick={handleEdgeClick}
                     onClearSelection={clearProteinSelection}
-                    height={520}
+                    height={554}
                   />
                 )}
                 {/* Protein info slides in from the right when a node is selected.
@@ -363,15 +519,16 @@ export function DashboardPage() {
               </div>
             </PanelCard>
           </section>
-        </div>
 
-        {/* === Row 2: Pathway 50% + Imaging-column 50% =================== */}
-        <div className="grid grid-cols-12 gap-5">
+          {/* Pathway Enrichment — inside the Target Module Dynamics container as
+              the 2nd row (개정안 mockup). Capped height with internal scroll so
+              long enrichment lists don't stretch the whole container. */}
           <section
             id="pathway"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
+            className="col-span-12 min-w-0 scroll-mt-[200px]"
           >
             <PanelCard
+              flat
               title="Pathway Enrichment"
               tooltip={t(
                 "• 현재 community 단백질의 GO 기능 농축\n• 막대 길이 = −log10(보정 p) (길수록 유의)\n• 색 = 카테고리 (BP/MF/CC)\n• p_adj = Benjamini–Hochberg(FDR) 보정 — gene-set 라이브러리별 다중검정 보정\n• 배경 universe = 측정된 단백질 전체(~9천), Fisher exact 검정\n→ 이 community가 어떤 기능에 모여 있는지",
@@ -386,52 +543,74 @@ export function DashboardPage() {
                 ) : undefined
               }
             >
-              <EnrichmentBar terms={enrichmentTerms} />
-            </PanelCard>
-          </section>
-
-          <section
-            id="imaging"
-            className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px] flex flex-col gap-5"
-          >
-            <PanelCard
-              title="Time-lapse Imaging"
-              tooltip={t(
-                "• 약물 처리 후 0–48h 세포 이미지\n• 0.5h 간격 촬영 (표시 간격 조절 가능)\n• 시간에 따른 세포 수·형태 변화 = 표현형 효과\n• 스케일바 = 실제 크기\n• GIF로 내보내기 가능",
-                "• Cell images 0–48 h after treatment\n• Captured every 0.5 h (display interval adjustable)\n• Cell-count / morphology change over time = effect\n• Scale bar = real size\n• Exportable as GIF",
-              )}
-              status={d.status_flags.time_lapse}
-              meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
-              actions={<CellLineInline cell={d.cell_line} />}
-            >
-              <TimeLapseViewerPanel data={d.time_lapse} drugName={d.drug_name} />
-            </PanelCard>
-
-            <PanelCard
-              title="Phenotypic Profiling"
-              tooltip={t(
-                "Growth Rate — GR(t) = DMSO 대비 성장:\n   · 1 = DMSO 수준 · 0 = 정지 · <0 = 사멸\n   · clip −1~1.5\n   · 곡선 = 약효 관찰창(실제 촬영 시각)\nPhenome Tracking:\n   · vehicle 궤적축에서 벗어난 정도(표현형 이탈)",
-                "Growth Rate — GR(t) = growth vs DMSO:\n   · 1 = DMSO rate · 0 = stasis · <0 = death\n   · clipped −1…1.5\n   · curve = drug-effect window (real capture times)\nPhenome Tracking:\n   · deviation from the vehicle trajectory axis",
-              )}
-              status={d.status_flags.phenotypic}
-              meta={
-                d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
-                  ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
-                  : undefined
-              }
-              actions={
-                d.phenotypic ? (
-                  <CsvExportButton
-                    filename={`${exportBase}_profiling.csv`}
-                    build={() => buildProfilingCsv(d.phenotypic!, exportMeta)}
-                  />
-                ) : undefined
-              }
-            >
-              <PhenotypicProfilingPanel data={d.phenotypic} />
+              <div className="max-h-72 overflow-y-auto pr-1">
+                <EnrichmentBar terms={enrichmentTerms} />
+              </div>
             </PanelCard>
           </section>
         </div>
+        </section>
+
+        {/* === Phenome container — Time-lapse + Phenotypic Profiling
+             grouped under one card, matching Dynamics' visual weight. The
+             section nav points at this id for the top-level "Phenome" tab. */}
+        <section id="phenome" className="panel-card scroll-mt-[200px]">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-line">
+            <div className="text-body-strong text-ink-secondary">
+              {t("Phenome", "Phenome")}
+            </div>
+          </div>
+          <div className="grid grid-cols-12 gap-5 p-4">
+            <section
+              id="imaging"
+              className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
+            >
+              <PanelCard
+                flat
+                title="Time-lapse Imaging"
+                tooltip={t(
+                  "• 약물 처리 후 0–48h 세포 이미지\n• 0.5h 간격 촬영 (표시 간격 조절 가능)\n• 시간에 따른 세포 수·형태 변화 = 표현형 효과\n• 스케일바 = 실제 크기\n• GIF로 내보내기 가능",
+                  "• Cell images 0–48 h after treatment\n• Captured every 0.5 h (display interval adjustable)\n• Cell-count / morphology change over time = effect\n• Scale bar = real size\n• Exportable as GIF",
+                )}
+                status={d.status_flags.time_lapse}
+                meta={d.time_lapse?.well_id ? `well ${d.time_lapse.well_id}` : undefined}
+                actions={<CellLineInline cell={d.cell_line} />}
+              >
+                <TimeLapseViewerPanel data={d.time_lapse} drugName={d.drug_name} />
+              </PanelCard>
+            </section>
+
+            <section
+              id="profiling"
+              className="col-span-12 lg:col-span-6 min-w-0 scroll-mt-[200px]"
+            >
+              <PanelCard
+                flat
+                title="Phenotypic Profiling"
+                tooltip={t(
+                  "Growth Rate — GR(t) = DMSO 대비 성장:\n   · 1 = DMSO 수준 · 0 = 정지 · <0 = 사멸\n   · clip −1~1.5\n   · 곡선 = 약효 관찰창(실제 촬영 시각)\nPhenome Tracking:\n   · vehicle 궤적축에서 벗어난 정도(표현형 이탈)",
+                  "Growth Rate — GR(t) = growth vs DMSO:\n   · 1 = DMSO rate · 0 = stasis · <0 = death\n   · clipped −1…1.5\n   · curve = drug-effect window (real capture times)\nPhenome Tracking:\n   · deviation from the vehicle trajectory axis",
+                )}
+                status={d.status_flags.phenotypic}
+                meta={
+                  d.phenotypic?.gr_score !== null && d.phenotypic?.gr_score !== undefined
+                    ? `GR score ${d.phenotypic.gr_score.toFixed(4)}`
+                    : undefined
+                }
+                actions={
+                  d.phenotypic ? (
+                    <CsvExportButton
+                      filename={`${exportBase}_profiling.csv`}
+                      build={() => buildProfilingCsv(d.phenotypic!, exportMeta)}
+                    />
+                  ) : undefined
+                }
+              >
+                <PhenotypicProfilingPanel data={d.phenotypic} />
+              </PanelCard>
+            </section>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -457,10 +636,8 @@ function formatDrugGroup(raw: string): string {
 
 const SECTION_NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "ppi", label: "PPI" },
-  { id: "landscape", label: "Landscape" },
-  { id: "pathway", label: "Pathway" },
-  { id: "imaging", label: "Imaging" },
+  { id: "dynamics", label: "Target Module Dynamics" },
+  { id: "phenome", label: "Phenome" },
 ];
 
 /**
@@ -503,12 +680,15 @@ function DashboardHeader({
   target,
   activePpi,
   onTargetChange,
+  onDoseChange,
 }: {
   d: DashboardResponse;
   plateId: string | undefined;
   target: string;
   activePpi: PpiPanel | null;
   onTargetChange: (t: string) => void;
+  /** Dose chip click — passes the folder-form label ("10uM"/"3uM") for the URL. */
+  onDoseChange: (doseLabel: string) => void;
 }) {
   const c = d.compound;
   const activeSection = useActiveSection(SECTION_NAV.map((s) => s.id));
@@ -606,6 +786,35 @@ function DashboardHeader({
           </div>
         )}
 
+        {/* Dose selector — only shown for multi-dose plates. Same chip pattern
+            as Target so the two scopes read symmetrically. KPIs, GR, MoA and
+            everything else downstream re-fetch with the new ?dose= param. */}
+        {d.doses && d.doses.available.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="text-ink-muted text-body">Dose</span>
+            <div
+              role="group"
+              aria-label="Switch dose"
+              className="flex flex-wrap items-center gap-1.5"
+            >
+              {d.doses.available.map((opt) => {
+                const isActive = d.doses?.current_dose === opt.dose_um;
+                const doseLabel = `${opt.dose_um}uM`;
+                return (
+                  <button
+                    key={opt.plate_id}
+                    className={isActive ? "chip chip--active" : "chip"}
+                    onClick={() => !isActive && onDoseChange(doseLabel)}
+                    aria-pressed={isActive}
+                  >
+                    {opt.dose_um}μM
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {d.target_profile.drug_group && (
           <p className="mt-1 text-body text-ink-secondary">
             {formatDrugGroup(d.target_profile.drug_group)}
@@ -640,6 +849,18 @@ function DashboardHeader({
               <li key={it.id}>
                 <a
                   href={`#${it.id}`}
+                  onClick={(e) => {
+                    // Bypass the browser's default hash jump (which ignored
+                    // the sticky header height — landed past Dynamics into
+                    // Phenome). Smooth-scroll the target via element ref so
+                    // scroll-mt-[…] is honored consistently.
+                    e.preventDefault();
+                    const el = document.getElementById(it.id);
+                    if (el) {
+                      el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      window.history.replaceState(null, "", `#${it.id}`);
+                    }
+                  }}
                   aria-current={isActive ? "true" : undefined}
                   className={`
                     inline-flex items-center px-3.5 py-2.5

@@ -50,15 +50,19 @@
   --color-brand-primary-pressed-rgb: 109  40 217;
   --color-brand-secondary-rgb:        37  99 235;
 
-  /* === Semantic status (deeper tones for legibility on light) ======== */
+  /* === Semantic status (deeper tones for legibility on light) ========
+   * 2026-06-07: status-warning (Static) aligned to the dark-mode amber
+   * (#FBBF24) per user spec — the previous deep orange #D97706 read as
+   * too close to error/cytotoxic on bright backgrounds, making Static
+   * hard to distinguish in the Plate Summary bar. */
   --color-status-success:   #16A34A;
-  --color-status-warning:   #D97706;
+  --color-status-warning:   #FBBF24;
   --color-status-error:     #DC2626;
   --color-status-info:      #2563EB;
   --color-status-neutral:   #64748B;
 
   --color-status-success-rgb:  22 163  74;
-  --color-status-warning-rgb: 217 119   6;
+  --color-status-warning-rgb: 251 191  36;
   --color-status-error-rgb:   220  38  38;
   --color-status-info-rgb:     37  99 235;
   --color-status-neutral-rgb: 100 116 139;

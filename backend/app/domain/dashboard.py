@@ -123,32 +123,50 @@ def _read_json(path: Path) -> dict[str, Any] | None:
 
 
 def _load_asset(drug: DrugRecord, target: str, suffix: str,
-                 time: str | None = None) -> dict[str, Any] | None:
-    """Load <drug.asset_dir>/<TARGET>_<WELL>/[<24h|4h>/]<suffix>.json.
+                 time: str | None = None, dose: str | None = None) -> dict[str, Any] | None:
+    """Load <drug.asset_dir>/<TARGET>_<WELL>/[<dose>/][<24h|4h>/]<suffix>.json.
 
     Layout (plate-unit): each (drug, target) lives in a `<TARGET>_<WELL_LABEL>/`
-    subfolder (e.g. dBET6/BRD3_C05/landscape.json). We resolve WELL_LABEL from
-    drug.wells; if there are multiple wells with the same target we take the
-    first match. As a last-resort fallback, glob for `<TARGET>_*/<suffix>.json`.
-    When `time` is specified ("4h"/"24h") only that subfolder is tried.
+    subfolder (e.g. dBET6/BRD3_C05/landscape.json). When `dose` is given (multi-
+    dose plate path: `target_well/{dose}/{time}/{suffix}.json`), the dose folder
+    is inserted before the time folder. Single-dose plates omit `dose`. We
+    resolve WELL_LABEL from drug.wells; if there are multiple wells with the
+    same target we take the first match. As a last-resort fallback (single-dose
+    only), glob for `<TARGET>_*/<suffix>.json`.
     """
     if not drug.asset_dir or not drug.asset_dir.exists():
         return None
 
+    def _try(tw_dir: Path) -> dict[str, Any] | None:
+        if dose:
+            # multi-dose: tw_dir/{dose}/{time}/{suffix}.json (time required when
+            # dose is given — there's no legacy un-nested fallback here).
+            if time:
+                cand = tw_dir / dose / time / f"{suffix}.json"
+                return _read_json(cand) if cand.exists() else None
+            for tw in _TIME_PREF:
+                cand = tw_dir / dose / tw / f"{suffix}.json"
+                if cand.exists():
+                    return _read_json(cand)
+            return None
+        cand = _resolve_in_well_dir(tw_dir, suffix, time)
+        return _read_json(cand) if cand else None
+
     # Primary: resolve WELL from drug.wells
     for w in drug.wells:
         if any(t.target == target for t in w.targets):
-            cand = _resolve_in_well_dir(drug.asset_dir / f"{target}_{w.well_label}", suffix, time)
-            if cand:
-                return _read_json(cand)
+            hit = _try(drug.asset_dir / f"{target}_{w.well_label}")
+            if hit is not None:
+                return hit
             break  # well resolved but file missing → fall through to glob
 
-    # Fallback: glob the subfolder by target prefix
-    for tdir in sorted(drug.asset_dir.glob(f"{target}_*")):
-        if tdir.is_dir():
-            cand = _resolve_in_well_dir(tdir, suffix, time)
-            if cand:
-                return _read_json(cand)
+    # Fallback (single-dose only): glob the subfolder by target prefix
+    if not dose:
+        for tdir in sorted(drug.asset_dir.glob(f"{target}_*")):
+            if tdir.is_dir():
+                cand = _resolve_in_well_dir(tdir, suffix, time)
+                if cand:
+                    return _read_json(cand)
     return None
 
 
@@ -164,61 +182,92 @@ def _load_baseline_asset(plate: PlateRecord, target: str, suffix: str) -> dict[s
     return _read_json(cand) if cand.exists() else None
 
 
-def _extract_timepoint_snapshot(on_target: dict[str, Any] | None, time: str) -> "TimepointSnapshot | None":
-    """Pull the time-varying bits out of an on_target.json payload — the pieces
-    that change as the user clicks 0h/4h/24h while the 24h-fixed map stays put.
-
-    Returns None when the payload is missing (so the time is reported as
-    `missing` in TimepointsPanel and the button gets disabled in the UI).
-    """
-    if not on_target:
-        return None
-    nodes_corr: dict[str, float] = {}
-    seen: set[str] = set()
+def _nodes_corr_from_payload(on_target: dict[str, Any]) -> dict[str, float]:
+    """Flatten communities[].ppi.nodes into {gene_id -> corr}. First-seen wins
+    when a gene appears in multiple communities (rare; keeps deterministic)."""
+    out: dict[str, float] = {}
     for cid_str, c in (on_target.get("communities") or {}).items():
         for n in (c.get("ppi", {}).get("nodes") or []):
             nid = n.get("id")
-            if isinstance(nid, str) and nid not in seen:
-                seen.add(nid)
+            if isinstance(nid, str) and nid not in out:
                 corr = n.get("corr")
                 if isinstance(corr, (int, float)):
-                    nodes_corr[nid] = float(corr)
-    scatter_z: dict[str, float] = {}
-    for s in (on_target.get("scatter") or []):
-        cid = s.get("community_id")
-        z = s.get("z")
-        if cid is not None and isinstance(z, (int, float)):
-            scatter_z[str(cid)] = float(z)
-    target_meta = on_target.get("target_meta") or {}
-    return TimepointSnapshot(
-        time=time,                                            # type: ignore[arg-type]
-        nodes_corr=nodes_corr,
-        scatter_z=scatter_z,
-        target_meta=target_meta if isinstance(target_meta, dict) else {},
-    )
+                    out[nid] = float(corr)
+    return out
+
+
+def _community_members_from_payload(on_target: dict[str, Any]) -> dict[str, list[str]]:
+    """Map each community_id (str) -> the list of gene ids in its PPI subgraph.
+    This is the membership at THIS payload's timepoint — used as the fixed
+    24h-frame membership when projecting other timepoints onto it."""
+    out: dict[str, list[str]] = {}
+    for cid_str, c in (on_target.get("communities") or {}).items():
+        ids = [n.get("id") for n in (c.get("ppi", {}).get("nodes") or [])
+               if isinstance(n.get("id"), str)]
+        if ids:
+            out[cid_str] = ids
+    return out
+
+
+def _dose_label_for(dose_um: float) -> str:
+    """Folder/label form of a dose value: 10.0 -> '10uM', 3.0 -> '3uM',
+    1.5 -> '1.5uM'. Matches the on-disk multi-dose layout (`{drug}/{tw}/{dose}/`)."""
+    return f"{int(dose_um)}uM" if float(dose_um).is_integer() else f"{dose_um}uM"
+
+
+def _resolve_dose(plate: PlateRecord, requested: str | None) -> str | None:
+    """Pick the effective dose label for asset loads. Single-dose plates return
+    None (legacy path). Multi-dose plates honor the requested dose if it maps to
+    a known member; otherwise fall back to the highest dose."""
+    if plate.kind != "multi_dose" or not plate.member_doses:
+        return None
+    valid = {_dose_label_for(v) for v in plate.member_doses.values()}
+    if requested and requested in valid:
+        return requested
+    return _dose_label_for(max(plate.member_doses.values()))
 
 
 def _build_timepoints_panel(plate: PlateRecord, drug: DrugRecord,
-                              target: str) -> "TimepointsPanel":
-    """Try 0h (baseline) / 4h / 24h and report which are available + a snapshot
-    of each available timepoint for the time toggle."""
+                              target: str, dose: str | None = None) -> "TimepointsPanel | None":
+    """Time-toggle metadata — which timepoints exist and their target_meta
+    label (powers the KPI strip "흩어짐 → 모듈 형성" verdict).
+
+    Per 2026-06-07 spec, the time toggle now refetches the dashboard with
+    ?time=… and gets the raw payload for that timepoint — no scatter_z /
+    nodes_corr projection here. We only ship the lightweight metadata: which
+    times have data, the primary frame, and each available time's target_meta.
+    """
+    payloads: dict[str, dict[str, Any] | None] = {}
+    for t in _ALL_TIMES:
+        payloads[t] = (_load_baseline_asset(plate, target, "on_target") if t == "0h"
+                       else _load_asset(drug, target, "on_target", time=t, dose=dose))
+
+    primary = next((t for t in (_PRIMARY_TIME, "4h", "0h") if payloads.get(t)), None)
+    if primary is None:
+        return None
+
     by_time: dict[str, TimepointSnapshot] = {}
     available: list[str] = []
     missing: list[str] = []
     for t in _ALL_TIMES:
-        payload = (_load_baseline_asset(plate, target, "on_target")
-                   if t == "0h"
-                   else _load_asset(drug, target, "on_target", time=t))
-        snap = _extract_timepoint_snapshot(payload, t)
-        if snap is None:
+        payload = payloads.get(t)
+        if not payload:
             missing.append(t)
-        else:
-            available.append(t)
-            by_time[t] = snap
+            continue
+        target_meta = payload.get("target_meta") or {}
+        # Snapshot stays minimal — empty corr/z dicts (kept for schema stability
+        # with older clients); only target_meta is actually consumed.
+        by_time[t] = TimepointSnapshot(
+            time=t,                                            # type: ignore[arg-type]
+            nodes_corr={},
+            scatter_z={},
+            target_meta=target_meta if isinstance(target_meta, dict) else {},
+        )
+        available.append(t)
     return TimepointsPanel(
-        available=available,                                  # type: ignore[arg-type]
-        missing=missing,                                      # type: ignore[arg-type]
-        primary=_PRIMARY_TIME,                                # type: ignore[arg-type]
+        available=available,                                   # type: ignore[arg-type]
+        missing=missing,                                       # type: ignore[arg-type]
+        primary=primary,                                       # type: ignore[arg-type]
         by_time=by_time,
     )
 
@@ -248,11 +297,13 @@ def _build_doses_panel(plate: PlateRecord, drug: DrugRecord, target: str) -> "Do
         available.append(DoseOption(plate_id=mid, dose_um=float(dose)))
     if not available:
         return None
-    # Sort high-to-low so the toggle reads "10uM | 3uM" left-to-right naturally.
-    available.sort(key=lambda d: d.dose_um, reverse=True)
+    # Ascending — low dose first so the header chip row reads "3μM | 10μM"
+    # (per user spec). current_dose stays high — see _resolve_dose's default
+    # (max dose) — only the listing order flips.
+    available.sort(key=lambda d: d.dose_um)
     return DosesPanel(
         available=available,
-        current_dose=available[0].dose_um,
+        current_dose=available[-1].dose_um,
         normalization_group=plate.normalization_group,
     )
 
@@ -861,11 +912,17 @@ def _compute_insight(
     )
 
 
+_VALID_TIMES = ("0h", "4h", "24h")
+
+
 def build_dashboard(
     plate: PlateRecord,
     drug: DrugRecord,
     target: str | None,
     file_prefix: str,
+    *,
+    dose: str | None = None,
+    time: str | None = None,
 ) -> DashboardResponse:
     available_targets = [t.target for t in drug.targets] or ["unknown"]
     if not target or target not in available_targets:
@@ -922,13 +979,38 @@ def build_dashboard(
             }
     references = ReferenceDatabases(by_target=references_by_target)
 
-    phenotypic = _build_phenotypic(plate, drug)
+    # Resolve effective dose once, before any panel build. On single-dose plates
+    # this returns None and every panel takes the legacy path.
+    effective_dose = _resolve_dose(plate, dose)
+
+    # Dose-scoped plate used for GR/phenotypic/time-lapse/KPI. On a multi-dose
+    # virtual plate (e.g. D3), those panels must read from the member plate
+    # matching the active dose — otherwise switching 10μM ↔ 3μM only repaints
+    # the Target Module Dynamics container while the headline KPIs and the GR
+    # curve (both derived from member-plate CSVs) keep the wrong dose.
+    plate_for_dose = plate
+    if plate.kind == "multi_dose" and effective_dose:
+        from ..data_loader import get_registry
+        reg = get_registry()
+        for mid, dv in plate.member_doses.items():
+            if _dose_label_for(dv) == effective_dose:
+                m = reg.get_plate(mid)
+                if m is not None:
+                    plate_for_dose = m
+                break
+
+    # Drug record from the dose-scoped plate. On multi-dose, the asset_dir on
+    # the virtual plate's drug points at the aggregator folder (no per-dose
+    # timelapse/csv); the member plate's drug record carries the right paths.
+    drug_for_dose = plate_for_dose.drugs.get(drug.drug_id) or drug
+
+    phenotypic = _build_phenotypic(plate_for_dose, drug_for_dose)
 
     # Time-lapse: prefer drug-specific timelapse asset, fallback to plate mosaic for one well
-    frames = _frames_from_drug_assets(drug, file_prefix)
+    frames = _frames_from_drug_assets(drug_for_dose, file_prefix)
     well_id = None
     if not frames:
-        frames, well_id = _frames_from_mosaic(plate, drug, file_prefix)
+        frames, well_id = _frames_from_mosaic(plate_for_dose, drug_for_dose, file_prefix)
     else:
         well = _pick_representative_well(drug)
         well_id = well.well_label if well else None
@@ -945,9 +1027,20 @@ def build_dashboard(
         n_cells_t0=n_cells_t0,
     )
 
-    # PPI + Landscape — prefer real assets keyed by current target
-    on_target_payload = _load_asset(drug, target, "on_target")
-    landscape_payload = _load_asset(drug, target, "landscape")
+    # PPI + Landscape — time-scoped. Default to the primary frame (24h); 0h
+    # comes from the per-plate baseline (dose-invariant); 4h/24h follow the
+    # active dose. Sending raw per-timepoint payload — no projection — per the
+    # 2026-06-07 spec ("데이터 그대로 송출"); the time-difference view will
+    # come back as a separate panel later.
+    effective_time = time if time in _VALID_TIMES else _PRIMARY_TIME
+    if effective_time == "0h":
+        on_target_payload = _load_baseline_asset(plate, target, "on_target")
+        landscape_payload = _load_baseline_asset(plate, target, "landscape")
+    else:
+        on_target_payload = _load_asset(drug, target, "on_target",
+                                         time=effective_time, dose=effective_dose)
+        landscape_payload = _load_asset(drug, target, "landscape",
+                                         time=effective_time, dose=effective_dose)
     # No synthetic fallback: when the real asset JSON is absent, leave the panel
     # empty (None) so the UI shows "데이터 없음" instead of fabricated PPI/landscape.
     ppi = _ppi_panel_from_on_target(on_target_payload, target, plate.target_map) if on_target_payload else None
@@ -977,8 +1070,15 @@ def build_dashboard(
     insight = _compute_insight(drug, target, drug.drug_group, kpis, moa_summary, ppi, enrichment)
 
     # Time/dose toggles for the Target Module Dynamics view.
-    timepoints = _build_timepoints_panel(plate, drug, target)
+    timepoints = _build_timepoints_panel(plate, drug, target, dose=effective_dose)
     doses = _build_doses_panel(plate, drug, target)
+    if doses and effective_dose:
+        # Reflect the resolved dose in the doses panel so the UI highlights the
+        # correct toggle even when the request omitted ?dose=.
+        for opt in doses.available:
+            if _dose_label_for(opt.dose_um) == effective_dose:
+                doses.current_dose = opt.dose_um
+                break
 
     return DashboardResponse(
         plate_id=plate.plate_id,

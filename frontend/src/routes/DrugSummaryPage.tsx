@@ -279,7 +279,37 @@ export function DrugSummaryPage() {
                   </td>
                   <td className="text-ink-secondary">{d.drug_group ?? "—"}</td>
                   <td>
-                    {d.gr_score !== null ? (
+                    {d.by_dose.length > 0 ? (
+                      // Multi-dose plate: stack one row per concentration so
+                      // the row height grows with the dose count (cell-in-cell).
+                      <div className="flex flex-col gap-1">
+                        {d.by_dose.map((dd) => (
+                          <div
+                            key={dd.plate_id}
+                            className="flex items-center gap-2 text-meta"
+                          >
+                            <span className="text-ink-muted font-mono tabular w-12 shrink-0">
+                              {dd.dose_um}μM
+                            </span>
+                            {dd.gr_score !== null ? (
+                              <span
+                                className={
+                                  dd.gr_score < 0
+                                    ? "text-status-error tabular font-semibold"
+                                    : dd.gr_score < 0.5
+                                    ? "text-status-warning tabular font-semibold"
+                                    : "text-status-success tabular font-semibold"
+                                }
+                              >
+                                {dd.gr_score.toFixed(3)}
+                              </span>
+                            ) : (
+                              <span className="text-ink-muted">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : d.gr_score !== null ? (
                       <span
                         className={
                           d.gr_score < 0
@@ -296,7 +326,20 @@ export function DrugSummaryPage() {
                     )}
                   </td>
                   <td>
-                    <StatusBadge label={d.growth_class} />
+                    {d.by_dose.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {d.by_dose.map((dd) => (
+                          <div key={dd.plate_id} className="flex items-center gap-2">
+                            <span className="text-ink-muted font-mono tabular w-12 shrink-0 text-meta">
+                              {dd.dose_um}μM
+                            </span>
+                            <StatusBadge label={dd.growth_class} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <StatusBadge label={d.growth_class} />
+                    )}
                   </td>
                   <td className="font-mono text-meta text-ink-muted">{d.wells.join(", ")}</td>
                   <td className="text-center">
@@ -538,6 +581,10 @@ function PlateSummaryBar({
     filtered: number;
   };
 }) {
+  // Order: no-asset (data-missing) → permissive → static → toxic. Active
+  // categories follow the biological severity ramp (살아남 → 정지 → 죽음) per
+  // user spec; noAsset stays at the head since it is a "no measurement"
+  // bucket, not an effect strength.
   const segments = [
     {
       key: "noAsset",
@@ -549,23 +596,22 @@ function PlateSummaryBar({
       key: "assetOnly",
       count: s.assetOnly,
       // "Asset Only" = has analysis assets AND growth-permissive (no
-      // cytotoxic / cytostatic signal). Semantically this matches the
-      // Growth-permissive StatusBadge → use the same green hue rather
-      // than the brand purple (purple read as decorative, not semantic).
+      // cytotoxic / cytostatic signal). Same green hue as the
+      // Growth-permissive StatusBadge for semantic continuity.
       label: "Asset Only",
       color: "var(--color-status-success)",
-    },
-    {
-      key: "cytotoxic",
-      count: s.cytotoxic,
-      label: "Cytotoxic",
-      color: "var(--color-cytotoxic-moderate)",
     },
     {
       key: "static",
       count: s.cytostatic,
       label: "Static",
       color: "var(--color-status-warning)",
+    },
+    {
+      key: "cytotoxic",
+      count: s.cytotoxic,
+      label: "Cytotoxic",
+      color: "var(--color-cytotoxic-moderate)",
     },
   ];
   const present = segments.filter((seg) => seg.count > 0);

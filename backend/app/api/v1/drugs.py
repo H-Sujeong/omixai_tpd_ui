@@ -31,6 +31,8 @@ def get_dashboard(
     drug_id: str,
     _owned: str = Depends(require_owned_plate),
     target: str | None = Query(default=None, description="Target gene (default = first)"),
+    dose: str | None = Query(default=None, description="Dose label (multi-dose plates only, e.g. '10uM', '3uM')"),
+    time: str | None = Query(default=None, description="Timepoint label ('0h'/'4h'/'24h'); ppi/landscape only — KPIs/GR stay at primary"),
 ) -> DashboardResponse:
     plate = get_registry().get_plate(plate_id)
     if not plate:
@@ -38,7 +40,7 @@ def get_dashboard(
     drug = plate.drugs.get(drug_id)
     if not drug:
         raise HTTPException(status_code=404, detail=f"drug {drug_id} not found in plate {plate_id}")
-    return build_dashboard(plate, drug, target, _FILE_PREFIX)
+    return build_dashboard(plate, drug, target, _FILE_PREFIX, dose=dose, time=time)
 
 
 @router.get(

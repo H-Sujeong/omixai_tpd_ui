@@ -46,14 +46,16 @@ export function useDashboard(
   plateId: string | undefined,
   drugId: string | undefined,
   target?: string,
+  dose?: string,
+  time?: string,
 ) {
   return useQuery<DashboardResponse>({
-    queryKey: ["dashboard", plateId, drugId, target ?? "default"],
+    queryKey: ["dashboard", plateId, drugId, target ?? "default", dose ?? "default", time ?? "default"],
     enabled: !!plateId && !!drugId,
     queryFn: () =>
       apiGet<DashboardResponse>(
         `/api/v1/plates/${plateId}/drugs/${drugId}/dashboard`,
-        { target },
+        { target, dose, time },
       ),
   });
 }

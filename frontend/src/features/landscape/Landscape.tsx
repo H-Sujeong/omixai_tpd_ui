@@ -12,6 +12,22 @@ interface Props {
   highlightCommunity?: number | null;
   onCommunityClick?: (communityId: number) => void;
   height?: number;
+  /**
+   * Per-community z override (community_id as string -> avg PCC at the active
+   * timepoint). When provided, the scatter point heights and the interpolated
+   * surface are rebuilt from this z instead of `landscape.scatter[].z`. The
+   * (x, y) positions and community identities stay fixed — that's the B안
+   * "지도 모양은 24h 기준 고정, 높이·색만 시점에 따라 바뀜" rule.
+   * null = use the payload's primary-time z as-is.
+   */
+  scatterZByCommunity?: Record<string, number> | null;
+  /**
+   * The timepoint the fixed frame is anchored to (e.g. "24h"). When set, every
+   * community label is suffixed with `@<frameTime>` (e.g. "community 43@24h")
+   * so users can tell at a glance which timepoint defined the layout vs. which
+   * one is being projected onto it. Pure visualization label — not a DB id.
+   */
+  frameTime?: string | null;
 }
 
 /**
@@ -129,15 +145,36 @@ const SHOW_TARGET_GLYPH = false;
 const COLOR_SELF_ANCHOR = "#DC2626";
 
 export function Landscape({
-  landscape,
+  landscape: landscapeProp,
   targetName,
   highlightCommunity,
   onCommunityClick,
   height = 380,
+  scatterZByCommunity,
+  frameTime,
 }: Props) {
+  // Suffix appended to every community label (e.g. "@24h"). Empty when no frame
+  // is provided — preserves pre-timepoint plates' visuals unchanged.
+  const fs = frameTime ? `@${frameTime}` : "";
   const t = useT();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  // B안 (time-comparison §3): the 24h scatter (x, y, community_id) is the fixed
+  // frame; the time toggle only rewrites z. When scatterZByCommunity is given,
+  // remap each scatter point's z by community_id, leaving everything else
+  // untouched. Points whose community isn't present in the override at this
+  // timepoint drop out (the community had no signal at this time).
+  const landscape = useMemo(() => {
+    if (!scatterZByCommunity) return landscapeProp;
+    const remapped = landscapeProp.scatter
+      .map((p) => {
+        const z = scatterZByCommunity[String(p.community_id)];
+        return z === undefined ? null : { ...p, z };
+      })
+      .filter((p): p is typeof landscapeProp.scatter[number] => p !== null);
+    return { ...landscapeProp, scatter: remapped };
+  }, [landscapeProp, scatterZByCommunity]);
   // Plotly takes literal color strings, not CSS vars, so we branch here.
   // In light mode the original near-black axis text was fine; in dark
   // mode the same color disappeared into the dark page background, so
@@ -206,9 +243,27 @@ export function Landscape({
   }, [landscape.scatter]);
 
   const effectiveThreshold = Math.max(rangeMin, Math.min(rangeMax, pccThreshold));
-  // Symmetric color limit so 0 = neutral (white/green centre) and the scale is
-  // tightened to the real data range (the old ±0.5 washed everything out).
-  const zlim = Math.max(Math.abs(rangeMin), Math.abs(rangeMax)) || 0.5;
+  // Symmetric color limit anchored to the PRIMARY frame's z range (the
+  // landscape we received before any per-timepoint override). Without this,
+  // each time-toggle frame got its own zlim and the same color meant a
+  // different PCC at 0h vs 24h — making the "지형이 자란다" comparison
+  // impossible. Fixed scale = same color = same PCC across all timepoints.
+  const zlim = useMemo(() => {
+    let lo = Infinity, hi = -Infinity;
+    for (const p of landscapeProp.scatter) {
+      if (p.z < lo) lo = p.z;
+      if (p.z > hi) hi = p.z;
+    }
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return 0.5;
+    return Math.max(Math.abs(lo), Math.abs(hi)) || 0.5;
+  }, [landscapeProp.scatter]);
+
+  // True when we're showing a non-primary timepoint via override. The target
+  // ✚ marker uses the primary frame's position by design (B안 fixed map), so
+  // we fade it on non-primary toggles to signal that the position is the 24h
+  // anchor — not "this timepoint's target community" (which doesn't exist as
+  // a stable concept; community IDs reshuffle each timepoint).
+  const isProjected = scatterZByCommunity != null;
 
   const [distMin, distMax] = useMemo(() => {
     if (landscape.scatter.length === 0) return [0, 0];
@@ -400,13 +455,16 @@ export function Landscape({
           line: { width: 1.5, color: COLOR_OTHER_EDGE },
         },
         hovertemplate:
-          "<b>community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
+          `<b>community %{customdata}${fs}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
         showlegend: false,
       });
     }
 
     // 4. Target community marker — real = filled yellow cross; absent = hollow
-    //    pseudo cross at the would-be target position.
+    //    pseudo cross at the would-be target position. On a non-primary
+    //    timepoint (isProjected) we draw it hollow + faded so users read it as
+    //    "24h frame anchor projected onto this timepoint" rather than "this
+    //    timepoint's target community" (which doesn't exist as a stable id).
     if (scTarget.length > 0) {
       const trace: any = {
         type: "scatter",
@@ -414,17 +472,26 @@ export function Landscape({
         x: scTarget.map((p) => p.x),
         y: scTarget.map((p) => p.y),
         customdata: scTarget.map((p) => p.community_id),
-        marker: {
-          size: SHOW_TARGET_GLYPH ? 14 : 16,
-          symbol: "cross",
-          color: COLOR_TARGET_FILL,
-          line: { width: 2.5, color: COLOR_TARGET_EDGE },
-        },
-        hovertemplate:
-          "<b>★ target community %{customdata}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
+        marker: isProjected
+          ? {
+              size: 14,
+              symbol: "cross-open",
+              color: COLOR_TARGET_FILL,
+              line: { width: 2, color: COLOR_TARGET_FILL },
+              opacity: 0.45,
+            }
+          : {
+              size: SHOW_TARGET_GLYPH ? 14 : 16,
+              symbol: "cross",
+              color: COLOR_TARGET_FILL,
+              line: { width: 2.5, color: COLOR_TARGET_EDGE },
+            },
+        hovertemplate: isProjected
+          ? `<b>★ target community %{customdata}${fs}</b><br>(24h 위치 투영)<br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`
+          : `<b>★ target community %{customdata}${fs}</b><br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>`,
         showlegend: false,
       };
-      if (SHOW_TARGET_GLYPH) {
+      if (SHOW_TARGET_GLYPH && !isProjected) {
         trace.text = scTarget.map(() => "✚");
         trace.textposition = "top center";
         trace.textfont = { size: 16, color: COLOR_TARGET_FILL };
@@ -463,7 +530,7 @@ export function Landscape({
           color: "#F59E0B",
           line: { width: 3, color: "#F59E0B" },
         },
-        hovertemplate: `<b>community ${selectedCommunityPoint.community_id}</b> · selected<extra></extra>`,
+        hovertemplate: `<b>community ${selectedCommunityPoint.community_id}${fs}</b> · selected<extra></extra>`,
         showlegend: false,
       });
     }
@@ -543,7 +610,7 @@ export function Landscape({
           line: { width: 1, color: "rgba(255,255,255,0.9)" },
         },
         hovertemplate:
-          "community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
+          `community %{customdata}${fs}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
         showlegend: false,
       });
     }
@@ -562,7 +629,7 @@ export function Landscape({
           line: { width: 2, color: COLOR_TARGET_EDGE },
         },
         hovertemplate:
-          "★ target community %{customdata}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>",
+          `★ target community %{customdata}${fs}<br>x=%{x:.2f} y=%{y:.2f}<extra></extra>`,
         showlegend: false,
       };
       if (SHOW_TARGET_GLYPH) {
@@ -621,7 +688,7 @@ export function Landscape({
           color: "#F59E0B",
           line: { width: 2, color: "#92400E" },
         },
-        hovertemplate: `community ${selectedCommunityPoint.community_id} · PCC ${selectedCommunityPoint.z.toFixed(2)}<extra></extra>`,
+        hovertemplate: `community ${selectedCommunityPoint.community_id}${fs} · PCC ${selectedCommunityPoint.z.toFixed(2)}<extra></extra>`,
         showlegend: false,
       });
     }
@@ -657,7 +724,7 @@ export function Landscape({
         x: selectedCommunityPoint.x,
         y: selectedCommunityPoint.y,
         z: selectedCommunityPoint.z,
-        text: `community ${selectedCommunityPoint.community_id} · PCC ${selectedCommunityPoint.z.toFixed(2)}`,
+        text: `community ${selectedCommunityPoint.community_id}${fs} · PCC ${selectedCommunityPoint.z.toFixed(2)}`,
         showarrow: true, arrowhead: 2, arrowsize: 1.3, arrowwidth: 2.5,
         arrowcolor: "#F59E0B", ax: 42, ay: -55, borderpad: 2,
         font: { color: "#B45309", size: 11 },
@@ -848,7 +915,7 @@ export function Landscape({
               </option>
               {communityOptions.map((c) => (
                 <option key={c.id} value={c.id} style={{ color: "#111827", backgroundColor: "#FFFFFF" }}>
-                  {`c${String(c.id).padStart(3, "0")} · n=${c.size} · PCC ${c.z.toFixed(2)}${
+                  {`c${String(c.id).padStart(3, "0")}${fs} · n=${c.size} · PCC ${c.z.toFixed(2)}${
                     c.isTarget ? " ★" : ""
                   }`}
                 </option>

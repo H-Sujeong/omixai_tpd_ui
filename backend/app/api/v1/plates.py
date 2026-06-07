@@ -15,7 +15,7 @@ from ...data_loader import PlateRegistry, get_registry
 from ...db import get_db
 from ...models import User
 from ...ownership import owned_plate_ids
-from ...schemas import DrugSummaryRow, DrugTargetEntry, PlateSummary
+from ...schemas import DrugDoseRow, DrugSummaryRow, DrugTargetEntry, PlateSummary
 
 router = APIRouter(prefix="/api/v1", tags=["plates"])
 
@@ -101,8 +101,14 @@ def list_plates(
     dirty = False
     out: list[PlateSummary] = []
     for plate in reg.list_plates():
+        # Multi-dose virtual plates (e.g. D3) inherit access from their members:
+        # if any member single-dose plate is owned, the multi-dose aggregator is
+        # visible too. Saves a separate admin assignment per virtual plate.
         if plate.plate_id not in owned:
-            continue
+            if plate.kind == "multi_dose" and any(m in owned for m in plate.members):
+                pass                # accessible via member ownership
+            else:
+                continue
         # Every drug in plate.py is shown (each has a folder + timelapse even
         # without dashboard assets); the PPI/landscape panels just read empty
         # for drugs whose analysis hasn't arrived yet.
@@ -140,9 +146,38 @@ def list_drugs(
 ) -> list[DrugSummaryRow]:
     if plate_id not in owned_plate_ids(db, user):
         raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
-    plate = _registry().get_plate(plate_id)
+    reg = _registry()
+    plate = reg.get_plate(plate_id)
     if not plate:
         raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
+
+    # For multi-dose plates, gather per-member dose breakdown so the drug-list
+    # table can show one sub-row per concentration (stacked GR/Growth cells).
+    # drug_id -> [DrugDoseRow sorted by dose desc].
+    dose_views: dict[str, list[DrugDoseRow]] = {}
+    if plate.kind == "multi_dose":
+        for mid in plate.members:
+            m = reg.get_plate(mid)
+            if m is None:
+                continue
+            mdose = plate.member_doses.get(mid, m.dose_um or 0.0)
+            for md in m.drugs.values():
+                m_grs = [w.gr_score for w in md.wells if w.gr_score is not None]
+                m_gr = float(sum(m_grs) / len(m_grs)) if m_grs else None
+                m_ecs = [w.effect_class for w in md.wells
+                         if w.effect_class and w.effect_class != "invalid"]
+                m_ec = max(set(m_ecs), key=m_ecs.count) if m_ecs else None
+                dose_views.setdefault(md.drug_id, []).append(DrugDoseRow(
+                    dose_um=float(mdose),
+                    plate_id=mid,
+                    gr_score=m_gr,
+                    growth_class=_growth_label(m_gr, m_ec),
+                    effect_class=m_ec,
+                ))
+        for k in dose_views:
+            # Ascending — low dose first (per user spec: "저농도부터").
+            dose_views[k].sort(key=lambda r: r.dose_um)
+
     rows: list[DrugSummaryRow] = []
     for drug in plate.drugs.values():
         # Show all drugs from plate.py; has_dashboard_assets just tells the UI
@@ -169,6 +204,7 @@ def list_drugs(
             effect_class=effect_class,
             smiles=drug.smiles,
             has_dashboard_assets=drug.has_dashboard_assets,
+            by_dose=dose_views.get(drug.drug_id, []),
         ))
     rows.sort(key=lambda r: r.drug_name.lower())
     return rows

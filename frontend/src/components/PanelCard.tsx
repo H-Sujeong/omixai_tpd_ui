@@ -8,6 +8,9 @@ interface Props {
   actions?: ReactNode;
   status?: string;
   className?: string;
+  /** Nested style: drops border/bg/shadow + flattens header padding so the
+   *  parent container reads as the single card. */
+  flat?: boolean;
   children: ReactNode;
 }
 
@@ -19,11 +22,12 @@ export function PanelCard({
   actions,
   status,
   className,
+  flat,
   children,
 }: Props) {
   return (
-    <section className={`panel-card ${accent ? "panel-card--accent" : ""} ${className ?? ""}`}>
-      <header className="panel-header">
+    <section className={`panel-card ${flat ? "panel-card--flat" : ""} ${accent ? "panel-card--accent" : ""} ${className ?? ""}`}>
+      <header className={`panel-header ${flat ? "panel-header--flat" : ""}`}>
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="panel-title truncate">{title}</h3>
@@ -50,7 +54,7 @@ export function PanelCard({
         </div>
         {actions && <div className="flex items-center gap-1.5">{actions}</div>}
       </header>
-      <div className="panel-body">{children}</div>
+      <div className={`panel-body ${flat ? "panel-body--flat" : ""}`}>{children}</div>
     </section>
   );
 }

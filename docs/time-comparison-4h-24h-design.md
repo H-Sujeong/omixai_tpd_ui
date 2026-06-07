@@ -5,6 +5,34 @@
 > 그 데이터를 **사용자(따로 교육받지 않고 가이드만 읽은 사람)** 가 이해할 수 있게 보여주는
 > 시각화안(B안 = 고정 프레임)을 확정한다.
 > 근거 코드/데이터: `tpd_prot_pipeline/`, `TPD_UI_DB/plate_*/{drug}/{target}_{well}/{0h,4h,24h}/{landscape,on_target}.json`.
+> 검토 완료한 레이아웃 mockup: `ui_workspace/시간축 추가 개선안 (2).png` (Before=분리 / After=통합 컨테이너+공유 시간토글).
+
+---
+
+## 0. 제작팀 핸드오프 체크리스트 (먼저 읽기)
+
+**상태: 의도·설계·UX·사용자 문구 = 확정(넘겨도 됨). 단, 엔지니어 결정 2건이 미결.**
+
+### ✅ 확정 — 그대로 진행 가능
+- 0h 생산 의도(§1), 비교 가능 단위(§2: 단백질/PCC만), 시각화 B안(§3), 사용자 문구(§4),
+  0h 생산 규칙(§5: 16샘플 비압축·dose 합침·plate공유).
+
+### ❓ 미결 — 제작팀이 결정/확인해야 시작 가능
+1. **[데이터/파이프라인] 0h 생산 명령 & gg-matrix 토큰 매칭.**
+   - `tpd_prot_pipeline`은 `--time 4h 24h` 형식. **`--time 0h`로 0h를 export할 수 있는지**,
+     gg-matrix 컬럼에 `0h` 토큰이 part 매칭되는지 확인 필요(README상 토큰 part 매칭이라 가능성 높음).
+   - 산출물: `{...}/0h/{landscape,on_target}.json`, 4h/24h와 **동일 gene symbol 공간**.
+   - 담당: 파이프라인 오너.
+2. **[프론트/데이터] B안 고정프레임에서 landscape "높이(surface)"를 어디서 계산할지.**
+   - 점의 가로 위치·PPI 레이아웃은 24h 고정(조건 무관) → OK. 변하는 건 **높이=각 시점 PCC 평균**.
+   - 선택지 ⓐ export가 "24h 멤버십 위 0h/4h 투영 surface"를 미리 산출 vs ⓑ 프론트가
+     `on_target.json`의 `node.corr`를 24h 프레임에 조인해 높이 갱신.
+   - **기존 "RBF 보간오류 근본 수정" 이슈와 묶임**(`[[project_tpd_ui_pending_improvements]]`) → 같이 결정 권장.
+   - 담당: 프론트 + 데이터.
+
+### 🧭 권장 착수 순서
+- **Phase 1(§6)은 위 미결과 무관하게 지금 시작 가능** — 두 시점 PCC가 이미 있으므로
+  PPI 색 토글 + ΔPCC 막대부터. 미결 2건은 Phase 2(통합 컨테이너) 착수 전까지 닫으면 됨.
 
 ---
 
@@ -158,8 +186,8 @@
 
 - 0h 생산: 4h/24h와 **같은 proteomics 공간(gene symbol)** 으로 `0h/{landscape,on_target}.json` export.
 - B안 고정 프레임은 가능하면 **프론트 조인**으로: 24h의 노드 집합·레이아웃에, 각 시점 `on_target.json`의
-  `node.corr`(단백질별 PCC)를 gene id로 붙여 색·높이만 갱신. (landscape surface 재생성만 export/프론트
-  중 어디서 할지 확인 필요 — 점 위치는 고정이라 높이만 바뀜.)
+  `node.corr`(단백질별 PCC)를 gene id로 붙여 색·높이만 갱신. (landscape surface를 어디서 재생성할지는
+  **§0 미결 #2** — 점 위치는 고정이라 높이만 바뀜.)
 - 시점 묶음 매니페스트: 한 (drug,target,well)의 존재하는 시점 리스트를 함께 기록(없는 시점은 UI 비활성).
 
 ---
@@ -181,3 +209,38 @@
 > **0h는 "변화의 출발선"이라 생산한다.** 그래야 4h·24h의 변화가 약물 때문임을 말할 수 있다.
 > 시각화는 **24h 지도를 고정하고 시간 버튼으로 높이·색(PCC)만 바꾸는 B안** —
 > "같은 자리에서 변화가 자라는" 그림이라 교육 없이도 읽힌다. community는 시간 추적하지 않는다(데이터가 불허).
+
+---
+
+## 9. 회귀 결정 — B안 보류, **시점별 raw 송출**로 v1 출시 (2026-06-07)
+
+### 9.1 무엇을 바꿨나
+- **B안의 "24h 고정 프레임 + 멤버 평균 z 투영"** 구현을 v1에서 **걷어내고**,
+  시간 토글이 `?time=` 쿼리를 바꾸면 백엔드가 **그 시점의 raw `on_target.json` / `landscape.json`** 을 그대로 돌려주는 단순 송출로 전환.
+- 프론트의 `scatterZByCommunity` / `corrOverride` 투영 로직 폐기. `?time=` 변경 시 react-query가 자동 refetch.
+
+### 9.2 왜 한 번 갔다가 돌아왔나 (시도 → 회귀)
+- 시도한 형태(B안 정식): `_build_timepoints_panel`이 24h primary 멤버를 frame으로 잡고, 비-primary 시점은 **그 24h community 멤버 단백질의 그 시점 corr 평균**으로 `scatter_z` 산출. 프론트는 그걸 받아 (x,y) 고정 + z만 swap.
+- 막상 실제 데이터에서 드러난 문제들(2026-06-07 디버그 세션):
+  1. **색 스케일이 시점마다 따로**라 0h ±0.79 / 4h ±0.12 / 24h ±0.15 — *같은 색이 다른 PCC* 라 비교가 거꾸로 읽힘. zlim을 primary 기준 fixed로 잡아도 0h baseline의 "강한 raw corr"가 모듈 미형성과 동시에 표시돼 의미가 모호.
+  2. **community ID가 시점 간 무관**(§2 Jaccard ≈ 0). 24h community 156 멤버의 0h 평균을 "community 156@0h"라고 표시했지만, 0h엔 그 멤버들이 **다른 community**(예: 4)로 흩어져 있어 *시각상의 community 동질성과 실제 멤버십*이 충돌. AU-15330·SMARCA2 케이스에서 KPI("0h 흩어짐") ↔ Landscape("✚ + 강한 색") 모순으로 표면화.
+  3. **✚ 마커**가 비-primary 시점에서도 24h 위치에 그대로 떠 있으니 "이 시점의 target community"로 오독. fade/outline까지 더했지만 그 자체가 또 다른 시각 노이즈.
+  4. 결과적으로 *교육 없이 읽히게* 만들겠다던 B안의 목적(§3)과 반대로, **무엇을 보고 있는지 설명이 필요한 화면**이 됨.
+
+→ 사용자 한 줄 결론: *"시간에 따른 변화는 다른 관점에서 보여주고 지금은 데이터 그대로 송출하는 것에 의의를 두자. 시간 토글이 변하면 시간에 따른 landscape, PPI network 일괄 송출."* (2026-06-07)
+
+### 9.3 v1의 행동 정의
+- `dose` 차원 — 페이지 전체 (KPI / GR / phenotypic / time-lapse / Dynamics 컨테이너 전부)
+- `time` 차원 — **Target Module Dynamics 컨테이너 안**만 (PPI / Landscape / Enrichment / MoA bars). KPI·GR은 dose primary 그대로
+- 0h은 plate `_baseline/{TARGET}/0h/` (dose 무관 공유), 4h/24h는 `{drug}/{target_well}/{dose}/{time}/`
+- 시점별 community ID는 raw 그대로 (시점 추적·매칭 시도 X). 라벨 `community 156@4h` 처럼 시점 어노테이션만.
+
+### 9.4 보류한 항목 (v2 후보, 같은 문서 §3·§6 그대로 살아있음)
+- **시간 비교 전용 패널** — 같은 (drug,target,dose)에 대해 *gene 단위 ΔPCC*(4h−0h, 24h−4h, 24h−0h)를
+  별도 카드/탭으로 표시. 단백질 멤버십 차원이라 §2의 community 추적 불가 제약과 충돌하지 않음.
+- **Δ 모드 토글 · 자동 재생** — 위 비교 패널 안에서.
+- B안 고정 프레임이 다시 필요해지면 그 비교 패널의 **부속 옵션**으로 부활시키되, 본 대시보드의 기본 시점 토글은 raw 송출 그대로 유지.
+
+### 9.5 한 줄 정리
+> v1은 **"라벨이 단순한 그림"**(시점별 raw)로 출시한다. *변화를 시각으로 읽히게* 만드는 B안의 약속은
+> 데이터가 더 안정되거나 별 비교 패널이 준비됐을 때 v2에서 다시 시도한다.

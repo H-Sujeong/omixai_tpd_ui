@@ -42,6 +42,17 @@ class DrugTargetEntry(BaseModel):
     e3_ligase: str | None = None
 
 
+class DrugDoseRow(BaseModel):
+    """Per-dose breakdown of a drug's response on a multi-dose plate. Empty for
+    single-dose plates (the row's top-level gr_score/growth_class already
+    captures the only dose)."""
+    dose_um: float
+    plate_id: str               # the source single-dose member plate
+    gr_score: float | None = None
+    growth_class: str | None = None
+    effect_class: str | None = None
+
+
 class DrugSummaryRow(BaseModel):
     drug_id: str
     drug_name: str
@@ -55,6 +66,10 @@ class DrugSummaryRow(BaseModel):
     effect_class: str | None = None
     smiles: str | None = None
     has_dashboard_assets: bool = False
+    # Multi-dose plates: each member's gr_score/growth_class as a stacked
+    # sub-row. The drug-list table can render one cell-in-cell line per dose so
+    # rows visibly thicken when more concentrations are available.
+    by_dose: list[DrugDoseRow] = Field(default_factory=list)
 
 
 # -----------------------------------------------------------------------------

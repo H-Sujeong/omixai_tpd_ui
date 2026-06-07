@@ -33,7 +33,7 @@ import ast
 import json
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -586,15 +586,26 @@ def _load_multi_dose_plate(fs: MultiDoseFileSet,
                         fs.plate_id, bad)
 
     base = resolved[0]
-    # GR/mosaic from the first member as a placeholder — the UI's dose toggle
-    # will pick the appropriate member's per-drug data; aggregate panels (GR
-    # curves, mosaic) currently follow the primary member.
+    # Drugs: re-base each one's asset_dir from the member plate to the multi-
+    # dose plate's own folder, so per-drug JSON/timelapse loads hit this plate's
+    # `{drug}/{target_well}/{dose}/{time}/...` layout instead of the member's
+    # un-dosed `{drug}/{target_well}/{time}/...`. Drugs whose folder doesn't
+    # exist here (e.g. drugs lacking dashboard assets) keep asset_dir=None.
+    new_drugs: dict[str, DrugRecord] = {}
+    for slug, d in base.drugs.items():
+        new_dir: Path | None = None
+        if d.asset_dir is not None:
+            cand = fs.data_dir / d.asset_dir.name
+            if cand.exists() and cand.is_dir():
+                new_dir = cand
+        new_drugs[slug] = replace(d, asset_dir=new_dir,
+                                    has_dashboard_assets=new_dir is not None)
     return PlateRecord(
         plate_id=fs.plate_id,
         plate_code=base.plate_code,
         dose_um=None,                             # multi-dose has no single dose
         data_dir=fs.data_dir,
-        drugs=base.drugs,
+        drugs=new_drugs,
         gr_t_hours=base.gr_t_hours,
         gr_dmso=base.gr_dmso,
         mosaic_dir=base.mosaic_dir,

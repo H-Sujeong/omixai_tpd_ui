@@ -17,6 +17,13 @@ from .models import Plate, User
 
 
 def owned_plate_ids(db: DbSession, user: User) -> set[str]:
+    # Admins implicitly own every registered plate — saves a manual assign step
+    # for new plates (incl. multi-dose virtuals like D3 that don't fit the
+    # one-row-per-plate ownership model). All ownership-gated reads
+    # (`list_plates`, `require_owned_plate`, `owned_plates`) flow through here,
+    # so this single short-circuit covers the entire surface.
+    if getattr(user, "is_admin", False):
+        return {p.plate_id for p in get_registry().list_plates()}
     return {pid for (pid,) in db.query(Plate.plate_id).filter(Plate.owner_id == user.id)}
 
 

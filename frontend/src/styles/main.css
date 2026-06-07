@@ -19,6 +19,25 @@
     border-color: rgba(168, 85, 247, 0.55);
     box-shadow: var(--shadow-lg), 0 0 24px rgba(168, 85, 247, 0.15);
   }
+  /* Nested panels — no border / no shadow / transparent bg so the outer
+     container (e.g. Target Module Dynamics) reads as one card and the
+     inner Landscape/PPI/Enrichment headers separate by spacing alone. */
+  .panel-card--flat {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .panel-header--flat {
+    border-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .panel-body--flat {
+    padding: 0;
+  }
   .panel-header {
     display: flex;
     align-items: center;

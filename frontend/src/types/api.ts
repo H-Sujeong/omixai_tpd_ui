@@ -22,6 +22,14 @@ export interface DrugTargetEntry {
   e3_ligase: string | null;
 }
 
+export interface DrugDoseRow {
+  dose_um: number;
+  plate_id: string;
+  gr_score: number | null;
+  growth_class: string | null;
+  effect_class: string | null;
+}
+
 export interface DrugSummaryRow {
   drug_id: string;
   drug_name: string;
@@ -35,6 +43,8 @@ export interface DrugSummaryRow {
   effect_class: string | null;
   smiles: string | null;
   has_dashboard_assets: boolean;
+  /** Per-dose breakdown — non-empty only on multi-dose plates. */
+  by_dose: DrugDoseRow[];
 }
 
 export interface CompoundDetails {
@@ -241,6 +251,43 @@ export interface DashboardResponse {
   provenance: ProvenancePanel;
   kpis: KpiMetric[];
   insight: InsightSummary | null;
+  timepoints: TimepointsPanel | null;
+  doses: DosesPanel | null;
+}
+
+export type TimeLabel = "0h" | "4h" | "24h";
+
+export interface TimepointSnapshot {
+  time: TimeLabel;
+  /** gene symbol -> signed corr (PCC with target) for PPI node coloring */
+  nodes_corr: Record<string, number>;
+  /** community_id (str) -> avg PCC for that community at this time (landscape z) */
+  scatter_z: Record<string, number>;
+  target_meta: {
+    label?: "in_community" | "isolated_in_ppi" | "absent_from_ppi";
+    in_main_community?: boolean;
+    ppi_present?: boolean;
+    [k: string]: unknown;
+  };
+}
+
+export interface TimepointsPanel {
+  available: TimeLabel[];
+  missing: TimeLabel[];
+  /** Timepoint the rest of the payload (PPI/landscape) is rendered against. */
+  primary: TimeLabel;
+  by_time: Partial<Record<TimeLabel, TimepointSnapshot>>;
+}
+
+export interface DoseOption {
+  plate_id: string;
+  dose_um: number;
+}
+
+export interface DosesPanel {
+  available: DoseOption[];
+  current_dose: number | null;
+  normalization_group: string | null;
 }
 
 export interface CommunitySwitchResponse {

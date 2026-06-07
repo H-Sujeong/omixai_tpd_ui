@@ -26,6 +26,14 @@ interface Props {
   /** Clear the active protein selection (called by the Reset button). */
   onClearSelection?: () => void;
   height?: number;
+  /**
+   * Per-gene corr override (gene id -> signed PCC at the active timepoint).
+   * When provided, every node's `corr` is replaced before the color is
+   * computed, so the 24h layout stays put while colors swap by time. Genes
+   * absent from the override at this timepoint stay at their primary-time
+   * color (no fabrication — the PPI structure is 24h-fixed by design).
+   */
+  corrOverride?: Record<string, number> | null;
 }
 
 /**
@@ -77,7 +85,7 @@ function nodeSize(n: PpiNode): number {
 }
 
 export function PpiGraph({
-  nodes,
+  nodes: nodesProp,
   edges,
   targetName,
   selectedNode,
@@ -86,6 +94,7 @@ export function PpiGraph({
   onEdgeClick,
   onClearSelection,
   height,
+  corrOverride,
 }: Props) {
   const t = useT();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -93,6 +102,16 @@ export function PpiGraph({
   const [filter, setFilter] = useState<FilterMode>("all");
   // Hide weak correlations: show only |corr| >= minCorr (target always kept).
   const [minCorr, setMinCorr] = useState<number>(0);
+
+  // Time-toggle (B안 §3): swap each node's corr by gene id while layout/degree
+  // stay fixed. Missing entries keep their primary-time corr (no fabrication).
+  const nodes = useMemo(() => {
+    if (!corrOverride) return nodesProp;
+    return nodesProp.map((n) => {
+      const c = corrOverride[n.id];
+      return c === undefined ? n : { ...n, corr: c };
+    });
+  }, [nodesProp, corrOverride]);
 
   const elements = useMemo<ElementDefinition[]>(() => {
     const els: ElementDefinition[] = [];
