@@ -218,6 +218,8 @@
 - **B안의 "24h 고정 프레임 + 멤버 평균 z 투영"** 구현을 v1에서 **걷어내고**,
   시간 토글이 `?time=` 쿼리를 바꾸면 백엔드가 **그 시점의 raw `on_target.json` / `landscape.json`** 을 그대로 돌려주는 단순 송출로 전환.
 - 프론트의 `scatterZByCommunity` / `corrOverride` 투영 로직 폐기. `?time=` 변경 시 react-query가 자동 refetch.
+- **명칭 정리**: 실제 v1 출시 형태는 §3.1의 **A안 패턴**(시점마다 새 지도 · raw 송출)이다.
+  §3.1의 **B안**(24h 지도 고정 + 높이·색만 변경)은 §9.4의 **v2 후보**로 보류된 상태.
 
 ### 9.2 왜 한 번 갔다가 돌아왔나 (시도 → 회귀)
 - 시도한 형태(B안 정식): `_build_timepoints_panel`이 24h primary 멤버를 frame으로 잡고, 비-primary 시점은 **그 24h community 멤버 단백질의 그 시점 corr 평균**으로 `scatter_z` 산출. 프론트는 그걸 받아 (x,y) 고정 + z만 swap.
