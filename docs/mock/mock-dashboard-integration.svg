@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Malgun Gothic, Segoe UI, sans-serif">
+<rect width="900" height="560" fill="#0b1220"/>
+<text x="34" y="40" font-size="16" font-weight="700" fill="#E2E8F0">시간축 — 대시보드 통합안 (톤다운 · 계단식)</text>
+<text x="34" y="60" font-size="11" fill="#8a97ad">v1 = 시점 데이터 그대로 송출(기본) · 분석·해석 무거운 건 opt-in(v2) 안으로 (§9 회귀결정)</text>
+<rect x="34" y="86" width="400" height="300" rx="10" fill="#131c33" stroke="#27324d"/>
+<text x="50" y="112" font-size="12.5" font-weight="700" fill="#E2E8F0">PPI Network</text>
+<rect x="174" y="98" width="40" height="20" rx="10" fill="#0f1830" stroke="#27324d"/>
+<text x="194" y="112" font-size="10" font-weight="600" fill="#aeb9cb" text-anchor="middle">0h</text>
+<rect x="220" y="98" width="40" height="20" rx="10" fill="#0f1830" stroke="#27324d"/>
+<text x="240" y="112" font-size="10" font-weight="600" fill="#aeb9cb" text-anchor="middle">4h</text>
+<rect x="266" y="98" width="40" height="20" rx="10" fill="#A855F7" stroke="#27324d"/>
+<text x="286" y="112" font-size="10" font-weight="600" fill="#fff" text-anchor="middle">24h</text>
+<rect x="308" y="96" width="116" height="24" rx="12" fill="#30255b" stroke="#A855F7" stroke-width="1.3"/>
+<text x="366.0" y="112" font-size="10.5" font-weight="700" fill="#A855F7" text-anchor="middle">⊕ 시간축 분석</text>
+<line x1="234.0" y1="260.0" x2="283.0" y2="269.9" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="234.0" y1="260.0" x2="264.7" y2="331.7" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="234.0" y1="260.0" x2="166.5" y2="299.1" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="234.0" y1="260.0" x2="187.1" y2="197.7" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="234.0" y1="260.0" x2="290.2" y2="205.9" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="283.0" y1="269.9" x2="294.5" y2="309.2" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="264.7" y1="331.7" x2="230.0" y2="309.8" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="166.5" y1="299.1" x2="184.0" y2="262.1" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="187.1" y1="197.7" x2="225.9" y2="210.7" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="290.2" y1="205.9" x2="282.0" y2="246.0" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="294.5" y1="309.2" x2="192.4" y2="326.0" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="184.0" y1="262.1" x2="163.5" y2="226.7" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<line x1="225.9" y1="210.7" x2="258.6" y2="186.0" stroke="#64748b" stroke-width="1" opacity="0.5"/>
+<circle cx="283.0" cy="269.9" r="6" fill="#F59E0B"/>
+<circle cx="294.5" cy="309.2" r="6" fill="#F59E0B"/>
+<circle cx="264.7" cy="331.7" r="6" fill="#185FA5"/>
+<circle cx="230.0" cy="309.8" r="6" fill="#5b6781"/>
+<circle cx="192.4" cy="326.0" r="6" fill="#F59E0B"/>
+<circle cx="166.5" cy="299.1" r="6" fill="#185FA5"/>
+<circle cx="184.0" cy="262.1" r="6" fill="#185FA5"/>
+<circle cx="163.5" cy="226.7" r="6" fill="#5b6781"/>
+<circle cx="187.1" cy="197.7" r="6" fill="#F59E0B"/>
+<circle cx="225.9" cy="210.7" r="6" fill="#185FA5"/>
+<circle cx="258.6" cy="186.0" r="6" fill="#5b6781"/>
+<circle cx="290.2" cy="205.9" r="6" fill="#F59E0B"/>
+<circle cx="282.0" cy="246.0" r="6" fill="#185FA5"/>
+<circle cx="234.0" cy="260.0" r="9" fill="#A855F7" stroke="#fff" stroke-width="1.4"/>
+<text x="234.0" y="264.0" font-size="11" fill="#fff" font-weight="700" text-anchor="middle">✚</text>
+<text x="50" y="372" font-size="10" fill="#aeb9cb">시점 토글 → 그 시점 landscape/PPI 그대로 송출 (raw · 시점 추적/매칭 안 함)</text>
+<text x="34" y="410" font-size="11.5" font-weight="700" fill="#E2E8F0">① 기본 (모두에게)</text>
+<text x="34" y="428" font-size="10.5" fill="#8a97ad">v1: 컨테이너 시점 토글 = 그 시점 raw 송출. 새 차트 없음 · 시점 추적 안 함.</text>
+<path d="M428,108 C464,108 430,104 464,104" fill="none" stroke="#A855F7" stroke-width="1.6" stroke-dasharray="4 3"/>
+<polygon points="470,104 462,100 462,108" fill="#A855F7"/>
+<rect x="470" y="86" width="396" height="300" rx="10" fill="#131c33" stroke="#A855F7" stroke-width="1.3"/>
+<text x="486" y="112" font-size="12.5" font-weight="700" fill="#E2E8F0">시간축 분석 <tspan fill="#8a97ad" font-size="10" font-weight="400">(opt-in · v2)</tspan></text>
+<text x="850" y="112" font-size="13" fill="#8a97ad" text-anchor="end">✕</text>
+<rect x="486" y="122" width="81" height="22" rx="11" fill="#2a2253" stroke="#A855F7"/>
+<text x="496" y="137" font-size="10" font-weight="700" fill="#A855F7">모듈×시점 히트맵</text>
+<rect x="575" y="122" width="107" height="22" rx="11" fill="#0f1830" stroke="#27324d"/>
+<text x="585" y="137" font-size="10" font-weight="400" fill="#8a97ad">Gathering</text>
+<text x="674" y="137" font-size="8.5" fill="#8a97ad" text-anchor="end">·고급</text>
+<rect x="690" y="122" width="100" height="22" rx="11" fill="#0f1830" stroke="#27324d"/>
+<text x="700" y="137" font-size="10" font-weight="400" fill="#8a97ad">Alluvial</text>
+<text x="782" y="137" font-size="8.5" fill="#8a97ad" text-anchor="end">·실험</text>
+<text x="626.0" y="164" font-size="10" fill="#8a97ad" text-anchor="middle">0h</text>
+<text x="706.0" y="164" font-size="10" fill="#8a97ad" text-anchor="middle">4h</text>
+<text x="786.0" y="164" font-size="10" fill="#8a97ad" text-anchor="middle">24h</text>
+<text x="486" y="185.0" font-size="10.5" font-weight="400" fill="#aeb9cb">Chromatin</text>
+<rect x="590" y="168" width="72" height="26" rx="4" fill="#28274b" stroke="#27324d" stroke-width="1"/>
+<text x="626.0" y="185.0" font-size="9.5" fill="#8a97ad" text-anchor="middle">10%</text>
+<rect x="670" y="168" width="72" height="26" rx="4" fill="#59388d" stroke="#27324d" stroke-width="1"/>
+<text x="706.0" y="185.0" font-size="9.5" fill="#8a97ad" text-anchor="middle">45%</text>
+<rect x="750" y="168" width="72" height="26" rx="4" fill="#9c50e7" stroke="#27324d" stroke-width="1"/>
+<text x="786.0" y="185.0" font-size="9.5" fill="#fff" text-anchor="middle">92%</text>
+<text x="486" y="219.0" font-size="10.5" font-weight="400" fill="#aeb9cb">mRNA splicing</text>
+<rect x="590" y="202" width="72" height="26" rx="4" fill="#2b284e" stroke="#27324d" stroke-width="1"/>
+<text x="626.0" y="219.0" font-size="9.5" fill="#8a97ad" text-anchor="middle">12%</text>
+<rect x="670" y="202" width="72" height="26" rx="4" fill="#8b4ad0" stroke="#27324d" stroke-width="1"/>
+<text x="706.0" y="219.0" font-size="9.5" fill="#fff" text-anchor="middle">80%</text>
+<rect x="750" y="202" width="72" height="26" rx="4" fill="#944ddc" stroke="#27324d" stroke-width="1"/>
+<text x="786.0" y="219.0" font-size="9.5" fill="#fff" text-anchor="middle">86%</text>
+<text x="486" y="253.0" font-size="10.5" font-weight="700" fill="#A855F7">Target · BRD3 ★</text>
+<rect x="590" y="236" width="72" height="26" rx="4" fill="#212441" stroke="#A855F7" stroke-width="1.6"/>
+<text x="626.0" y="253.0" font-size="9.5" fill="#8a97ad" text-anchor="middle">5%</text>
+<rect x="670" y="236" width="72" height="26" rx="4" fill="#2f2954" stroke="#A855F7" stroke-width="1.6"/>
+<text x="706.0" y="253.0" font-size="9.5" fill="#8a97ad" text-anchor="middle">15%</text>
+<rect x="750" y="236" width="72" height="26" rx="4" fill="#a052ed" stroke="#A855F7" stroke-width="1.6"/>
+<text x="786.0" y="253.0" font-size="9.5" fill="#fff" text-anchor="middle">95%</text>
+<text x="486" y="287.0" font-size="10.5" font-weight="400" fill="#aeb9cb">Translation</text>
+<rect x="590" y="270" width="72" height="26" rx="4" fill="#6c3fa6" stroke="#27324d" stroke-width="1"/>
+<text x="626.0" y="287.0" font-size="9.5" fill="#fff" text-anchor="middle">57%</text>
+<rect x="670" y="270" width="72" height="26" rx="4" fill="#6f40aa" stroke="#27324d" stroke-width="1"/>
+<text x="706.0" y="287.0" font-size="9.5" fill="#fff" text-anchor="middle">60%</text>
+<rect x="750" y="270" width="72" height="26" rx="4" fill="#6f40aa" stroke="#27324d" stroke-width="1"/>
+<text x="786.0" y="287.0" font-size="9.5" fill="#fff" text-anchor="middle">60%</text>
+<text x="486" y="372" font-size="10" fill="#aeb9cb">제일 쉬운 히트맵이 기본 · 색=참여율 · 한 행=한 모듈의 시간</text>
+<text x="470" y="410" font-size="11.5" font-weight="700" fill="#E2E8F0">② 버튼 누른 사람만</text>
+<text x="470" y="428" font-size="10.5" fill="#8a97ad">모듈×시점 히트맵부터(v2). Gathering·Alluvial은 실험 탭.</text>
+<text x="34" y="482" font-size="11" font-weight="700" fill="#E2E8F0">노출 단계</text>
+<rect x="34" y="490" width="270" height="44" rx="8" fill="#27214f" stroke="#A855F7"/>
+<text x="48" y="509" font-size="11" font-weight="700" fill="#A855F7">Tier 0 · v1(기본)</text>
+<text x="48" y="525" font-size="9.5" fill="#8a97ad">시점 raw 송출 — 현재 출시</text>
+<text x="306" y="517" font-size="14" fill="#8a97ad">›</text>
+<rect x="320" y="490" width="270" height="44" rx="8" fill="#0f1830" stroke="#27324d"/>
+<text x="334" y="509" font-size="11" font-weight="700" fill="#aeb9cb">Tier 1 · opt-in(v2)</text>
+<text x="334" y="525" font-size="9.5" fill="#8a97ad">버튼 → 모듈×시점 히트맵</text>
+<text x="592" y="517" font-size="14" fill="#8a97ad">›</text>
+<rect x="606" y="490" width="270" height="44" rx="8" fill="#0f1830" stroke="#27324d"/>
+<text x="620" y="509" font-size="11" font-weight="700" fill="#8a97ad">Tier 2 · 실험</text>
+<text x="620" y="525" font-size="9.5" fill="#8a97ad">Gathering · Alluvial (보류/검증 후)</text>
+</svg>

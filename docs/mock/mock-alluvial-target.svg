@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="430" viewBox="0 0 860 430" font-family="Malgun Gothic, Segoe UI, sans-serif">
+<rect width="860" height="430" fill="#0b1220"/>
+<rect x="16" y="16" width="828" height="398" rx="12" fill="#131c33" stroke="#27324d"/>
+<text x="40" y="48" font-size="15" font-weight="700" fill="#E2E8F0">③ Alluvial 흐름 (고급) — 멤버십 재편을 정직하게 · 타깃 가닥 따라가기</text>
+<text x="40" y="66" font-size="10.5" fill="#8a97ad">community 유지 가정 안 함 · 단백질이 시점마다 어느 그룹에 속했나를 흐름으로 (회색=일반 재편, 색=타깃 코호트로 수렴)</text>
+<rect x="112" y="86" width="716" height="170" rx="6" fill="none" stroke="#27324d" stroke-dasharray="3 4"/>
+<text x="108" y="174.0" font-size="9.5" fill="#aeb9cb" text-anchor="end" transform="rotate(-90 108 174.0)">module (community)</text>
+<rect x="112" y="270" width="716" height="48" rx="6" fill="none" stroke="#27324d" stroke-dasharray="3 4"/>
+<text x="108" y="297.0" font-size="9.5" fill="#8a97ad" text-anchor="end" transform="rotate(-90 108 297.0)">isolated (모듈 없음)</text>
+<rect x="112" y="330" width="716" height="42" rx="6" fill="none" stroke="#27324d" stroke-dasharray="3 4"/>
+<text x="108" y="354.0" font-size="9.5" fill="#42506e" text-anchor="end" transform="rotate(-90 108 354.0)">absent (미측정/비PPI)</text>
+<text x="210" y="84" font-size="12" font-weight="700" fill="#E2E8F0" text-anchor="middle">0h</text>
+<text x="470" y="84" font-size="12" font-weight="700" fill="#E2E8F0" text-anchor="middle">4h</text>
+<text x="730" y="84" font-size="12" font-weight="700" fill="#E2E8F0" text-anchor="middle">24h</text>
+<rect x="178.0" y="96" width="64" height="30" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="178.0" y="132" width="64" height="26" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="178.0" y="166" width="64" height="34" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="178.0" y="206" width="64" height="28" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="178.0" y="280" width="64" height="22" rx="3" fill="#231b3a" stroke="#A855F7" stroke-width="1.4"/>
+<text x="210" y="295" font-size="10" font-weight="700" fill="#A855F7" text-anchor="middle">✚T</text>
+<rect x="438.0" y="96" width="64" height="34" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="438.0" y="138" width="64" height="30" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="438.0" y="176" width="64" height="30" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="438.0" y="214" width="64" height="24" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="438.0" y="280" width="64" height="22" rx="3" fill="#231b3a" stroke="#A855F7" stroke-width="1.4"/>
+<text x="470" y="295" font-size="10" font-weight="700" fill="#A855F7" text-anchor="middle">✚T</text>
+<rect x="698.0" y="96" width="64" height="118" rx="3" fill="#2a1b46" stroke="#A855F7" stroke-width="1.8"/>
+<text x="730" y="151.0" font-size="10" font-weight="700" fill="#A855F7" text-anchor="middle">Target</text>
+<text x="730" y="165.0" font-size="10" font-weight="700" fill="#A855F7" text-anchor="middle">module ✚</text>
+<rect x="698.0" y="226" width="64" height="24" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<rect x="698.0" y="256" width="64" height="20" rx="3" fill="#0f1830" stroke="#27324d" stroke-width="1"/>
+<path d="M242.0,100 C340.0,100 340.0,100 438.0,100 L438.0,118 C340.0,118 340.0,116 242.0,116 Z" fill="#42506e" opacity="0.28"/>
+<path d="M242.0,134 C340.0,134 340.0,150 438.0,150 L438.0,164 C340.0,164 340.0,146 242.0,146 Z" fill="#42506e" opacity="0.28"/>
+<path d="M242.0,170 C340.0,170 340.0,180 438.0,180 L438.0,194 C340.0,194 340.0,186 242.0,186 Z" fill="#42506e" opacity="0.28"/>
+<path d="M242.0,208 C340.0,208 340.0,118 438.0,118 L438.0,130 C340.0,130 340.0,220 242.0,220 Z" fill="#42506e" opacity="0.28"/>
+<path d="M242.0,166 C340.0,166 340.0,216 438.0,216 L438.0,228 C340.0,228 340.0,176 242.0,176 Z" fill="#42506e" opacity="0.28"/>
+<path d="M242.0,132 C340.0,132 340.0,210 438.0,210 L438.0,220 C340.0,220 340.0,140 242.0,140 Z" fill="#42506e" opacity="0.28"/>
+<path d="M502.0,214 C600.0,214 600.0,228 698.0,228 L698.0,240 C600.0,240 600.0,224 502.0,224 Z" fill="#42506e" opacity="0.28"/>
+<path d="M502.0,176 C600.0,176 600.0,258 698.0,258 L698.0,270 C600.0,270 600.0,184 502.0,184 Z" fill="#42506e" opacity="0.28"/>
+<path d="M502.0,96 C600.0,96 600.0,228 698.0,228 L698.0,236 C600.0,236 600.0,106 502.0,106 Z" fill="#42506e" opacity="0.28"/>
+<path d="M502.0,98 C600.0,98 600.0,100 698.0,100 L698.0,124 C600.0,124 600.0,112 502.0,112 Z" fill="#F59E0B" opacity="0.45"/>
+<path d="M502.0,140 C600.0,140 600.0,128 698.0,128 L698.0,152 C600.0,152 600.0,152 502.0,152 Z" fill="#F59E0B" opacity="0.45"/>
+<path d="M502.0,178 C600.0,178 600.0,150 698.0,150 L698.0,174 C600.0,174 600.0,190 502.0,190 Z" fill="#185FA5" opacity="0.45"/>
+<path d="M502.0,216 C600.0,216 600.0,176 698.0,176 L698.0,200 C600.0,200 600.0,224 502.0,224 Z" fill="#185FA5" opacity="0.45"/>
+<path d="M242.0,96 C340.0,96 340.0,98 438.0,98 L438.0,110 C340.0,110 340.0,108 242.0,108 Z" fill="#F59E0B" opacity="0.3"/>
+<path d="M242.0,166 C340.0,166 340.0,178 438.0,178 L438.0,190 C340.0,190 340.0,178 242.0,178 Z" fill="#185FA5" opacity="0.3"/>
+<path d="M242.0,206 C340.0,206 340.0,216 438.0,216 L438.0,228 C340.0,228 340.0,216 242.0,216 Z" fill="#185FA5" opacity="0.3"/>
+<path d="M242.0,291 C340.0,291 340.0,291 438.0,291" fill="none" stroke="#A855F7" stroke-width="3"/>
+<path d="M502.0,291 C600.0,291 600.0,200 698.0,200" fill="none" stroke="#A855F7" stroke-width="3"/>
+<circle cx="502.0" cy="291" r="3.5" fill="#A855F7"/><circle cx="698.0" cy="200" r="3.5" fill="#A855F7"/>
+<text x="40" y="386" font-size="10.5" fill="#aeb9cb">타깃 궤적: <tspan fill="#8a97ad">isolated</tspan> (0h) → <tspan fill="#8a97ad">isolated</tspan> (4h) → <tspan fill="#A855F7">module</tspan> (24h) = <tspan fill="#A855F7" font-weight="700">결정화(crystallization)</tspan></text>
+<text x="40" y="404" font-size="10.5" fill="#aeb9cb">타깃 코호트(같은 모듈 단백질): 0 → 0 → 다수.  ✚T가 module에 못 들어가면(isolated 유지) → PAC 높음=선택적 분해, 낮음=효과 약함</text>
+<rect x="610" y="374" width="20" height="9" rx="2" fill="#F59E0B" opacity="0.5"/><text x="636" y="382" font-size="9.5" fill="#8a97ad">코호트 수렴(↑/↓)</text>
+<rect x="610" y="390" width="20" height="9" rx="2" fill="#42506e" opacity="0.4"/><text x="636" y="398" font-size="9.5" fill="#8a97ad">일반 재편</text>
+</svg>
