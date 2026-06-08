@@ -57,7 +57,7 @@ function FlyoutFooter() {
     "text-left px-3 h-[38px] flex items-center text-body rounded-md transition-colors duration-fast";
 
   return (
-    <div className="border-t border-line pt-2.5 flex flex-col items-stretch gap-1 shrink-0">
+    <div className="border-t border-line pt-2.5 mt-auto flex flex-col items-stretch gap-1 shrink-0">
       <button
         type="button"
         onClick={() => setLang(lang === "ko" ? "en" : "ko")}
@@ -249,12 +249,14 @@ const SignOutButton = () => {
       title={`${me?.email ?? ""} · ${t("로그아웃", "Sign out")}`}
       aria-label={t("로그아웃", "Sign out")}
       onClick={signOut}
-      className="sidebar-item__icon text-ink-muted hover:text-status-error transition-colors"
+      className="sidebar-item text-ink-muted hover:text-status-error transition-colors"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path d="M15 17v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" strokeLinecap="round" />
-        <path d="M10 12h10m0 0-3-3m3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+      <span className="sidebar-item__icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M15 17v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" strokeLinecap="round" />
+          <path d="M10 12h10m0 0-3-3m3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
     </button>
   );
 };

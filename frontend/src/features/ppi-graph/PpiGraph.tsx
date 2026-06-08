@@ -261,14 +261,25 @@ export function PpiGraph({
       if (evt.target === cy) cy.edges().removeClass("hl");
     });
 
-    // Focus on main target if present
+    // Focus on main target if present. The delayed re-fit had a races issue —
+    // if the community changed within 600ms (which is normal during quick
+    // clicks now that placeholderData keeps stale data visible), the previous
+    // cy was already destroyed when the timeout fired → null isHeadless crash.
+    // Track the timer in a local var so cleanup can cancel it.
+    let fitTimer: ReturnType<typeof setTimeout> | null = null;
     const mainNode = cy.nodes().filter((n) => n.data("is_main") === "yes");
     if (mainNode.length > 0) {
       cy.fit(mainNode.union(mainNode.neighborhood()), 60);
-      setTimeout(() => cy.fit(undefined, 20), 600);
+      fitTimer = setTimeout(() => {
+        // Belt-and-suspenders: also guard against the case where cleanup
+        // hasn't been able to clear this timer yet (e.g. rare ordering bugs).
+        if (cyRef.current !== cy || (cy as any).destroyed?.()) return;
+        cy.fit(undefined, 20);
+      }, 600);
     }
 
     return () => {
+      if (fitTimer !== null) clearTimeout(fitTimer);
       cy.destroy();
       cyRef.current = null;
     };
