@@ -1,5 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, type PinnedFlyout } from "@/components/Sidebar";
+
+const PIN_STORAGE_KEY = "omixai-sidebar-pin";
+
+function loadPinned(): PinnedFlyout {
+  try {
+    const v = localStorage.getItem(PIN_STORAGE_KEY);
+    return v === "plates" || v === "guide" ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * AppShell: deep-navy app frame with a 240px sidebar (design_02) on the left
@@ -9,11 +20,26 @@ import { Sidebar } from "@/components/Sidebar";
  * Step 7 (2026-05-21): added mobile drawer state. On <lg screens the sidebar
  * collapses behind a hamburger button (fixed, top-left, z-30). Backdrop is
  * z-40, sidebar drawer z-50. Esc closes; body scroll locks while open.
+ * v2.15.2 (2026-06-08): pin/unpin for the icon-rail flyouts (Plates / Guide).
+ * Persisted in localStorage; when pinned the main column shifts right so the
+ * flyout sits beside content rather than on top of it (Notion-style).
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pinnedFlyout, setPinnedFlyout] = useState<PinnedFlyout>(loadPinned);
 
-  // Esc closes the drawer.
+  // Persist pin selection so it survives reload — matches the "stays open"
+  // expectation users have for a pinned panel.
+  useEffect(() => {
+    try {
+      if (pinnedFlyout) localStorage.setItem(PIN_STORAGE_KEY, pinnedFlyout);
+      else localStorage.removeItem(PIN_STORAGE_KEY);
+    } catch {
+      /* private mode / quota — fall through; in-memory state still applies */
+    }
+  }, [pinnedFlyout]);
+
+  // Esc closes the mobile drawer.
   useEffect(() => {
     if (!mobileOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -23,8 +49,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, [mobileOpen]);
 
-  // Prevent body scroll while drawer is open (avoids the page scrolling
-  // behind the overlay on mobile).
   useEffect(() => {
     if (!mobileOpen) return;
     const prev = document.body.style.overflow;
@@ -36,7 +60,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-surface-base text-ink-primary">
-      {/* Mobile hamburger — fixed, visible only <lg. Sits above topbar. */}
       <button
         type="button"
         className="lg:hidden fixed top-3 left-3 z-30 w-10 h-10 rounded-md border border-line bg-surface-elevated flex items-center justify-center text-ink-primary hover:border-brand-primary/45 transition-colors duration-fast"
@@ -49,7 +72,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </svg>
       </button>
 
-      {/* Backdrop — clicks close the drawer. Visible only when open + <lg. */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/60"
@@ -61,9 +83,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar
         isMobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
+        pinnedFlyout={pinnedFlyout}
+        onPinnedFlyoutChange={setPinnedFlyout}
       />
 
-      <main className="flex-1 min-w-0 flex flex-col">{children}</main>
+      {/* When a flyout is pinned (≥lg only — mobile uses the drawer), shift the
+          main column right by 240px so the flyout sits beside content instead
+          of covering it. Smooth transition keeps the pin/unpin act readable. */}
+      <main
+        className={`flex-1 min-w-0 flex flex-col transition-[margin-left] duration-base ${
+          pinnedFlyout ? "lg:ml-[240px]" : ""
+        }`}
+      >
+        {children}
+      </main>
     </div>
   );
 }

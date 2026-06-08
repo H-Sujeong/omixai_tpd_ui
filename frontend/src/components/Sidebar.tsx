@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LangToggle } from "@/components/LangToggle";
 import { useMe, useLogout } from "@/api/auth";
 import { usePlates } from "@/api/queries";
-import { useT } from "@/store/uiLang";
+import { useT, useUiLang } from "@/store/uiLang";
+import { useTheme } from "@/hooks/useTheme";
 
 type Flyout = "plates" | "guide" | null;
+export type PinnedFlyout = "plates" | "guide" | null;
 
 interface GuideEntry {
   id: string;
@@ -25,18 +27,127 @@ const GUIDE_SECTIONS: GuideEntry[] = [
   { id: "dashboard-phenome",  ko: "Phenome",        en: "Phenome",    indent: true },
 ];
 
-function PlatesFlyout({ onClose }: { onClose: () => void }) {
+/**
+ * Labels for the rail's footer icons — shown ONLY at the bottom of the flyout
+ * when expanded (any pin active). The icons themselves stay in the rail and
+ * remain the click target; these are explanatory text positioned to sit
+ * horizontally beside each icon (the rail footer and the flyout footer both
+ * use the same pt-2.5 / gap-2 / 38px-row layout so the rows line up visually).
+ *
+ * The labels ARE clickable too — convenience hit area — but the rail icons
+ * stay where they are. We don't move the controls.
+ */
+function FlyoutFooter() {
+  const t = useT();
+  const { lang, setLang } = useUiLang();
+  const { theme, toggleTheme } = useTheme();
+  const { data: me } = useMe();
+  const logout = useLogout();
+  const isDark = theme === "dark";
+
+  const signOut = async () => {
+    try { await logout.mutateAsync(); } catch { /* clear client state anyway */ }
+    window.location.assign("/login");
+  };
+
+  // Same padding/gap stack as the rail's `.sidebar-footer` so rows align with
+  // the LangToggle / ThemeToggle / SignOutButton icons sitting in the rail.
+  // Each row's height = 38px (matches .sidebar-item: padding 8 + 22 icon + 8).
+  const rowCls =
+    "text-left px-3 h-[38px] flex items-center text-body rounded-md transition-colors duration-fast";
+
+  return (
+    <div className="border-t border-line pt-2.5 flex flex-col items-stretch gap-1 shrink-0">
+      <button
+        type="button"
+        onClick={() => setLang(lang === "ko" ? "en" : "ko")}
+        className={`${rowCls} text-ink-secondary hover:text-ink-primary hover:bg-surface-soft`}
+        title={lang === "ko" ? "English로 전환" : "한국어로 전환"}
+      >
+        {lang === "ko" ? "한국어 / English" : "English / 한국어"}
+      </button>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className={`${rowCls} text-ink-secondary hover:text-ink-primary hover:bg-surface-soft`}
+      >
+        {isDark ? t("라이트 모드", "Light mode") : t("다크 모드", "Dark mode")}
+      </button>
+      <button
+        type="button"
+        onClick={signOut}
+        title={me?.email ?? undefined}
+        className={`${rowCls} text-ink-secondary hover:text-status-error hover:bg-surface-soft`}
+      >
+        {t("로그아웃", "Sign out")}
+      </button>
+    </div>
+  );
+}
+
+function PinButton({
+  pinned,
+  onToggle,
+}: {
+  pinned: boolean;
+  onToggle: () => void;
+}) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={pinned}
+      title={pinned ? t("고정 해제", "Unpin") : t("패널 고정", "Pin panel")}
+      className={`shrink-0 rounded-md p-1 transition-colors duration-fast ${
+        pinned
+          ? "text-brand-primary bg-brand-primary/12"
+          : "text-ink-muted hover:text-ink-primary hover:bg-surface-soft"
+      }`}
+    >
+      {/* Pushpin glyph — filled head when pinned, outline when not, so the
+          state reads visually at a glance. */}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="M9 4h6v5l3 5H6l3-5V4z" fill={pinned ? "currentColor" : "none"} strokeLinejoin="round" />
+        <path d="M12 14v6" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+function PlatesFlyout({
+  onClose,
+  pinned,
+  expanded,
+  onTogglePin,
+}: {
+  onClose: () => void;
+  pinned: boolean;
+  expanded: boolean;
+  onTogglePin: () => void;
+}) {
   const t = useT();
   const plates = usePlates();
   return (
-    <div className="flex flex-col h-full">
-      <header className="px-4 py-3 border-b border-line">
-        <h3 className="text-body-strong text-ink-primary">
-          {t("플레이트", "Plates")}
-        </h3>
-        <p className="text-meta text-ink-muted mt-0.5">
-          {t("내가 볼 수 있는 플레이트", "Plates you can open")}
-        </p>
+    <div className="flex flex-col h-full pb-3">
+      {/* Height & vertical centering chosen so the header's bottom border lines
+          up with the rail's brand bottom border (12px pad-top + 48px brand +
+          1px = y=61). pb-3 on the wrapper does the same for the footer
+          (rail's app-sidebar carries 12px pad-bottom, so the footer's
+          border-top y matches the rail's .sidebar-footer border-top). */}
+      <header
+        className="px-4 border-b border-line flex items-center gap-2 shrink-0"
+        style={{ height: 61 }}
+      >
+        <div className="flex-1 min-w-0">
+          <h3 className="text-body-strong text-ink-primary leading-tight">
+            {t("플레이트", "Plates")}
+          </h3>
+          <p className="text-meta text-ink-muted leading-tight">
+            {t("내가 볼 수 있는 플레이트", "Plates you can open")}
+          </p>
+        </div>
+        <PinButton pinned={pinned} onToggle={onTogglePin} />
       </header>
       <ul className="flex-1 overflow-y-auto py-1">
         {plates.isLoading && (
@@ -66,21 +177,38 @@ function PlatesFlyout({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
+      {expanded && <FlyoutFooter />}
     </div>
   );
 }
 
-function GuideFlyout({ onClose }: { onClose: () => void }) {
+function GuideFlyout({
+  onClose,
+  pinned,
+  expanded,
+  onTogglePin,
+}: {
+  onClose: () => void;
+  pinned: boolean;
+  expanded: boolean;
+  onTogglePin: () => void;
+}) {
   const t = useT();
   return (
-    <div className="flex flex-col h-full">
-      <header className="px-4 py-3 border-b border-line">
-        <h3 className="text-body-strong text-ink-primary">
-          {t("가이드", "Guide")}
-        </h3>
-        <p className="text-meta text-ink-muted mt-0.5">
-          {t("섹션을 클릭하면 이동합니다", "Click a section to jump")}
-        </p>
+    <div className="flex flex-col h-full pb-3">
+      <header
+        className="px-4 border-b border-line flex items-center gap-2 shrink-0"
+        style={{ height: 61 }}
+      >
+        <div className="flex-1 min-w-0">
+          <h3 className="text-body-strong text-ink-primary leading-tight">
+            {t("가이드", "Guide")}
+          </h3>
+          <p className="text-meta text-ink-muted leading-tight">
+            {t("섹션을 클릭하면 이동합니다", "Click a section to jump")}
+          </p>
+        </div>
+        <PinButton pinned={pinned} onToggle={onTogglePin} />
       </header>
       <ul className="flex-1 overflow-y-auto py-1">
         {GUIDE_SECTIONS.map((s) => (
@@ -99,6 +227,7 @@ function GuideFlyout({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
+      {expanded && <FlyoutFooter />}
     </div>
   );
 }
@@ -146,6 +275,11 @@ const SignOutButton = () => {
 interface Props {
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  /** Notion-style pin. When set, that flyout stays visible regardless of hover
+   *  state, and AppShell shifts the main column right by 240px so the flyout
+   *  sits beside content. Hover still previews the other flyout temporarily. */
+  pinnedFlyout?: PinnedFlyout;
+  onPinnedFlyoutChange?: (next: PinnedFlyout) => void;
 }
 
 // Microplate outline with the A1-orientation chamfer (top-left corner cut on
@@ -196,14 +330,30 @@ const AdminIcon = () => (
   </svg>
 );
 
-export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
+export function Sidebar({
+  isMobileOpen = false,
+  onCloseMobile,
+  pinnedFlyout = null,
+  onPinnedFlyoutChange,
+}: Props) {
   const location = useLocation();
   const { data: me } = useMe();
   const onPlatesIndex = location.pathname === "/plates";
   const onGuide = location.pathname === "/guide";
   const onAdmin = location.pathname === "/admin";
-  const [flyout, setFlyout] = useState<Flyout>(null);
-  const close = () => setFlyout(null);
+  // Initial flyout follows the pinned panel so a reload-with-pin lands on the
+  // open state immediately rather than a flash of icon-rail-only.
+  const [flyout, setFlyout] = useState<Flyout>(pinnedFlyout);
+  // When the pinned panel changes externally, mirror it into local flyout
+  // state so the user sees the new pinned panel even without re-hovering.
+  // (Won't fight hover updates — those drive setFlyout directly.)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setFlyout(pinnedFlyout); }, [pinnedFlyout]);
+  // mouseLeave behaviour: revert to the pinned panel (if any) instead of
+  // closing. If nothing is pinned, close as before.
+  const close = () => setFlyout(pinnedFlyout);
+  const togglePin = (which: "plates" | "guide") =>
+    onPinnedFlyoutChange?.(pinnedFlyout === which ? null : which);
 
   return (
     <div
@@ -274,6 +424,9 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
         )}
       </nav>
 
+      {/* Rail footer — always visible. When expanded the labels appear to the
+          right (inside the flyout) at the same vertical heights, so the icons
+          stay put while the names are revealed. */}
       <div className="sidebar-footer mt-auto flex flex-col items-center gap-1" onMouseEnter={close}>
         <LangToggle />
         <ThemeToggle />
@@ -281,17 +434,29 @@ export function Sidebar({ isMobileOpen = false, onCloseMobile }: Props) {
       </div>
     </aside>
     {/* Flyout panel — sits to the right of the icon rail. The wrapper div's
-        onMouseLeave (above) closes it; staying inside the rail OR the flyout
-        keeps it open since both are children of the same wrapper. Hidden on
-        screens narrower than lg so the mobile drawer stays simple. */}
+        onMouseLeave (above) reverts to the pinned panel (or closes if none).
+        Pinned mode drops the floating shadow since the panel is now a
+        layout-level companion to the icon rail rather than a popover. */}
     {flyout && (
       <div
-        className="hidden lg:block absolute top-0 left-full h-screen w-[240px] z-40 bg-surface-elevated border-r border-line shadow-xl"
+        className={`hidden lg:block absolute top-0 left-full h-screen w-[240px] z-40 bg-surface-elevated border-r border-line ${
+          pinnedFlyout === flyout ? "" : "shadow-xl"
+        }`}
       >
         {flyout === "plates" ? (
-          <PlatesFlyout onClose={close} />
+          <PlatesFlyout
+            onClose={close}
+            pinned={pinnedFlyout === "plates"}
+            expanded={pinnedFlyout !== null}
+            onTogglePin={() => togglePin("plates")}
+          />
         ) : (
-          <GuideFlyout onClose={close} />
+          <GuideFlyout
+            onClose={close}
+            pinned={pinnedFlyout === "guide"}
+            expanded={pinnedFlyout !== null}
+            onTogglePin={() => togglePin("guide")}
+          />
         )}
       </div>
     )}
