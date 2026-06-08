@@ -397,7 +397,11 @@ function SlimHeatCell({
       className="h-7 rounded border border-line flex items-center justify-center text-meta tabular"
       style={{
         background: `rgb(${r},${g},${b})`,
-        color: mag > 0.5 ? "#fff" : "var(--color-text-secondary)",
+        // Theme-independent: cell bg is the white↔blue/red lerp, so the text
+        // is dark on the pale end (matches dark mode too) and white on the
+        // saturated end. var(--color-text-secondary) was light in dark mode
+        // and blended into the pale cell — fixed dark instead.
+        color: mag > 0.5 ? "#fff" : "#0f172a",
       }}
       title={`avg PCC ${z >= 0 ? "+" : ""}${z.toFixed(3)} · ${cell.n_measured}/${cell.n_total} measured`}
     >

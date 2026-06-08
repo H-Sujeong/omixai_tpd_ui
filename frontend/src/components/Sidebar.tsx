@@ -433,15 +433,17 @@ export function Sidebar({
         <SignOutButton />
       </div>
     </aside>
-    {/* Flyout panel — sits to the right of the icon rail. The wrapper div's
-        onMouseLeave (above) reverts to the pinned panel (or closes if none).
-        Pinned mode drops the floating shadow since the panel is now a
-        layout-level companion to the icon rail rather than a popover. */}
+    {/* Flyout panel — viewport-fixed (NOT absolute to wrapper) so it tracks
+        the rail's sticky position during page scroll. If we used `absolute`
+        the panel would scroll with the wrapper and detach from the rail
+        whenever the user scrolled the dashboard down.
+        left = rail width (var(--space-sidebar-width)). */}
     {flyout && (
       <div
-        className={`hidden lg:block absolute top-0 left-full h-screen w-[240px] z-40 bg-surface-elevated border-r border-line ${
+        className={`hidden lg:block fixed top-0 h-screen w-[240px] z-40 bg-surface-elevated border-r border-line ${
           pinnedFlyout === flyout ? "" : "shadow-xl"
         }`}
+        style={{ left: "var(--space-sidebar-width)" }}
       >
         {flyout === "plates" ? (
           <PlatesFlyout

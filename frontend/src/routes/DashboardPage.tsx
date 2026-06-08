@@ -349,12 +349,10 @@ export function DashboardPage() {
                 so it belongs to the page scope, not this container's. Only the
                 time toggle stays here — it's the within-frame swap. */}
             <div className="flex items-center gap-4">
-              {/* Tier 1 opt-in (v2) — single-dose only. For multi-dose plates
-                  the timecourse moves to the 농도별 비교 modal (button next to
-                  the dose chips in the header), so cross-dose reading is
-                  primary and a single inline view would be ambiguous about
-                  which dose it represents. */}
-              {!(d.doses && d.doses.available.length > 1) && (() => {
+              {/* Tier 1 opt-in (v2) — always rendered (single and multi-dose).
+                  On multi-dose the drawer below shows the active dose's
+                  timecourse; 농도별 비교 (dose chip row link) is independent. */}
+              {(() => {
                 const tcDisabled = tp.available.length < 2;
                 return (
                   <button
@@ -597,22 +595,24 @@ export function DashboardPage() {
         </div>
         </section>
 
-        {/* === Timecourse section — Tier 1 (opt-in v2). Inline drawer for
-             single-dose plates only; multi-dose drives users through the
-             농도별 비교 modal instead (opened from the dose row in the header). */}
-        {!(d.doses && d.doses.available.length > 1) && (
-          <TimecourseDrawer
-            plateId={plateId}
-            drugId={drugId}
-            target={activeTarget}
-            dose={dose}
-            enabled={tcOpen}
-            onEnable={() => setTcOpen(true)}
-            collapsed={tcCollapsed}
-            onCollapsedChange={setTcCollapsed}
-            unavailable={!tp || tp.available.length < 2}
-          />
-        )}
+        {/* === Timecourse — Tier 1 inline drawer. Always rendered (single AND
+             multi-dose). On multi-dose this shows the CURRENT dose's per-
+             module timecourse; the cross-dose comparison is a SEPARATE feature
+             accessed via the "+ 농도별 비교" link in the dose row. */}
+        <TimecourseDrawer
+          plateId={plateId}
+          drugId={drugId}
+          target={activeTarget}
+          dose={dose}
+          enabled={tcOpen}
+          onEnable={() => setTcOpen(true)}
+          collapsed={tcCollapsed}
+          onCollapsedChange={setTcCollapsed}
+          unavailable={!tp || tp.available.length < 2}
+        />
+
+        {/* Dose-comparison modal — independent of the inline drawer; opened
+             from the dose row's "+ 농도별 비교" link. Multi-dose only. */}
         {d.doses && d.doses.available.length > 1 && plateId && drugId && (
           <DoseTimecourseModal
             open={doseTcOpen}

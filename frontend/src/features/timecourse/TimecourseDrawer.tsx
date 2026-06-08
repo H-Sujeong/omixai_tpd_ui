@@ -520,7 +520,10 @@ function HeatCell({
         className="h-12 rounded-md border border-line flex flex-col items-center justify-center text-meta tabular"
         style={{
           background: `rgb(${r},${g},${b})`,
-          color: e > 0.55 ? "#fff" : "var(--color-text-secondary)",
+          // Cell bg is the white→brand-primary lerp, theme-independent. Text
+          // tracks the bg, not the theme — dark on the pale end so dark-mode
+          // readers can see the number, white on the saturated end.
+          color: e > 0.55 ? "#fff" : "#0f172a",
         }}
         title={`participation ${(v * 100).toFixed(0)}% · ${cell.n_measured}/${cell.n_total} measured`}
       >
@@ -544,7 +547,11 @@ function HeatCell({
   return (
     <div
       className="h-12 rounded-md border border-line flex flex-col items-center justify-center text-meta tabular"
-      style={{ background: `rgb(${r},${g},${b})`, color: mag > 0.5 ? "#fff" : "var(--color-text-secondary)" }}
+      style={{
+        background: `rgb(${r},${g},${b})`,
+        // Theme-independent: dark text on the pale end, white on saturated.
+        color: mag > 0.5 ? "#fff" : "#0f172a",
+      }}
       title={`avg PCC ${z >= 0 ? "+" : ""}${z.toFixed(3)} · ${cell.n_measured}/${cell.n_total} measured`}
     >
       <span className="leading-tight">{z >= 0 ? "+" : ""}{z.toFixed(2)}</span>
