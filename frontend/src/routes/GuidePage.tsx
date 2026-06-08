@@ -173,24 +173,42 @@ const SECTIONS: Record<Section, { img: string; notes: Note[]; titleKo: string; t
   },
 };
 
-// Five-pattern verdict table for the Timecourse sub-section. Labels match
-// TimecourseDrawer's PATTERN_BADGES so the guide stays in lockstep.
-const TIMECOURSE_PATTERNS: Array<{ ko: string; en: string; descKo: string; descEn: string; chip: string; }> = [
+// Pattern verdict table for the Timecourse sub-section. Labels + criteria
+// mirror TimecourseDrawer.classifyPattern (STRONG=0.20, WEAK=0.10) so the
+// guide stays the single source of truth users can verify against the data.
+// a₀ / a₂₄ = avg PCC at 0h / 24h ·  p₀ / p₂₄ = participation rate
+const TIMECOURSE_PATTERNS: Array<{
+  ko: string; en: string; descKo: string; descEn: string;
+  criteria: string; chip: string;
+}> = [
   { chip: "🟣", ko: "관계 반전 −→+", en: "Flipped −→+",
     descKo: "baseline 음(−) → 24h 양(+). 강한 약물 신호.",
-    descEn: "negative at baseline → positive by 24h; strong signal." },
+    descEn: "negative at baseline → positive by 24h; strong signal.",
+    criteria: "a₀ ≤ −0.20  ∧  a₂₄ ≥ +0.20" },
+  { chip: "🟣", ko: "관계 반전 +→−", en: "Flipped +→−",
+    descKo: "baseline 양(+) → 24h 음(−). 강한 약물 신호 (반대 방향).",
+    descEn: "positive at baseline → negative by 24h; strong signal (opposite direction).",
+    criteria: "a₀ ≥ +0.20  ∧  a₂₄ ≤ −0.20" },
   { chip: "🔴", ko: "관계 강화", en: "Amplified",
-    descKo: "원래 있던 동변동을 약물이 강화.",
-    descEn: "drug strengthened an existing co-variation." },
+    descKo: "원래 있던 동변동을 약물이 강화 (부호 동일, |avg PCC| 증가).",
+    descEn: "drug strengthened an existing co-variation (same sign, |avg PCC| grew).",
+    criteria: "sign(a₀) = sign(a₂₄)  ∧  |a₂₄| − |a₀| ≥ 0.15" },
   { chip: "🔴", ko: "관계 형성", en: "Formed",
     descKo: "baseline 약함 → 24h 새 관계 형성.",
-    descEn: "weak at baseline → new relationship by 24h." },
+    descEn: "weak at baseline → new relationship by 24h.",
+    criteria: "|a₀| < 0.10  ∧  |a₂₄| ≥ 0.20" },
   { chip: "🔵", ko: "관계 해체", en: "Dissolved",
-    descKo: "baseline 강한 모듈이 24h에 약화.",
-    descEn: "strong baseline module weakened by 24h." },
+    descKo: "baseline 강한 모듈이 24h에 약화 + 참여율 동반 감소.",
+    descEn: "strong baseline module weakened by 24h, with participation also dropping.",
+    criteria: "|a₀| ≥ 0.20  ∧  |a₂₄| < 0.10  ∧  p₀ − p₂₄ > 0.20" },
   { chip: "⚪", ko: "관계 유지", en: "Stable",
-    descKo: "거의 안 변함 — 약물 효과 미약.",
-    descEn: "barely changes — weak drug effect." },
+    descKo: "약하지 않은 신호가 거의 안 변함 — 약물 효과 미약.",
+    descEn: "a non-trivial signal barely changes — weak drug effect.",
+    criteria: "|a₂₄ − a₀| < 0.10  ∧  |a₂₄| ≥ 0.10" },
+  { chip: "⚪", ko: "관계 약함", en: "Weak",
+    descKo: "전 시점에서 신호가 약함 — 위 어느 분류에도 해당 안 됨 (fallback).",
+    descEn: "weak signal across all timepoints — none of the above rules fire (fallback).",
+    criteria: "otherwise" },
 ];
 
 // Community-formation explainer notes (shown under the dashboard section).
@@ -357,25 +375,38 @@ export function GuidePage() {
         </div>
       )}
 
-      {/* Five-pattern verdict table — shown only on the Timecourse sub-section.
-          Labels mirror TimecourseDrawer's PATTERN_BADGES (관계 형성/강화/반전/해체/유지). */}
+      {/* Pattern verdict table — shown only on the Timecourse sub-section.
+          Labels + criteria mirror TimecourseDrawer.classifyPattern. */}
       {section === "dashboard-timecourse" && (
         <section className="mt-8 pt-6 border-t border-line">
-          <h3 className="text-ink-primary text-body-strong font-semibold mb-3">
-            {t("패턴 5종 — 자동 판정", "Five patterns — automatic verdict")}
+          <h3 className="text-ink-primary text-body-strong font-semibold mb-1">
+            {t("패턴 분류 — 자동 판정 기준", "Pattern verdict — classification rules")}
           </h3>
-          <ul className="flex flex-col gap-2">
+          <p className="text-meta text-ink-muted mb-3" style={{ lineHeight: 1.5 }}>
+            {t(
+              "a₀ / a₂₄ = 0h / 24h 평균 PCC · p₀ / p₂₄ = 참여율. 위에서부터 차례로 검사하여 처음 매치되는 규칙이 채택됩니다.",
+              "a₀ / a₂₄ = avg PCC at 0h / 24h · p₀ / p₂₄ = participation rate. Rules are checked top to bottom; the first match wins.",
+            )}
+          </p>
+          <ul className="flex flex-col gap-3">
             {TIMECOURSE_PATTERNS.map((p) => (
               <li
                 key={p.en}
-                className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 items-start text-body"
+                className="grid grid-cols-[160px_minmax(0,1fr)] gap-3 items-start text-body"
               >
                 <span className="font-semibold text-ink-primary whitespace-nowrap">
                   {p.chip} {t(p.ko, p.en)}
                 </span>
-                <span className="text-ink-secondary" style={{ lineHeight: 1.5 }}>
-                  {t(p.descKo, p.descEn)}
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-ink-secondary" style={{ lineHeight: 1.5 }}>
+                    {t(p.descKo, p.descEn)}
+                  </span>
+                  <code
+                    className="text-meta text-ink-muted bg-surface-soft rounded px-2 py-0.5 font-mono whitespace-pre-wrap break-words self-start"
+                  >
+                    {p.criteria}
+                  </code>
+                </div>
               </li>
             ))}
           </ul>

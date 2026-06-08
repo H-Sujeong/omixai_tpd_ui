@@ -31,7 +31,11 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
 
-  const from = location.state?.from ?? "/plates";
+  // Post-login default = /guide so first-time / demo users land on the
+  // walkthrough rather than the raw plate list. Deep-link intent is still
+  // honored via location.state.from (e.g. expired session on /plates/D3 → back
+  // there after re-auth).
+  const from = location.state?.from ?? "/guide";
 
   function submit(e: React.FormEvent) {
     e.preventDefault();

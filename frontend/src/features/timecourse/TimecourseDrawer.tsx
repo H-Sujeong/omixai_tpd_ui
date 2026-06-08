@@ -37,9 +37,9 @@ interface Props {
   unavailable: boolean;
 }
 
-type Metric = "participation" | "avg_pcc";
+export type Metric = "participation" | "avg_pcc";
 
-const ORDERED_TIMES: TimeLabel[] = ["0h", "4h", "24h"];
+export const ORDERED_TIMES: TimeLabel[] = ["0h", "4h", "24h"];
 
 type Pattern = "new" | "amplify" | "flip-pos" | "flip-neg" | "dissolve" | "stable" | "noise";
 
@@ -51,7 +51,7 @@ interface PatternBadge {
   fg: string;       // text color
 }
 
-const PATTERN_BADGES: Record<Pattern, PatternBadge> = {
+export const PATTERN_BADGES: Record<Pattern, PatternBadge> = {
   "new":       { key: "new",
                  ko: { label: "관계 형성",        description: "baseline은 약함 → 24h에 새 동변동 관계 형성" },
                  en: { label: "Formed",           description: "baseline weak → new co-variation by 24h" },
@@ -88,7 +88,7 @@ const PATTERN_BADGES: Record<Pattern, PatternBadge> = {
  * informative for kinetics but doesn't change the verdict. Falls back to
  * "noise" / "stable" when there isn't enough signal to commit.
  */
-function classifyPattern(m: ModuleTimecourse): Pattern {
+export function classifyPattern(m: ModuleTimecourse): Pattern {
   const a0 = m.by_time["0h"]?.avg_pcc;
   const a24 = m.by_time["24h"]?.avg_pcc;
   const p0 = m.by_time["0h"]?.participation_rate;
@@ -140,12 +140,6 @@ export function TimecourseDrawer({
     <section
       id="timecourse"
       className="panel-card scroll-mt-[200px]"
-      // panel-card sets overflow:hidden so child contents can't escape the
-      // rounded corners — but that also clips the ⓘ tooltip when the section
-      // is collapsed (the tooltip wants to pop down past the card's bottom
-      // edge). Override here so the tooltip can extend outside while the rest
-      // of the layout stays inside.
-      style={{ overflow: "visible" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-line">
         <div className="flex items-center gap-3 min-w-0">
@@ -214,6 +208,22 @@ export function TimecourseDrawer({
           </div>
         )}
       </div>
+
+      {/* Isolated-target banner — Timecourse loaded but the target protein is
+          not in any community detected at the primary frame. Mirrors the
+          Landscape's per-node honest check (see _coerce_scatter_source) so
+          both views read the same way for the SMARCA2-style case. Bold + top
+          of the panel body so it can't be missed. */}
+      {data && !targetModule && !tc.isLoading && !tc.error && (
+        <div className="px-4 py-2.5 border-b border-line bg-status-warning/5">
+          <p className="text-body text-ink-primary font-bold" style={{ lineHeight: 1.5 }}>
+            {t(
+              `현재 타겟 단백질 ${target}는 ${data.primary_time} 검출 커뮤니티에 속한 곳이 없습니다.`,
+              `The target protein ${target} is not in any community detected at ${data.primary_time}.`,
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Collapsed body — three states:
           1) unavailable: static "no data" notice (NOT clickable; nothing to run).
@@ -346,7 +356,7 @@ function CollapsedTargetRow({
   );
 }
 
-function HeatmapLegend({
+export function HeatmapLegend({
   metric,
   threshold,
   t,
@@ -374,7 +384,7 @@ function HeatmapLegend({
   );
 }
 
-function ModuleTimeHeatmap({
+export function ModuleTimeHeatmap({
   modules,
   cols,
   metric,

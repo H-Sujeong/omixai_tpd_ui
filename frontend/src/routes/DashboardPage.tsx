@@ -13,6 +13,7 @@ import { PhenotypicProfilingPanel } from "@/features/phenotypic/PhenotypicProfil
 import { TimeLapseViewerPanel } from "@/features/time-lapse/TimeLapseViewerPanel";
 import { EnrichmentBar } from "@/features/enrichment/EnrichmentBar";
 import { TimecourseDrawer } from "@/features/timecourse/TimecourseDrawer";
+import { DoseTimecourseModal } from "@/features/timecourse/DoseTimecourseModal";
 import { CsvExportButton } from "@/features/export/CsvExportButton";
 import { buildEnrichmentCsv, buildLandscapeCsv, buildProfilingCsv } from "@/features/export/tableExports";
 import { DashboardExportMenu } from "@/features/export/DashboardExportMenu";
@@ -47,8 +48,9 @@ export function DashboardPage() {
   // Panel visibility is decoupled from selectedNode: closing (✕) hides the
   // panel but keeps the node highlighted in the graph.
   const [proteinPanelOpen, setProteinPanelOpen] = useState(false);
-  const [tcOpen, setTcOpen] = useState(false);     // Tier 1 fetch enabled
+  const [tcOpen, setTcOpen] = useState(false);     // Tier 1 fetch enabled (single-dose inline)
   const [tcCollapsed, setTcCollapsed] = useState(true);  // section header-only by default
+  const [doseTcOpen, setDoseTcOpen] = useState(false);   // multi-dose comparison modal
   const [bridgeNotice, setBridgeNotice] = useState<{
     text: string;
     direction: "ppi-to-landscape" | "landscape-to-ppi" | "node-jump";
@@ -306,6 +308,7 @@ export function DashboardPage() {
           setSelectedEdgeId(null);
           setBridgeNotice(null);
         }}
+        onOpenDoseTimecourse={() => setDoseTcOpen(true)}
       />
 
       <div className="px-4 lg:px-8 py-6 mx-auto w-full max-w-[1920px] flex-1 flex flex-col gap-6">
@@ -345,12 +348,12 @@ export function DashboardPage() {
                 so it belongs to the page scope, not this container's. Only the
                 time toggle stays here — it's the within-frame swap. */}
             <div className="flex items-center gap-4">
-              {/* Tier 1 opt-in (v2) — always rendered; disabled when there
-                  isn't enough data to compare (per the "데이터 미수신" policy).
-                  AZ-3137-style drugs (proteomics-undetected target) still see
-                  the button as a faded ghost so the affordance is consistent
-                  across drugs. */}
-              {(() => {
+              {/* Tier 1 opt-in (v2) — single-dose only. For multi-dose plates
+                  the timecourse moves to the 농도별 비교 modal (button next to
+                  the dose chips in the header), so cross-dose reading is
+                  primary and a single inline view would be ambiguous about
+                  which dose it represents. */}
+              {!(d.doses && d.doses.available.length > 1) && (() => {
                 const tcDisabled = tp.available.length < 2;
                 return (
                   <button
@@ -593,19 +596,33 @@ export function DashboardPage() {
         </div>
         </section>
 
-        {/* === Timecourse section — Tier 1 (opt-in v2). Inline panel-card so the
-             heatmap has full page width to breathe; lazy fetches on ⊕ click. */}
-        <TimecourseDrawer
-          plateId={plateId}
-          drugId={drugId}
-          target={activeTarget}
-          dose={dose}
-          enabled={tcOpen}
-          onEnable={() => setTcOpen(true)}
-          collapsed={tcCollapsed}
-          onCollapsedChange={setTcCollapsed}
-          unavailable={!tp || tp.available.length < 2}
-        />
+        {/* === Timecourse section — Tier 1 (opt-in v2). Inline drawer for
+             single-dose plates only; multi-dose drives users through the
+             농도별 비교 modal instead (opened from the dose row in the header). */}
+        {!(d.doses && d.doses.available.length > 1) && (
+          <TimecourseDrawer
+            plateId={plateId}
+            drugId={drugId}
+            target={activeTarget}
+            dose={dose}
+            enabled={tcOpen}
+            onEnable={() => setTcOpen(true)}
+            collapsed={tcCollapsed}
+            onCollapsedChange={setTcCollapsed}
+            unavailable={!tp || tp.available.length < 2}
+          />
+        )}
+        {d.doses && d.doses.available.length > 1 && plateId && drugId && (
+          <DoseTimecourseModal
+            open={doseTcOpen}
+            onClose={() => setDoseTcOpen(false)}
+            plateId={plateId}
+            drugId={drugId}
+            target={activeTarget}
+            drugName={d.drug_name}
+            doseOptions={d.doses.available}
+          />
+        )}
 
         {/* === Phenome container — Time-lapse + Phenotypic Profiling
              grouped under one card, matching Dynamics' visual weight. The
@@ -738,6 +755,7 @@ function DashboardHeader({
   activePpi,
   onTargetChange,
   onDoseChange,
+  onOpenDoseTimecourse,
 }: {
   d: DashboardResponse;
   plateId: string | undefined;
@@ -746,7 +764,10 @@ function DashboardHeader({
   onTargetChange: (t: string) => void;
   /** Dose chip click — passes the folder-form label ("10uM"/"3uM") for the URL. */
   onDoseChange: (doseLabel: string) => void;
+  /** Multi-dose only — opens the 농도별 비교 modal. */
+  onOpenDoseTimecourse: () => void;
 }) {
+  const t = useT();
   const c = d.compound;
   const activeSection = useActiveSection(SECTION_NAV.map((s) => s.id));
 
@@ -845,7 +866,9 @@ function DashboardHeader({
 
         {/* Dose selector — only shown for multi-dose plates. Same chip pattern
             as Target so the two scopes read symmetrically. KPIs, GR, MoA and
-            everything else downstream re-fetch with the new ?dose= param. */}
+            everything else downstream re-fetch with the new ?dose= param.
+            농도별 비교 button moved here from Dynamics (multi-dose only): the
+            modal renders one timecourse heatmap per dose for cross-dose reading. */}
         {d.doses && d.doses.available.length > 0 && (
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className="text-ink-muted text-body">Dose</span>
@@ -869,6 +892,20 @@ function DashboardHeader({
                 );
               })}
             </div>
+            {d.doses.available.length > 1 && (
+              <button
+                type="button"
+                onClick={onOpenDoseTimecourse}
+                className="inline-flex items-baseline gap-1 text-body font-medium text-brand-primary hover:underline transition-colors duration-fast bg-transparent p-0 border-0"
+                title={t(
+                  "농도별 Timecourse 히트맵을 한 화면에 — 컬럼 비교 모달",
+                  "Per-dose Timecourse heatmaps as columns",
+                )}
+              >
+                <span aria-hidden>+</span>
+                {t("농도별 비교", "Dose comparison")}
+              </button>
+            )}
           </div>
         )}
 

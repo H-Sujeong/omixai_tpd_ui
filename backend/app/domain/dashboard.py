@@ -1185,12 +1185,17 @@ def build_timecourse(
         )
 
     primary_payload = payloads[primary] or {}
-    target_cid = primary_payload.get("target_community")
     # Per-time nodes_corr lookups (gene → corr at that time).
     corr_by_time: dict[str, dict[str, float]] = {
         tl: _nodes_corr_from_payload(p or {}) for tl, p in payloads.items() if p
     }
 
+    # NB: do NOT trust primary_payload["target_community"] for the ★ row — the
+    # 2026-06 landscape audit found ~18/80 assets carry a placeholder cid in
+    # that field whose target protein is actually absent from every community
+    # (true "isolated" case). Detect target membership the honest way by
+    # walking community.ppi.nodes and checking the target id directly. Same
+    # principle as the Landscape build (see _coerce_scatter_source above).
     modules: list[ModuleTimecourse] = []
     for cid_str, c in (primary_payload.get("communities") or {}).items():
         try:
@@ -1241,7 +1246,7 @@ def build_timecourse(
             community_id=cid,
             label=label,
             size=len(members),
-            is_target=(target_cid is not None and cid == target_cid),
+            is_target=(target in members),
             by_time=by_time,
             top_terms=top_terms,
             top_go=top_go,

@@ -13,7 +13,10 @@
     box-shadow: var(--shadow-lg);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* overflow: visible (default) so absolute-positioned children — ⓘ tooltips,
+       hover popovers — can escape the card's rounded box. Specific panels that
+       need to clip (e.g. tables with overflow-x-auto) opt in locally. */
+    overflow: visible;
   }
   .panel-card--accent {
     border-color: rgba(168, 85, 247, 0.55);
