@@ -117,6 +117,7 @@ export function DashboardPage() {
       ? selectedCommunity
       : null,
     target,
+    dose,   // multi-dose: which member plate's on_target.json to load from
   );
 
   const activePpi: PpiPanel | null = useMemo(() => {

@@ -93,18 +93,18 @@ const SECTIONS: Record<Section, { img: string; notes: Note[]; titleKo: string; t
   plate: {
     img: "/guide/plate.svg",
     notes: PLATE,
-    titleKo: "1. 플레이트 목록",
-    titleEn: "1. Plate list",
-    descKo: "실험 플레이트를 고르는 첫 화면. 정렬·뷰를 바꾸고 카드로 결과 구성을 한눈에 본 뒤 플레이트로 들어갑니다.",
-    descEn: "The entry screen for picking an experiment plate. Sort/switch views, scan each card's outcome mix, then open a plate.",
+    titleKo: "1. 실험 목록",
+    titleEn: "1. Experiment list",
+    descKo: "실험을 고르는 첫 화면. 정렬·뷰를 바꾸고 카드로 결과 구성을 한눈에 본 뒤 실험으로 들어갑니다.",
+    descEn: "The entry screen for picking an experiment. Sort/switch views, scan each card's outcome mix, then open an experiment.",
   },
   drug: {
     img: "/guide/drug.svg",
     notes: DRUG,
-    titleKo: "2. 약물 목록 (플레이트 내부)",
-    titleEn: "2. Drug list (inside a plate)",
-    descKo: "플레이트 안 화합물 표. 검색·필터로 좁히고, 약물/타깃을 클릭해 대시보드로 들어가거나 플레이트 단위로 export합니다.",
-    descEn: "The compound table inside a plate. Filter/search, click a drug/target to open its dashboard, or export the whole plate.",
+    titleKo: "2. 약물 목록 (실험 내부)",
+    titleEn: "2. Drug list (inside an experiment)",
+    descKo: "실험 안 화합물 표. 검색·필터로 좁히고, 약물/타깃을 클릭해 대시보드로 들어가거나 실험 단위로 export합니다.",
+    descEn: "The compound table inside an experiment. Filter/search, click a drug/target to open its dashboard, or export the whole experiment.",
   },
   dashboard: {
     img: "/guide/dashboard.svg",
@@ -272,7 +272,7 @@ export function GuidePage() {
 
   const tabs: Array<{ k: Section; label: string; indent?: boolean }> = [
     { k: "sidebar",              label: t("사이드바", "Sidebar") },
-    { k: "plate",                label: t("플레이트", "Plate") },
+    { k: "plate",                label: t("실험", "Experiment") },
     { k: "drug",                 label: t("약물", "Drug") },
     { k: "dashboard",            label: t("대시보드", "Dashboard") },
     { k: "dashboard-dynamics",   label: "Dynamics",   indent: true },

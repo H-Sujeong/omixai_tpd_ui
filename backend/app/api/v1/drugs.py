@@ -81,20 +81,49 @@ def get_community(
     community_id: int,
     _owned: str = Depends(require_owned_plate),
     target: str | None = Query(default=None),
+    dose: str | None = Query(default=None, description="Dose label (multi-dose plates only, e.g. '10uM'/'3uM')"),
 ) -> PpiPanel:
     plate = get_registry().get_plate(plate_id)
     if not plate:
         raise HTTPException(status_code=404, detail=f"plate {plate_id} not found")
-    drug = plate.drugs.get(drug_id)
-    if not drug:
-        raise HTTPException(status_code=404, detail=f"drug {drug_id} not found in plate {plate_id}")
-    available = [t.target for t in drug.targets] or ["unknown"]
-    if target is None or target not in available:
-        target = available[0]
-    panel = switch_community(plate, drug, target, community_id)
-    if panel is None:
-        raise HTTPException(status_code=404, detail=f"drug {drug_id} has no PPI asset")
-    return PpiPanel.model_validate(panel)
+
+    # Dose-scoped plate/drug — mirrors build_dashboard so multi-dose plates
+    # (e.g. D3) load the right on_target.json for the requested community.
+    # Without this the virtual plate falls back to the default dose's assets
+    # and any community id present only in the OTHER dose returns 404.
+    from ...domain.dashboard import _resolve_dose, _dose_label_for
+    try:
+        effective_dose = _resolve_dose(plate, dose)
+        plate_for_dose = plate
+        if plate.kind == "multi_dose" and effective_dose:
+            for mid, dv in plate.member_doses.items():
+                if _dose_label_for(dv) == effective_dose:
+                    m = get_registry().get_plate(mid)
+                    if m is not None:
+                        plate_for_dose = m
+                    break
+        drug = plate_for_dose.drugs.get(drug_id) or plate.drugs.get(drug_id)
+        if not drug:
+            raise HTTPException(status_code=404, detail=f"drug {drug_id} not found in plate {plate_id}")
+        available = [t.target for t in drug.targets] or ["unknown"]
+        if target is None or target not in available:
+            target = available[0]
+        panel = switch_community(plate_for_dose, drug, target, community_id)
+        if panel is None:
+            raise HTTPException(status_code=404, detail=f"drug {drug_id} has no PPI asset")
+        return PpiPanel.model_validate(panel)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging, traceback
+        logging.getLogger(__name__).exception("get_community failed plate=%s drug=%s comm=%s target=%s dose=%s",
+                                              plate_id, drug_id, community_id, target, dose)
+        # Surface the trace in the response detail so the UI can show it during
+        # development (will be tightened later — see follow-up).
+        raise HTTPException(
+            status_code=500,
+            detail=f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-800:]}",
+        )
 
 
 @router.post(

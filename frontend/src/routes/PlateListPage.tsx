@@ -113,7 +113,7 @@ export function PlateListPage() {
           <div className="mt-5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-body text-ink-secondary tabular">
             <StatItem
               value={summary.plates}
-              label={summary.plates === 1 ? "Plate" : "Plates"}
+              label={summary.plates === 1 ? "Experiment" : "Experiments"}
             />
             <Dot />
             <StatItem value={summary.drugs} label="Compounds" />
@@ -136,7 +136,7 @@ export function PlateListPage() {
             textTransform: "uppercase",
           }}
         >
-          Experiment Plates
+          Experiments
         </span>
         <span className="flex-1 border-t border-line min-w-[1rem]" aria-hidden />
 
@@ -338,13 +338,13 @@ function PlateCard({
           )}
         </h3>
 
-        {/* Metadata — Set/Cell on one row, Dose/Observation on the next.
-         * Same labeled inline pattern as the plate detail header so the
-         * two views read consistently. */}
+        {/* Metadata — Cell on one row, Dose/Observation on the next.
+         * "Set" line removed (2026-06-08): the card's title (plate_id) now
+         * serves as the experiment identifier, so a separate Set label is
+         * redundant. */}
         <div className="mt-2.5 space-y-1">
           <MetaLine
             items={[
-              plate.plate_code ? { label: "Set", value: plate.plate_code } : null,
               plate.cell_line ? { label: "Cell", value: plate.cell_line } : null,
             ]}
           />
@@ -466,9 +466,10 @@ function PlateTable({
 }) {
   const t = useT();
   const navigate = useNavigate();
+  // "Set" column dropped (2026-06-08) — the first-column title now serves as
+  // the experiment identifier per design call.
   const cols = [
-    t("플레이트", "Plate"),
-    "Set",
+    t("실험", "Experiment"),
     "Cell",
     t("용량", "Dose"),
     t("관찰", "Obs"),
@@ -509,7 +510,6 @@ function PlateTable({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-right text-ink-secondary">{p.plate_code || "—"}</td>
                 <td className="px-4 py-2.5 text-right text-ink-secondary">{p.cell_line || "—"}</td>
                 <td className="px-4 py-2.5 text-right text-ink-secondary tabular">
                   {p.dose_um != null ? `${p.dose_um} µM` : "—"}

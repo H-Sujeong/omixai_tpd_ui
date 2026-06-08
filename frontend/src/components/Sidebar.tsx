@@ -141,10 +141,10 @@ function PlatesFlyout({
       >
         <div className="flex-1 min-w-0">
           <h3 className="text-body-strong text-ink-primary leading-tight">
-            {t("플레이트", "Plates")}
+            {t("실험", "Experiments")}
           </h3>
           <p className="text-meta text-ink-muted leading-tight">
-            {t("내가 볼 수 있는 플레이트", "Plates you can open")}
+            {t("내가 볼 수 있는 실험", "Experiments you can open")}
           </p>
         </div>
         <PinButton pinned={pinned} onToggle={onTogglePin} />
@@ -157,7 +157,7 @@ function PlatesFlyout({
         )}
         {!plates.isLoading && !plates.data?.length && (
           <li className="px-4 py-2 text-meta text-ink-muted">
-            {t("이용 가능한 플레이트가 없습니다", "No accessible plates")}
+            {t("이용 가능한 실험이 없습니다", "No accessible experiments")}
           </li>
         )}
         {plates.data?.map((p) => (
@@ -389,8 +389,8 @@ export function Sidebar({
           className={`sidebar-item ${onPlatesIndex ? "sidebar-item--active" : ""}`}
           onClick={() => { onCloseMobile?.(); close(); }}
           onMouseEnter={() => setFlyout("plates")}
-          title="Plates"
-          aria-label="Plates"
+          title="Experiments"
+          aria-label="Experiments"
         >
           <span className="sidebar-item__icon">
             <PlatesIcon />

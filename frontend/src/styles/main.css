@@ -116,7 +116,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 0;
+    /* padding 7 (was 8) + 22px icon span + 1+1 border = 38px exactly. With
+       padding 8 the icon items rendered 40px while the text-only LangToggle
+       was 32 and forced to 38 by min-height — non-uniform. Tightening padding
+       by 1px keeps all rail items at exactly 38px so the rail's bottom divider
+       aligns with the flyout's labeled-footer border-top y. */
+    padding: 7px 0;
+    min-height: 38px;
     border-radius: var(--radius-md);
     color: var(--color-text-secondary);
     cursor: pointer;

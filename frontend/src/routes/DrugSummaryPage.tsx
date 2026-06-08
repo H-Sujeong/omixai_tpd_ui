@@ -265,7 +265,6 @@ export function DrugSummaryPage() {
                 >
                   Growth
                 </Th>
-                <th>Wells</th>
                 <th className="text-center">Assets</th>
               </tr>
             </thead>
@@ -349,7 +348,6 @@ export function DrugSummaryPage() {
                       <StatusBadge label={d.growth_class} />
                     )}
                   </td>
-                  <td className="font-mono text-meta text-ink-muted">{d.wells.join(", ")}</td>
                   <td className="text-center">
                     {d.has_dashboard_assets ? (
                       <span
@@ -636,7 +634,8 @@ function PlateMetaRow({
 }) {
   if (!meta) return null;
   const items: Array<{ label: string; value: string }> = [];
-  if (meta.plate_code) items.push({ label: "Set", value: meta.plate_code });
+  // "Set" line removed (2026-06-08) — the page h1 (plate_id) plays the
+  // experiment-identifier role.
   if (meta.cell_line) items.push({ label: "Cell", value: meta.cell_line });
   const doseStr = formatDose(meta);
   if (doseStr) items.push({ label: "Dose", value: doseStr });

@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { apiGet, apiPost } from "./client";
 import type {
   CommunitySwitchResponse,
@@ -86,15 +86,20 @@ export function useCommunityPanel(
   drugId: string | undefined,
   communityId: number | null,
   target?: string,
+  dose?: string,
 ) {
   return useQuery<PpiPanel>({
-    queryKey: ["community", plateId, drugId, target ?? "", communityId],
+    queryKey: ["community", plateId, drugId, target ?? "", dose ?? "", communityId],
     enabled: !!plateId && !!drugId && communityId !== null,
     queryFn: () =>
       apiGet<PpiPanel>(
         `/api/v1/plates/${plateId}/drugs/${drugId}/communities/${communityId}`,
-        { target },
+        { target, dose },
       ),
+    // While the next community is fetching, keep showing the previous one
+    // instead of falling back to the dashboard payload's target community —
+    // otherwise the PPI flashes back to the target between every switch.
+    placeholderData: keepPreviousData,
   });
 }
 
