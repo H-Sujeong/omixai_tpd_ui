@@ -52,6 +52,9 @@ def get_drug_timelapse(
     # several plates (e.g. D3_10 + D3_3); timelapse filenames embed the per-frame
     # cell count, so they are plate-specific — fall through to the plate that
     # actually HAS this file instead of 404-ing on the first plate we try.
+    # `owned_plates` includes member single-dose plates of any owned multi-dose
+    # virtual, so each plate can serve from its OWN canonical folder without
+    # any cross-folder probing.
     for plate in owned_plates(db, user):
         drug = plate.drugs.get(drug_id)
         if not drug or not drug.asset_dir:

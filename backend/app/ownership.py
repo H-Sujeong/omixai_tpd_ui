@@ -38,10 +38,30 @@ def require_owned_plate(
 
 
 def owned_plates(db: DbSession, user: User) -> list[PlateRecord]:
+    """Return PlateRecord list for the user's owned plates.
+
+    Multi-dose expansion: a user owning a multi-dose virtual plate (e.g. D3)
+    implicitly has access to its member single-dose plates (D3_3, D3_10),
+    because the virtual aggregates them. Without this, file-serving handlers
+    that walk owned plates can't locate timelapse / mosaic assets that live
+    inside a member's canonical folder when the user only owns the virtual.
+    """
     reg = get_registry()
     out: list[PlateRecord] = []
+    seen: set[str] = set()
+    def _push(p: PlateRecord) -> None:
+        if p.plate_id in seen:
+            return
+        seen.add(p.plate_id)
+        out.append(p)
     for pid in owned_plate_ids(db, user):
         p = reg.get_plate(pid)
-        if p is not None:
-            out.append(p)
+        if p is None:
+            continue
+        _push(p)
+        if p.kind == "multi_dose":
+            for mid in (p.members or []):
+                m = reg.get_plate(mid)
+                if m is not None:
+                    _push(m)
     return out
